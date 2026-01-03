@@ -18,14 +18,21 @@ export function formatPhone(phone: string): string {
   return cleaned.replace(/(\d{2})(\d{4})(\d{4})/, '($1) $2-$3');
 }
 
+/**
+ * @deprecated Use formatDateDisplay from dateUtils.ts instead
+ */
 export function formatDate(date: string | Date): string {
-  const d = typeof date === 'string' ? new Date(date) : date;
-  return d.toLocaleDateString('pt-BR');
+  // Import the proper function from dateUtils
+  const { formatDateDisplay } = require('./dateUtils');
+  return formatDateDisplay(date);
 }
 
+/**
+ * @deprecated Use formatDateTimeDisplay from dateUtils.ts instead
+ */
 export function formatDateTime(date: string | Date): string {
-  const d = typeof date === 'string' ? new Date(date) : date;
-  return d.toLocaleString('pt-BR');
+  const { formatDateTimeDisplay } = require('./dateUtils');
+  return formatDateTimeDisplay(date);
 }
 
 export function formatMileage(value: number): string {

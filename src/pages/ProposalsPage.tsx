@@ -1,8 +1,11 @@
 import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { proposalStorage, vehicleStorage, clientStorage, generateId, generateNumber } from '@/lib/storage';
+import { proposalStorage, vehicleStorage, clientStorage, bankStorage, generateId, generateNumber } from '@/lib/storage';
 import type { Proposal, ProposalStatus } from '@/types';
-import { formatCurrency, formatDate, formatCPF } from '@/lib/formatters';
+import { formatCurrency, formatCPF } from '@/lib/formatters';
+import { formatDateDisplay, getCurrentTimestamp } from '@/lib/dateUtils';
+import { generateProposalPDF } from '@/lib/pdfGenerator';
+import { getBankConfigByName } from '@/lib/bankConfig';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,15 +20,12 @@ import {
   FileText, 
   Plus, 
   Search, 
-  Edit2, 
   Trash2,
   Download,
   Pen,
-  Eye
+  Building2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { jsPDF } from 'jspdf';
-import logo from '@/assets/logo.png';
 
 const statusLabels: Record<ProposalStatus, string> = {
   negociacao: 'Em Negociação',
@@ -60,11 +60,12 @@ export default function ProposalsPage() {
 
   const vehicles = vehicleStorage.getAll();
   const clients = clientStorage.getAll().filter(c => isAdmin || c.vendorId === user?.id);
+  const banks = bankStorage.getActive();
 
   const [form, setForm] = useState({
     clientId: '',
     vehicleId: '',
-    bank: '',
+    bankId: '',
     vehiclePrice: 0,
     downPayment: 0,
     installments: 48,
@@ -84,9 +85,10 @@ export default function ProposalsPage() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
+    const selectedBank = banks.find(b => b.id === form.bankId);
     const financedAmount = form.vehiclePrice - form.downPayment;
     const totalValue = form.installmentValue * form.installments;
-    const now = new Date().toISOString();
+    const now = getCurrentTimestamp();
 
     const proposal: Proposal = {
       id: generateId(),
@@ -95,7 +97,7 @@ export default function ProposalsPage() {
       vehicleId: form.vehicleId,
       vendorId: user!.id,
       status: 'negociacao',
-      bank: form.bank || undefined,
+      bank: selectedBank?.name,
       vehiclePrice: form.vehiclePrice,
       downPayment: form.downPayment,
       financedAmount,
@@ -123,7 +125,7 @@ export default function ProposalsPage() {
     const proposal = proposalStorage.getById(proposalId);
     if (proposal) {
       proposal.status = newStatus;
-      proposal.updatedAt = new Date().toISOString();
+      proposal.updatedAt = getCurrentTimestamp();
       proposalStorage.save(proposal);
       const all = proposalStorage.getAll();
       setProposals(isAdmin ? all : all.filter(p => p.vendorId === user?.id));
@@ -142,7 +144,7 @@ export default function ProposalsPage() {
       } else {
         proposal.vendorSignature = signature;
       }
-      proposal.updatedAt = new Date().toISOString();
+      proposal.updatedAt = getCurrentTimestamp();
       proposalStorage.save(proposal);
       const all = proposalStorage.getAll();
       setProposals(isAdmin ? all : all.filter(p => p.vendorId === user?.id));
@@ -167,128 +169,8 @@ export default function ProposalsPage() {
     }
   };
 
-  const generatePDF = async (proposal: Proposal) => {
-    const client = clientStorage.getById(proposal.clientId);
-    const vehicle = vehicleStorage.getById(proposal.vehicleId);
-    
-    if (!client || !vehicle) return;
-
-    const doc = new jsPDF();
-    const pageWidth = doc.internal.pageSize.getWidth();
-    
-    // Header
-    doc.setFillColor(26, 26, 46);
-    doc.rect(0, 0, pageWidth, 40, 'F');
-    
-    doc.setTextColor(255, 215, 0);
-    doc.setFontSize(24);
-    doc.setFont('helvetica', 'bold');
-    doc.text('AUTOS DA SERRA', 20, 25);
-    doc.setFontSize(10);
-    doc.setTextColor(200, 200, 200);
-    doc.text('Multimarcas', 20, 32);
-    
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(10);
-    doc.text('Lages - SC', pageWidth - 20, 25, { align: 'right' });
-    doc.text(`Proposta: ${proposal.number}`, pageWidth - 20, 32, { align: 'right' });
-
-    // Content
-    let y = 55;
-    doc.setTextColor(0, 0, 0);
-
-    // Title
-    doc.setFontSize(16);
-    doc.setFont('helvetica', 'bold');
-    doc.text('PROPOSTA DE VENDA', pageWidth / 2, y, { align: 'center' });
-    y += 15;
-
-    // Date
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'normal');
-    doc.text(`Data: ${formatDate(proposal.createdAt)}`, pageWidth - 20, y, { align: 'right' });
-    y += 10;
-
-    // Client Info
-    doc.setFillColor(245, 245, 245);
-    doc.rect(15, y, pageWidth - 30, 30, 'F');
-    y += 8;
-    doc.setFont('helvetica', 'bold');
-    doc.text('DADOS DO CLIENTE', 20, y);
-    y += 7;
-    doc.setFont('helvetica', 'normal');
-    doc.text(`Nome: ${client.name}`, 20, y);
-    y += 5;
-    doc.text(`CPF: ${formatCPF(client.cpf)}`, 20, y);
-    y += 20;
-
-    // Vehicle Info
-    doc.setFillColor(245, 245, 245);
-    doc.rect(15, y, pageWidth - 30, 35, 'F');
-    y += 8;
-    doc.setFont('helvetica', 'bold');
-    doc.text('DADOS DO VEÍCULO', 20, y);
-    y += 7;
-    doc.setFont('helvetica', 'normal');
-    doc.text(`Veículo: ${vehicle.brand} ${vehicle.model}`, 20, y);
-    y += 5;
-    doc.text(`Ano: ${vehicle.year}`, 20, y);
-    doc.text(`Cor: ${vehicle.color}`, 100, y);
-    y += 5;
-    doc.text(`Combustível: ${vehicle.fuel}`, 20, y);
-    doc.text(`Câmbio: ${vehicle.transmission}`, 100, y);
-    y += 25;
-
-    // Financial Info
-    doc.setFillColor(255, 215, 0);
-    doc.rect(15, y, pageWidth - 30, 8, 'F');
-    y += 6;
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(26, 26, 46);
-    doc.text('CONDIÇÕES DE PAGAMENTO', 20, y);
-    doc.setTextColor(0, 0, 0);
-    y += 12;
-
-    doc.setFont('helvetica', 'normal');
-    doc.text(`Valor do Veículo: ${formatCurrency(proposal.vehiclePrice)}`, 20, y);
-    y += 7;
-    doc.text(`Entrada: ${formatCurrency(proposal.downPayment)}`, 20, y);
-    y += 7;
-    doc.text(`Valor Financiado: ${formatCurrency(proposal.financedAmount)}`, 20, y);
-    y += 7;
-    doc.text(`Parcelas: ${proposal.installments}x de ${formatCurrency(proposal.installmentValue)}`, 20, y);
-    y += 7;
-    if (proposal.bank) {
-      doc.text(`Banco: ${proposal.bank}`, 20, y);
-      y += 7;
-    }
-    doc.setFont('helvetica', 'bold');
-    doc.text(`Valor Total: ${formatCurrency(proposal.totalValue)}`, 20, y);
-    y += 20;
-
-    // Signatures
-    y += 20;
-    doc.setFont('helvetica', 'normal');
-    
-    if (proposal.clientSignature) {
-      doc.addImage(proposal.clientSignature, 'PNG', 20, y, 60, 30);
-    }
-    doc.line(20, y + 35, 85, y + 35);
-    doc.text('Assinatura do Cliente', 52, y + 42, { align: 'center' });
-
-    if (proposal.vendorSignature) {
-      doc.addImage(proposal.vendorSignature, 'PNG', 110, y, 60, 30);
-    }
-    doc.line(110, y + 35, 175, y + 35);
-    doc.text('Assinatura do Vendedor', 142, y + 42, { align: 'center' });
-
-    // Footer
-    const footerY = doc.internal.pageSize.getHeight() - 15;
-    doc.setFontSize(8);
-    doc.setTextColor(128, 128, 128);
-    doc.text('Documento gerado eletronicamente pelo Sistema Autos da Serra', pageWidth / 2, footerY, { align: 'center' });
-
-    doc.save(`proposta-${proposal.number}.pdf`);
+  const handleGeneratePDF = (proposal: Proposal) => {
+    generateProposalPDF(proposal);
     toast({
       title: 'PDF gerado',
       description: 'A proposta foi baixada com sucesso.',
@@ -299,13 +181,22 @@ export default function ProposalsPage() {
     setForm({
       clientId: '',
       vehicleId: '',
-      bank: '',
+      bankId: '',
       vehiclePrice: 0,
       downPayment: 0,
       installments: 48,
       installmentValue: 0,
       notes: '',
     });
+  };
+
+  // Helper to get bank color indicator
+  const getBankColorStyle = (bankName?: string) => {
+    const config = getBankConfigByName(bankName || '');
+    if (!config) return {};
+    return {
+      borderLeft: `4px solid ${config.colorHex}`,
+    };
   };
 
   return (
@@ -368,6 +259,36 @@ export default function ProposalsPage() {
                 </div>
               </div>
 
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  <Building2 className="h-4 w-4" />
+                  Financiamento
+                </Label>
+                <Select value={form.bankId} onValueChange={(v) => setForm({ ...form, bankId: v })}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o banco" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {banks.map(b => {
+                      const config = getBankConfigByName(b.name);
+                      return (
+                        <SelectItem key={b.id} value={b.id}>
+                          <div className="flex items-center gap-2">
+                            {config && (
+                              <div 
+                                className="w-3 h-3 rounded-full" 
+                                style={{ backgroundColor: config.colorHex }}
+                              />
+                            )}
+                            {b.name}
+                          </div>
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
+              </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Valor do Veículo</Label>
@@ -387,7 +308,7 @@ export default function ProposalsPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Parcelas</Label>
                   <Input
@@ -402,14 +323,6 @@ export default function ProposalsPage() {
                     type="number"
                     value={form.installmentValue}
                     onChange={(e) => setForm({ ...form, installmentValue: parseFloat(e.target.value) || 0 })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Banco</Label>
-                  <Input
-                    value={form.bank}
-                    onChange={(e) => setForm({ ...form, bank: e.target.value })}
-                    placeholder="Opcional"
                   />
                 </div>
               </div>
@@ -435,6 +348,21 @@ export default function ProposalsPage() {
           </DialogContent>
         </Dialog>
       </div>
+
+      {/* Signature Dialog */}
+      <Dialog open={isSignatureOpen} onOpenChange={setIsSignatureOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              Assinatura do {signatureType === 'client' ? 'Cliente' : 'Vendedor'}
+            </DialogTitle>
+          </DialogHeader>
+          <SignaturePad
+            onSave={handleSignature}
+            onCancel={() => setIsSignatureOpen(false)}
+          />
+        </DialogContent>
+      </Dialog>
 
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-4">
@@ -470,6 +398,7 @@ export default function ProposalsPage() {
                   <TableHead>Número</TableHead>
                   <TableHead>Cliente</TableHead>
                   <TableHead>Veículo</TableHead>
+                  <TableHead>Banco</TableHead>
                   <TableHead>Valor</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Assinaturas</TableHead>
@@ -480,19 +409,58 @@ export default function ProposalsPage() {
                 {filteredProposals.map((proposal) => {
                   const client = clientStorage.getById(proposal.clientId);
                   const vehicle = vehicleStorage.getById(proposal.vehicleId);
+                  const bankConfig = getBankConfigByName(proposal.bank || '');
                   
                   return (
-                    <TableRow key={proposal.id} className="table-row-hover">
+                    <TableRow 
+                      key={proposal.id} 
+                      className="table-row-hover"
+                      style={getBankColorStyle(proposal.bank)}
+                    >
                       <TableCell className="font-mono text-sm">{proposal.number}</TableCell>
-                      <TableCell>{client?.name}</TableCell>
-                      <TableCell>{vehicle?.brand} {vehicle?.model}</TableCell>
-                      <TableCell>{formatCurrency(proposal.vehiclePrice)}</TableCell>
+                      <TableCell>
+                        <div>
+                          <p className="font-medium">{client?.name || 'N/A'}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {client && formatCPF(client.cpf)}
+                          </p>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div>
+                          <p className="font-medium">{vehicle?.brand} {vehicle?.model}</p>
+                          <p className="text-xs text-muted-foreground">{vehicle?.year}</p>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        {proposal.bank ? (
+                          <div className="flex items-center gap-2">
+                            {bankConfig && (
+                              <div 
+                                className="w-2 h-2 rounded-full" 
+                                style={{ backgroundColor: bankConfig.colorHex }}
+                              />
+                            )}
+                            <span className="text-sm">{proposal.bank}</span>
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground text-sm">-</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <div>
+                          <p className="font-semibold">{formatCurrency(proposal.vehiclePrice)}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {proposal.installments}x {formatCurrency(proposal.installmentValue)}
+                          </p>
+                        </div>
+                      </TableCell>
                       <TableCell>
                         <Select 
                           value={proposal.status} 
                           onValueChange={(v) => handleStatusChange(proposal.id, v as ProposalStatus)}
                         >
-                          <SelectTrigger className={cn('h-8 w-36', statusColors[proposal.status])}>
+                          <SelectTrigger className={cn('badge-status h-7 w-auto', statusColors[proposal.status])}>
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -505,27 +473,35 @@ export default function ProposalsPage() {
                       <TableCell>
                         <div className="flex gap-1">
                           <Button
-                            variant={proposal.clientSignature ? 'default' : 'outline'}
+                            variant={proposal.clientSignature ? "default" : "outline"}
                             size="sm"
-                            className={cn('h-7 px-2 text-xs', proposal.clientSignature && 'bg-success hover:bg-success/90')}
+                            className={cn(
+                              "h-7 text-xs",
+                              proposal.clientSignature && "bg-success hover:bg-success/90"
+                            )}
                             onClick={() => {
                               setSigningProposal(proposal);
                               setSignatureType('client');
                               setIsSignatureOpen(true);
                             }}
                           >
+                            <Pen className="h-3 w-3 mr-1" />
                             Cliente
                           </Button>
                           <Button
-                            variant={proposal.vendorSignature ? 'default' : 'outline'}
+                            variant={proposal.vendorSignature ? "default" : "outline"}
                             size="sm"
-                            className={cn('h-7 px-2 text-xs', proposal.vendorSignature && 'bg-success hover:bg-success/90')}
+                            className={cn(
+                              "h-7 text-xs",
+                              proposal.vendorSignature && "bg-success hover:bg-success/90"
+                            )}
                             onClick={() => {
                               setSigningProposal(proposal);
                               setSignatureType('vendor');
                               setIsSignatureOpen(true);
                             }}
                           >
+                            <Pen className="h-3 w-3 mr-1" />
                             Vendedor
                           </Button>
                         </div>
@@ -536,7 +512,7 @@ export default function ProposalsPage() {
                             variant="ghost"
                             size="icon"
                             className="h-8 w-8"
-                            onClick={() => generatePDF(proposal)}
+                            onClick={() => handleGeneratePDF(proposal)}
                           >
                             <Download className="h-4 w-4" />
                           </Button>
@@ -562,30 +538,10 @@ export default function ProposalsPage() {
           <div className="text-center">
             <FileText className="h-12 w-12 text-muted-foreground/30 mx-auto mb-4" />
             <h3 className="text-lg font-medium mb-1">Nenhuma proposta encontrada</h3>
-            <p className="text-muted-foreground">
-              {search || statusFilter !== 'all' 
-                ? 'Tente ajustar os filtros' 
-                : 'Crie sua primeira proposta'}
-            </p>
+            <p className="text-muted-foreground">Crie sua primeira proposta de venda</p>
           </div>
         </Card>
       )}
-
-      {/* Signature Dialog */}
-      <Dialog open={isSignatureOpen} onOpenChange={setIsSignatureOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>
-              Assinatura do {signatureType === 'client' ? 'Cliente' : 'Vendedor'}
-            </DialogTitle>
-          </DialogHeader>
-          <SignaturePad
-            label={`Assine abaixo - ${signatureType === 'client' ? 'Cliente' : 'Vendedor'}`}
-            onSave={handleSignature}
-            onCancel={() => setIsSignatureOpen(false)}
-          />
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

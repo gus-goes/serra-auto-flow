@@ -2,7 +2,9 @@ import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { receiptStorage, clientStorage, vehicleStorage, proposalStorage, generateId, generateNumber } from '@/lib/storage';
 import type { Receipt, PaymentMethod, PaymentReference } from '@/types';
-import { formatCurrency, formatDate, formatCPF, numberToWords } from '@/lib/formatters';
+import { formatCurrency, formatCPF } from '@/lib/formatters';
+import { formatDateDisplay, getCurrentDateString, getCurrentTimestamp } from '@/lib/dateUtils';
+import { generateReceiptPDF } from '@/lib/pdfGenerator';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -22,10 +24,10 @@ import {
   CreditCard,
   Banknote,
   QrCode,
-  ArrowRightLeft
+  ArrowRightLeft,
+  Pen
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { jsPDF } from 'jspdf';
 
 const paymentMethodLabels: Record<PaymentMethod, string> = {
   dinheiro: 'Dinheiro',
@@ -75,7 +77,7 @@ export default function ReceiptsPage() {
     reference: 'entrada' as PaymentReference,
     payerName: '',
     payerCpf: '',
-    paymentDate: new Date().toISOString().split('T')[0],
+    paymentDate: getCurrentDateString(), // Use proper date string format
     description: '',
   });
 
@@ -98,6 +100,7 @@ export default function ReceiptsPage() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
+    // Store date as YYYY-MM-DD string directly (no conversion)
     const receipt: Receipt = {
       id: generateId(),
       number: generateNumber('REC'),
@@ -110,10 +113,10 @@ export default function ReceiptsPage() {
       reference: form.reference,
       payerName: form.payerName,
       payerCpf: form.payerCpf,
-      paymentDate: form.paymentDate,
+      paymentDate: form.paymentDate, // Already in YYYY-MM-DD format
       description: form.description || undefined,
       location: 'Lages - SC',
-      createdAt: new Date().toISOString(),
+      createdAt: getCurrentTimestamp(),
     };
 
     receiptStorage.save(receipt);
@@ -160,110 +163,8 @@ export default function ReceiptsPage() {
     }
   };
 
-  const generatePDF = async (receipt: Receipt) => {
-    const client = clientStorage.getById(receipt.clientId);
-    const vehicle = receipt.vehicleId ? vehicleStorage.getById(receipt.vehicleId) : null;
-    
-    const doc = new jsPDF();
-    const pageWidth = doc.internal.pageSize.getWidth();
-    
-    // Header
-    doc.setFillColor(26, 26, 46);
-    doc.rect(0, 0, pageWidth, 40, 'F');
-    
-    doc.setTextColor(255, 215, 0);
-    doc.setFontSize(24);
-    doc.setFont('helvetica', 'bold');
-    doc.text('AUTOS DA SERRA', 20, 25);
-    doc.setFontSize(10);
-    doc.setTextColor(200, 200, 200);
-    doc.text('Multimarcas', 20, 32);
-    
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(10);
-    doc.text(`Recibo Nº ${receipt.number}`, pageWidth - 20, 25, { align: 'right' });
-    doc.text(receipt.location, pageWidth - 20, 32, { align: 'right' });
-
-    // Title
-    let y = 55;
-    doc.setTextColor(0, 0, 0);
-    doc.setFillColor(255, 215, 0);
-    doc.rect(15, y, pageWidth - 30, 12, 'F');
-    doc.setFontSize(16);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(26, 26, 46);
-    doc.text('RECIBO DE PAGAMENTO', pageWidth / 2, y + 9, { align: 'center' });
-    y += 25;
-
-    // Amount Box
-    doc.setTextColor(0, 0, 0);
-    doc.setDrawColor(200, 200, 200);
-    doc.rect(15, y, pageWidth - 30, 25, 'S');
-    doc.setFontSize(14);
-    doc.setFont('helvetica', 'bold');
-    doc.text(`Valor: ${formatCurrency(receipt.amount)}`, 25, y + 10);
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'normal');
-    doc.text(`(${numberToWords(receipt.amount)})`, 25, y + 18);
-    y += 35;
-
-    // Receipt Text
-    doc.setFontSize(11);
-    const receiptText = `Recebi(emos) de ${receipt.payerName}, CPF ${formatCPF(receipt.payerCpf)}, a importância acima discriminada, referente a ${paymentReferenceLabels[receipt.reference].toLowerCase()}${vehicle ? ` do veículo ${vehicle.brand} ${vehicle.model} ${vehicle.year}` : ''}.`;
-    
-    const lines = doc.splitTextToSize(receiptText, pageWidth - 40);
-    doc.text(lines, 20, y);
-    y += lines.length * 7 + 10;
-
-    // Payment Details
-    doc.setFillColor(245, 245, 245);
-    doc.rect(15, y, pageWidth - 30, 30, 'F');
-    y += 8;
-    doc.setFont('helvetica', 'bold');
-    doc.text('DETALHES DO PAGAMENTO', 20, y);
-    y += 7;
-    doc.setFont('helvetica', 'normal');
-    doc.text(`Forma de Pagamento: ${paymentMethodLabels[receipt.paymentMethod]}`, 20, y);
-    y += 5;
-    doc.text(`Data do Pagamento: ${formatDate(receipt.paymentDate)}`, 20, y);
-    y += 5;
-    doc.text(`Referência: ${paymentReferenceLabels[receipt.reference]}`, 20, y);
-    y += 20;
-
-    if (receipt.description) {
-      doc.setFont('helvetica', 'bold');
-      doc.text('Observações:', 20, y);
-      y += 5;
-      doc.setFont('helvetica', 'normal');
-      const descLines = doc.splitTextToSize(receipt.description, pageWidth - 40);
-      doc.text(descLines, 20, y);
-      y += descLines.length * 5 + 10;
-    }
-
-    // Signatures
-    y = Math.max(y + 20, 200);
-    doc.setFont('helvetica', 'normal');
-    
-    if (receipt.clientSignature) {
-      doc.addImage(receipt.clientSignature, 'PNG', 20, y, 60, 30);
-    }
-    doc.line(20, y + 35, 85, y + 35);
-    doc.text('Assinatura do Pagador', 52, y + 42, { align: 'center' });
-
-    if (receipt.vendorSignature) {
-      doc.addImage(receipt.vendorSignature, 'PNG', 110, y, 60, 30);
-    }
-    doc.line(110, y + 35, 175, y + 35);
-    doc.text('Assinatura do Recebedor', 142, y + 42, { align: 'center' });
-
-    // Footer
-    const footerY = doc.internal.pageSize.getHeight() - 15;
-    doc.setFontSize(8);
-    doc.setTextColor(128, 128, 128);
-    doc.text(`Para maior clareza, firmo(amos) o presente recibo para que produza os seus efeitos.`, pageWidth / 2, footerY - 5, { align: 'center' });
-    doc.text(`${receipt.location}, ${formatDate(receipt.paymentDate)}`, pageWidth / 2, footerY, { align: 'center' });
-
-    doc.save(`recibo-${receipt.number}.pdf`);
+  const handleGeneratePDF = (receipt: Receipt) => {
+    generateReceiptPDF(receipt);
     toast({
       title: 'PDF gerado',
       description: 'O recibo foi baixado com sucesso.',
@@ -280,7 +181,7 @@ export default function ReceiptsPage() {
       reference: 'entrada',
       payerName: '',
       payerCpf: '',
-      paymentDate: new Date().toISOString().split('T')[0],
+      paymentDate: getCurrentDateString(),
       description: '',
     });
   };
@@ -427,6 +328,21 @@ export default function ReceiptsPage() {
         </Dialog>
       </div>
 
+      {/* Signature Dialog */}
+      <Dialog open={isSignatureOpen} onOpenChange={setIsSignatureOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              Assinatura do {signatureType === 'client' ? 'Cliente' : 'Vendedor'}
+            </DialogTitle>
+          </DialogHeader>
+          <SignaturePad
+            onSave={handleSignature}
+            onCancel={() => setIsSignatureOpen(false)}
+          />
+        </DialogContent>
+      </Dialog>
+
       {/* Search */}
       <div className="relative max-w-md">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -471,35 +387,45 @@ export default function ReceiptsPage() {
                       <TableCell>
                         <div className="flex items-center gap-2">
                           <PaymentIcon className="h-4 w-4 text-muted-foreground" />
-                          <span>{paymentMethodLabels[receipt.paymentMethod]}</span>
+                          <span className="text-sm">{paymentMethodLabels[receipt.paymentMethod]}</span>
                         </div>
                       </TableCell>
-                      <TableCell>{formatDate(receipt.paymentDate)}</TableCell>
+                      <TableCell className="text-sm">
+                        {formatDateDisplay(receipt.paymentDate)}
+                      </TableCell>
                       <TableCell>
                         <div className="flex gap-1">
                           <Button
-                            variant={receipt.clientSignature ? 'default' : 'outline'}
+                            variant={receipt.clientSignature ? "default" : "outline"}
                             size="sm"
-                            className={cn('h-7 px-2 text-xs', receipt.clientSignature && 'bg-success hover:bg-success/90')}
+                            className={cn(
+                              "h-7 text-xs",
+                              receipt.clientSignature && "bg-success hover:bg-success/90"
+                            )}
                             onClick={() => {
                               setSigningReceipt(receipt);
                               setSignatureType('client');
                               setIsSignatureOpen(true);
                             }}
                           >
-                            Pagador
+                            <Pen className="h-3 w-3 mr-1" />
+                            Cliente
                           </Button>
                           <Button
-                            variant={receipt.vendorSignature ? 'default' : 'outline'}
+                            variant={receipt.vendorSignature ? "default" : "outline"}
                             size="sm"
-                            className={cn('h-7 px-2 text-xs', receipt.vendorSignature && 'bg-success hover:bg-success/90')}
+                            className={cn(
+                              "h-7 text-xs",
+                              receipt.vendorSignature && "bg-success hover:bg-success/90"
+                            )}
                             onClick={() => {
                               setSigningReceipt(receipt);
                               setSignatureType('vendor');
                               setIsSignatureOpen(true);
                             }}
                           >
-                            Recebedor
+                            <Pen className="h-3 w-3 mr-1" />
+                            Vendedor
                           </Button>
                         </div>
                       </TableCell>
@@ -509,7 +435,7 @@ export default function ReceiptsPage() {
                             variant="ghost"
                             size="icon"
                             className="h-8 w-8"
-                            onClick={() => generatePDF(receipt)}
+                            onClick={() => handleGeneratePDF(receipt)}
                           >
                             <Download className="h-4 w-4" />
                           </Button>
@@ -535,28 +461,10 @@ export default function ReceiptsPage() {
           <div className="text-center">
             <ReceiptIcon className="h-12 w-12 text-muted-foreground/30 mx-auto mb-4" />
             <h3 className="text-lg font-medium mb-1">Nenhum recibo encontrado</h3>
-            <p className="text-muted-foreground">
-              {search ? 'Tente ajustar a busca' : 'Emita seu primeiro recibo'}
-            </p>
+            <p className="text-muted-foreground">Crie seu primeiro recibo de pagamento</p>
           </div>
         </Card>
       )}
-
-      {/* Signature Dialog */}
-      <Dialog open={isSignatureOpen} onOpenChange={setIsSignatureOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>
-              Assinatura do {signatureType === 'client' ? 'Pagador' : 'Recebedor'}
-            </DialogTitle>
-          </DialogHeader>
-          <SignaturePad
-            label={`Assine abaixo - ${signatureType === 'client' ? 'Pagador' : 'Recebedor'}`}
-            onSave={handleSignature}
-            onCancel={() => setIsSignatureOpen(false)}
-          />
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
