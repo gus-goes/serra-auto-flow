@@ -1,4 +1,7 @@
 import type { User, Vehicle, Client, Bank, Simulation, Proposal, Receipt, Sale, ActivityLog } from '@/types';
+import { hashPassword } from './passwordUtils';
+import { getCurrentDateString, getCurrentTimestamp } from './dateUtils';
+import { BANK_CONFIGS } from './bankConfig';
 
 const STORAGE_KEYS = {
   USERS: 'autos_serra_users',
@@ -13,6 +16,7 @@ const STORAGE_KEYS = {
   SALES: 'autos_serra_sales',
   ACTIVITY_LOG: 'autos_serra_activity_log',
   SETTINGS: 'autos_serra_settings',
+  INITIALIZED: 'autos_serra_initialized_v2',
 };
 
 // Generic storage functions
@@ -44,64 +48,104 @@ export function generateNumber(prefix: string): string {
 }
 
 // Initialize default data
-export function initializeDefaultData(): void {
-  // Initialize default users if none exist
+export async function initializeDefaultData(): Promise<void> {
+  const isInitialized = localStorage.getItem(STORAGE_KEYS.INITIALIZED);
+  
+  // Check if we need to migrate or initialize
   const users = getItem<User[]>(STORAGE_KEYS.USERS, []);
-  if (users.length === 0) {
+  
+  if (users.length === 0 || !isInitialized) {
+    // Create default admin password hash
+    const adminHash = await hashPassword('admin123');
+    const vendorHash = await hashPassword('vendedor123');
+    
     const defaultUsers: User[] = [
       {
         id: generateId(),
         name: 'Administrador',
         email: 'admin@autosdoserra.com.br',
         role: 'admin',
-        createdAt: new Date().toISOString(),
+        status: 'ativo',
+        passwordHash: adminHash,
+        createdAt: getCurrentTimestamp(),
       },
       {
         id: generateId(),
         name: 'Carlos Silva',
         email: 'carlos@autosdoserra.com.br',
         role: 'vendedor',
-        createdAt: new Date().toISOString(),
+        status: 'ativo',
+        passwordHash: vendorHash,
+        createdAt: getCurrentTimestamp(),
       },
       {
         id: generateId(),
         name: 'Maria Santos',
         email: 'maria@autosdoserra.com.br',
         role: 'vendedor',
-        createdAt: new Date().toISOString(),
+        status: 'ativo',
+        passwordHash: vendorHash,
+        createdAt: getCurrentTimestamp(),
       },
     ];
     setItem(STORAGE_KEYS.USERS, defaultUsers);
+  } else {
+    // Migrate existing users to add status if missing
+    const migratedUsers = users.map(u => ({
+      ...u,
+      status: u.status || 'ativo',
+    }));
+    setItem(STORAGE_KEYS.USERS, migratedUsers);
   }
 
-  // Initialize default banks if none exist
+  // Initialize default banks with visual identity
   const banks = getItem<Bank[]>(STORAGE_KEYS.BANKS, []);
-  if (banks.length === 0) {
+  if (banks.length === 0 || !isInitialized) {
+    const bvConfig = BANK_CONFIGS.find(b => b.id === 'bv')!;
+    const bradescoConfig = BANK_CONFIGS.find(b => b.id === 'bradesco')!;
+    const c6Config = BANK_CONFIGS.find(b => b.id === 'c6')!;
+    const proprioConfig = BANK_CONFIGS.find(b => b.isOwn)!;
+    
     const defaultBanks: Bank[] = [
       {
         id: generateId(),
-        name: 'BV Financeira',
+        name: bvConfig.name,
+        slug: bvConfig.slug,
+        color: bvConfig.color,
+        colorHex: bvConfig.colorHex,
+        logo: bvConfig.logo,
         rates: { 12: 1.89, 24: 1.99, 36: 2.09, 48: 2.19, 60: 2.29 },
         commission: 2.5,
         active: true,
       },
       {
         id: generateId(),
-        name: 'Bradesco',
+        name: bradescoConfig.name,
+        slug: bradescoConfig.slug,
+        color: bradescoConfig.color,
+        colorHex: bradescoConfig.colorHex,
+        logo: bradescoConfig.logo,
         rates: { 12: 1.79, 24: 1.89, 36: 1.99, 48: 2.09, 60: 2.19 },
         commission: 2.0,
         active: true,
       },
       {
         id: generateId(),
-        name: 'C6 Bank',
+        name: c6Config.name,
+        slug: c6Config.slug,
+        color: c6Config.color,
+        colorHex: c6Config.colorHex,
+        logo: c6Config.logo,
         rates: { 12: 1.69, 24: 1.79, 36: 1.89, 48: 1.99, 60: 2.09 },
         commission: 1.8,
         active: true,
       },
       {
         id: generateId(),
-        name: 'Financiamento Próprio Autos da Serra',
+        name: proprioConfig.name,
+        slug: proprioConfig.slug,
+        color: proprioConfig.color,
+        colorHex: proprioConfig.colorHex,
         rates: { 12: 2.49, 24: 2.59, 36: 2.69, 48: 2.79, 60: 2.89 },
         commission: 5.0,
         active: true,
@@ -109,17 +153,21 @@ export function initializeDefaultData(): void {
     ];
     setItem(STORAGE_KEYS.BANKS, defaultBanks);
   }
+  
+  localStorage.setItem(STORAGE_KEYS.INITIALIZED, 'true');
 }
 
 // User storage
 export const userStorage = {
   getAll: (): User[] => getItem<User[]>(STORAGE_KEYS.USERS, []),
   getById: (id: string): User | undefined => userStorage.getAll().find(u => u.id === id),
+  getByEmail: (email: string): User | undefined => 
+    userStorage.getAll().find(u => u.email.toLowerCase() === email.toLowerCase()),
   save: (user: User): void => {
     const users = userStorage.getAll();
     const index = users.findIndex(u => u.id === user.id);
     if (index >= 0) {
-      users[index] = user;
+      users[index] = { ...user, updatedAt: getCurrentTimestamp() };
     } else {
       users.push(user);
     }
@@ -128,6 +176,16 @@ export const userStorage = {
   delete: (id: string): void => {
     const users = userStorage.getAll().filter(u => u.id !== id);
     setItem(STORAGE_KEYS.USERS, users);
+  },
+  updatePassword: async (userId: string, newPassword: string): Promise<boolean> => {
+    const user = userStorage.getById(userId);
+    if (!user) return false;
+    
+    const newHash = await hashPassword(newPassword);
+    user.passwordHash = newHash;
+    user.updatedAt = getCurrentTimestamp();
+    userStorage.save(user);
+    return true;
   },
 };
 
@@ -160,7 +218,7 @@ export const vehicleStorage = {
     const vehicles = vehicleStorage.getAll();
     const index = vehicles.findIndex(v => v.id === vehicle.id);
     if (index >= 0) {
-      vehicles[index] = { ...vehicle, updatedAt: new Date().toISOString() };
+      vehicles[index] = { ...vehicle, updatedAt: getCurrentTimestamp() };
     } else {
       vehicles.push(vehicle);
     }
@@ -181,7 +239,7 @@ export const clientStorage = {
     const clients = clientStorage.getAll();
     const index = clients.findIndex(c => c.id === client.id);
     if (index >= 0) {
-      clients[index] = { ...client, updatedAt: new Date().toISOString() };
+      clients[index] = { ...client, updatedAt: getCurrentTimestamp() };
     } else {
       clients.push(client);
     }
@@ -245,7 +303,7 @@ export const proposalStorage = {
     const proposals = proposalStorage.getAll();
     const index = proposals.findIndex(p => p.id === proposal.id);
     if (index >= 0) {
-      proposals[index] = { ...proposal, updatedAt: new Date().toISOString() };
+      proposals[index] = { ...proposal, updatedAt: getCurrentTimestamp() };
     } else {
       proposals.push(proposal);
     }
@@ -310,7 +368,7 @@ export const activityLog = {
       userId,
       action,
       details,
-      timestamp: new Date().toISOString(),
+      timestamp: getCurrentTimestamp(),
     });
     // Keep only last 500 logs
     setItem(STORAGE_KEYS.ACTIVITY_LOG, logs.slice(0, 500));
@@ -330,7 +388,7 @@ export const backup = {
       receipts: receiptStorage.getAll(),
       sales: saleStorage.getAll(),
       activityLog: activityLog.getAll(),
-      exportedAt: new Date().toISOString(),
+      exportedAt: getCurrentTimestamp(),
     };
     return JSON.stringify(data, null, 2);
   },

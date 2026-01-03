@@ -1,12 +1,16 @@
 export type UserRole = 'admin' | 'vendedor';
+export type UserStatus = 'ativo' | 'inativo';
 
 export interface User {
   id: string;
   name: string;
   email: string;
   role: UserRole;
+  status: UserStatus;
+  passwordHash?: string;
   avatar?: string;
   createdAt: string;
+  updatedAt?: string;
 }
 
 export interface Vehicle {
@@ -54,6 +58,10 @@ export type FunnelStage = 'lead' | 'atendimento' | 'simulacao' | 'proposta' | 'v
 export interface Bank {
   id: string;
   name: string;
+  slug?: string;
+  color?: string;
+  colorHex?: string;
+  logo?: string;
   rates: {
     12: number;
     24: number;
@@ -123,7 +131,7 @@ export interface Receipt {
   reference: PaymentReference;
   payerName: string;
   payerCpf: string;
-  paymentDate: string;
+  paymentDate: string; // YYYY-MM-DD format
   description?: string;
   location: string;
   clientSignature?: string;
@@ -139,7 +147,7 @@ export interface Sale {
   vendorId: string;
   totalValue: number;
   commission: number;
-  saleDate: string;
+  saleDate: string; // YYYY-MM-DD format
   createdAt: string;
 }
 
