@@ -5,6 +5,7 @@ export interface User {
   id: string;
   name: string;
   email: string;
+  phone?: string; // Added vendor phone
   role: UserRole;
   status: UserStatus;
   passwordHash?: string;
@@ -25,7 +26,7 @@ export interface Vehicle {
   color: string;
   plate?: string;
   status: 'disponivel' | 'reservado' | 'vendido';
-  images: string[];
+  images: string[]; // Base64 encoded images
   description?: string;
   createdAt: string;
   updatedAt: string;
@@ -104,11 +105,13 @@ export interface Proposal {
   status: ProposalStatus;
   bank?: string;
   vehiclePrice: number;
+  cashPrice?: number; // Valor à vista
   downPayment: number;
   financedAmount: number;
   installments: number;
   installmentValue: number;
   totalValue: number;
+  isOwnFinancing?: boolean; // Financiamento próprio (sem juros)
   clientSignature?: string;
   vendorSignature?: string;
   notes?: string;

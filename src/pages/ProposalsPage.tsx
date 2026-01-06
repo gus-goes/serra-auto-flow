@@ -16,6 +16,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { SignaturePad } from '@/components/ui/signature-pad';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
   FileText, 
   Plus, 
@@ -23,7 +24,9 @@ import {
   Trash2,
   Download,
   Pen,
-  Building2
+  Building2,
+  Home,
+  DollarSign
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -57,16 +60,21 @@ export default function ProposalsPage() {
   const [isSignatureOpen, setIsSignatureOpen] = useState(false);
   const [signingProposal, setSigningProposal] = useState<Proposal | null>(null);
   const [signatureType, setSignatureType] = useState<'client' | 'vendor'>('client');
+  const [financingType, setFinancingType] = useState<'bancario' | 'proprio'>('bancario');
 
   const vehicles = vehicleStorage.getAll();
   const clients = clientStorage.getAll().filter(c => isAdmin || c.vendorId === user?.id);
   const banks = bankStorage.getActive();
+  
+  // Separate banks
+  const externalBanks = banks.filter(b => !b.slug?.includes('proprio') && !b.name.toLowerCase().includes('próprio'));
 
   const [form, setForm] = useState({
     clientId: '',
     vehicleId: '',
     bankId: '',
     vehiclePrice: 0,
+    cashPrice: 0,
     downPayment: 0,
     installments: 48,
     installmentValue: 0,
@@ -82,12 +90,26 @@ export default function ProposalsPage() {
     return matchesSearch && matchesStatus;
   });
 
+  // Calculate installment for own financing (no interest)
+  const calculateOwnInstallment = () => {
+    const financedAmount = form.vehiclePrice - form.downPayment;
+    if (financedAmount <= 0 || form.installments <= 0) return 0;
+    return financedAmount / form.installments;
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    const selectedBank = banks.find(b => b.id === form.bankId);
+    const isOwnFinancing = financingType === 'proprio';
+    const selectedBank = isOwnFinancing ? null : externalBanks.find(b => b.id === form.bankId);
     const financedAmount = form.vehiclePrice - form.downPayment;
-    const totalValue = form.installmentValue * form.installments;
+    
+    // For own financing, calculate installment without interest
+    const installmentValue = isOwnFinancing 
+      ? calculateOwnInstallment() 
+      : form.installmentValue;
+    
+    const totalValue = installmentValue * form.installments;
     const now = getCurrentTimestamp();
 
     const proposal: Proposal = {
@@ -97,13 +119,15 @@ export default function ProposalsPage() {
       vehicleId: form.vehicleId,
       vendorId: user!.id,
       status: 'negociacao',
-      bank: selectedBank?.name,
+      bank: isOwnFinancing ? 'Financiamento Próprio' : selectedBank?.name,
       vehiclePrice: form.vehiclePrice,
+      cashPrice: form.cashPrice > 0 ? form.cashPrice : undefined,
       downPayment: form.downPayment,
       financedAmount,
       installments: form.installments,
-      installmentValue: form.installmentValue,
+      installmentValue,
       totalValue,
+      isOwnFinancing,
       notes: form.notes || undefined,
       createdAt: now,
       updatedAt: now,
@@ -183,20 +207,23 @@ export default function ProposalsPage() {
       vehicleId: '',
       bankId: '',
       vehiclePrice: 0,
+      cashPrice: 0,
       downPayment: 0,
       installments: 48,
       installmentValue: 0,
       notes: '',
     });
+    setFinancingType('bancario');
   };
 
   // Helper to get bank color indicator
-  const getBankColorStyle = (bankName?: string) => {
-    const config = getBankConfigByName(bankName || '');
+  const getBankColorStyle = (proposal: Proposal) => {
+    if (proposal.isOwnFinancing) {
+      return { borderLeft: '4px solid #FFD700' };
+    }
+    const config = getBankConfigByName(proposal.bank || '');
     if (!config) return {};
-    return {
-      borderLeft: `4px solid ${config.colorHex}`,
-    };
+    return { borderLeft: `4px solid ${config.colorHex}` };
   };
 
   return (
@@ -213,7 +240,7 @@ export default function ProposalsPage() {
               Nova Proposta
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-2xl">
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Nova Proposta</DialogTitle>
             </DialogHeader>
@@ -241,7 +268,8 @@ export default function ProposalsPage() {
                       setForm({ 
                         ...form, 
                         vehicleId: v,
-                        vehiclePrice: vehicle?.price || 0
+                        vehiclePrice: vehicle?.price || 0,
+                        cashPrice: vehicle?.price || 0
                       });
                     }}
                   >
@@ -259,36 +287,110 @@ export default function ProposalsPage() {
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <Label className="flex items-center gap-2">
-                  <Building2 className="h-4 w-4" />
-                  Financiamento
-                </Label>
-                <Select value={form.bankId} onValueChange={(v) => setForm({ ...form, bankId: v })}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione o banco" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {banks.map(b => {
-                      const config = getBankConfigByName(b.name);
-                      return (
-                        <SelectItem key={b.id} value={b.id}>
-                          <div className="flex items-center gap-2">
-                            {config && (
-                              <div 
-                                className="w-3 h-3 rounded-full" 
-                                style={{ backgroundColor: config.colorHex }}
-                              />
-                            )}
-                            {b.name}
-                          </div>
-                        </SelectItem>
-                      );
-                    })}
-                  </SelectContent>
-                </Select>
-              </div>
+              {/* Financing Type Tabs */}
+              <Tabs value={financingType} onValueChange={(v) => setFinancingType(v as 'bancario' | 'proprio')}>
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="bancario" className="flex items-center gap-2">
+                    <Building2 className="h-4 w-4" />
+                    Financiamento Bancário
+                  </TabsTrigger>
+                  <TabsTrigger value="proprio" className="flex items-center gap-2">
+                    <Home className="h-4 w-4" />
+                    Financiamento Próprio
+                  </TabsTrigger>
+                </TabsList>
+                
+                <TabsContent value="bancario" className="space-y-4 pt-4">
+                  <div className="space-y-2">
+                    <Label className="flex items-center gap-2">
+                      <Building2 className="h-4 w-4" />
+                      Banco
+                    </Label>
+                    <Select value={form.bankId} onValueChange={(v) => setForm({ ...form, bankId: v })}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione o banco" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {externalBanks.map(b => {
+                          const config = getBankConfigByName(b.name);
+                          return (
+                            <SelectItem key={b.id} value={b.id}>
+                              <div className="flex items-center gap-2">
+                                {config && (
+                                  <div 
+                                    className="w-3 h-3 rounded-full" 
+                                    style={{ backgroundColor: config.colorHex }}
+                                  />
+                                )}
+                                {b.name}
+                              </div>
+                            </SelectItem>
+                          );
+                        })}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Parcelas</Label>
+                      <Input
+                        type="number"
+                        value={form.installments}
+                        onChange={(e) => setForm({ ...form, installments: parseInt(e.target.value) || 0 })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Valor da Parcela</Label>
+                      <Input
+                        type="number"
+                        value={form.installmentValue}
+                        onChange={(e) => setForm({ ...form, installmentValue: parseFloat(e.target.value) || 0 })}
+                      />
+                    </div>
+                  </div>
+                </TabsContent>
+                
+                <TabsContent value="proprio" className="space-y-4 pt-4">
+                  <div className="bg-primary/5 border border-primary/20 rounded-lg p-4">
+                    <div className="flex items-center gap-2 text-primary mb-2">
+                      <Home className="h-5 w-5" />
+                      <span className="font-semibold">Financiamento Próprio - Sem Juros</span>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      O valor financiado será dividido igualmente pelo número de parcelas, sem acréscimo de juros.
+                    </p>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label>Parcelas</Label>
+                    <Select 
+                      value={String(form.installments)} 
+                      onValueChange={(v) => setForm({ ...form, installments: parseInt(v) })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {[6, 12, 18, 24, 30, 36, 42, 48].map(n => (
+                          <SelectItem key={n} value={String(n)}>{n}x</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  {form.vehiclePrice > 0 && form.downPayment >= 0 && (
+                    <div className="bg-muted/50 rounded-lg p-3">
+                      <p className="text-sm text-muted-foreground">Valor da parcela:</p>
+                      <p className="text-xl font-bold text-primary">
+                        {formatCurrency(calculateOwnInstallment())}
+                      </p>
+                    </div>
+                  )}
+                </TabsContent>
+              </Tabs>
 
+              {/* Common Fields */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Valor do Veículo</Label>
@@ -299,32 +401,26 @@ export default function ProposalsPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Entrada</Label>
+                  <Label className="flex items-center gap-2">
+                    <DollarSign className="h-4 w-4 text-success" />
+                    Valor à Vista
+                  </Label>
                   <Input
                     type="number"
-                    value={form.downPayment}
-                    onChange={(e) => setForm({ ...form, downPayment: parseFloat(e.target.value) || 0 })}
+                    value={form.cashPrice}
+                    onChange={(e) => setForm({ ...form, cashPrice: parseFloat(e.target.value) || 0 })}
+                    placeholder="Deixe 0 se não aplicável"
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Parcelas</Label>
-                  <Input
-                    type="number"
-                    value={form.installments}
-                    onChange={(e) => setForm({ ...form, installments: parseInt(e.target.value) || 0 })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Valor da Parcela</Label>
-                  <Input
-                    type="number"
-                    value={form.installmentValue}
-                    onChange={(e) => setForm({ ...form, installmentValue: parseFloat(e.target.value) || 0 })}
-                  />
-                </div>
+              <div className="space-y-2">
+                <Label>Entrada</Label>
+                <Input
+                  type="number"
+                  value={form.downPayment}
+                  onChange={(e) => setForm({ ...form, downPayment: parseFloat(e.target.value) || 0 })}
+                />
               </div>
 
               <div className="space-y-2">
@@ -398,7 +494,7 @@ export default function ProposalsPage() {
                   <TableHead>Número</TableHead>
                   <TableHead>Cliente</TableHead>
                   <TableHead>Veículo</TableHead>
-                  <TableHead>Banco</TableHead>
+                  <TableHead>Financiamento</TableHead>
                   <TableHead>Valor</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Assinaturas</TableHead>
@@ -409,13 +505,12 @@ export default function ProposalsPage() {
                 {filteredProposals.map((proposal) => {
                   const client = clientStorage.getById(proposal.clientId);
                   const vehicle = vehicleStorage.getById(proposal.vehicleId);
-                  const bankConfig = getBankConfigByName(proposal.bank || '');
                   
                   return (
                     <TableRow 
                       key={proposal.id} 
                       className="table-row-hover"
-                      style={getBankColorStyle(proposal.bank)}
+                      style={getBankColorStyle(proposal)}
                     >
                       <TableCell className="font-mono text-sm">{proposal.number}</TableCell>
                       <TableCell>
@@ -433,14 +528,14 @@ export default function ProposalsPage() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        {proposal.bank ? (
+                        {proposal.isOwnFinancing ? (
                           <div className="flex items-center gap-2">
-                            {bankConfig && (
-                              <div 
-                                className="w-2 h-2 rounded-full" 
-                                style={{ backgroundColor: bankConfig.colorHex }}
-                              />
-                            )}
+                            <Home className="h-4 w-4 text-primary" />
+                            <span className="text-sm">Próprio</span>
+                          </div>
+                        ) : proposal.bank ? (
+                          <div className="flex items-center gap-2">
+                            <Building2 className="h-4 w-4 text-muted-foreground" />
                             <span className="text-sm">{proposal.bank}</span>
                           </div>
                         ) : (
@@ -456,11 +551,11 @@ export default function ProposalsPage() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Select 
-                          value={proposal.status} 
+                        <Select
+                          value={proposal.status}
                           onValueChange={(v) => handleStatusChange(proposal.id, v as ProposalStatus)}
                         >
-                          <SelectTrigger className={cn('badge-status h-7 w-auto', statusColors[proposal.status])}>
+                          <SelectTrigger className={cn('h-8 w-32', statusColors[proposal.status])}>
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -538,7 +633,11 @@ export default function ProposalsPage() {
           <div className="text-center">
             <FileText className="h-12 w-12 text-muted-foreground/30 mx-auto mb-4" />
             <h3 className="text-lg font-medium mb-1">Nenhuma proposta encontrada</h3>
-            <p className="text-muted-foreground">Crie sua primeira proposta de venda</p>
+            <p className="text-muted-foreground">
+              {search || statusFilter !== 'all' 
+                ? 'Tente ajustar os filtros de busca' 
+                : 'Crie sua primeira proposta de venda'}
+            </p>
           </div>
         </Card>
       )}

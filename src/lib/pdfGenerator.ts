@@ -1,17 +1,15 @@
 import { jsPDF } from 'jspdf';
-import { formatCurrency, formatCPF, numberToWords } from './formatters';
+import { formatCurrency, formatCPF, numberToWords, formatPhone } from './formatters';
 import { formatDateDisplay, formatDateFullPtBr } from './dateUtils';
 import { getPDFColors, getBankConfigByName } from './bankConfig';
 import { getCompanyConfig, formatCompanyAddress, formatCompanyShortAddress } from './companyConfig';
-import type { Receipt, Proposal } from '@/types';
-import { clientStorage, vehicleStorage, userStorage } from './storage';
+import type { Receipt, Proposal, Client } from '@/types';
+import { clientStorage, vehicleStorage, userStorage, bankStorage } from './storage';
 
 /**
- * Professional PDF Generator for Receipts and Proposals
+ * Professional PDF Generator for Receipts, Proposals and Client Registration
  * with dynamic bank/company branding
  */
-
-const COMPANY_CONFIG = getCompanyConfig();
 
 interface PDFOptions {
   bankName?: string;
@@ -42,30 +40,40 @@ function drawHeader(doc: jsPDF, options: PDFOptions = {}): number {
   const bankConfig = options.bankName ? getBankConfigByName(options.bankName) : undefined;
   const company = getCompanyConfig();
   
+  // Get bank logo from storage if available
+  const storedBank = options.bankName ? bankStorage.getAll().find(b => 
+    b.name.toLowerCase().includes(options.bankName!.toLowerCase()) ||
+    options.bankName!.toLowerCase().includes(b.name.toLowerCase())
+  ) : undefined;
+  
   // Header background
   doc.setFillColor(...colors.primary);
-  doc.rect(0, 0, pageWidth, 42, 'F');
+  doc.rect(0, 0, pageWidth, 45, 'F');
   
   // Yellow accent bar for Autos da Serra
   if (colors.isOwn) {
     doc.setFillColor(...colors.secondary);
-    doc.rect(0, 42, pageWidth, 4, 'F');
+    doc.rect(0, 45, pageWidth, 4, 'F');
   }
   
   // Company name
   doc.setTextColor(...colors.text);
-  doc.setFontSize(24);
+  doc.setFontSize(22);
   doc.setFont('helvetica', 'bold');
-  doc.text(company.fantasyName, 20, 20);
+  doc.text(company.fantasyName, 20, 18);
   
   // Tagline
   doc.setFontSize(10);
   doc.setFont('helvetica', 'normal');
-  doc.text('Multimarcas', 20, 28);
+  doc.text('Multimarcas', 20, 26);
   
   // CNPJ
   doc.setFontSize(8);
-  doc.text(`CNPJ: ${company.cnpj}`, 20, 36);
+  doc.text(`CNPJ: ${company.cnpj}`, 20, 33);
+  
+  // Address
+  doc.setFontSize(7);
+  doc.text(formatCompanyAddress(), 20, 40);
   
   // Contact info on the right
   doc.setFontSize(9);
@@ -74,17 +82,19 @@ function drawHeader(doc: jsPDF, options: PDFOptions = {}): number {
     doc.text(company.phone, pageWidth - 20, 25, { align: 'right' });
   }
   
-  // Bank badge if applicable
-  if (bankConfig && !bankConfig.isOwn) {
+  // Bank logo/badge if applicable (external bank)
+  if (bankConfig && !bankConfig.isOwn && storedBank) {
+    // Show bank name badge
     doc.setFontSize(8);
     doc.setFillColor(255, 255, 255);
-    const badgeWidth = 70;
-    doc.roundedRect(pageWidth - 20 - badgeWidth, 30, badgeWidth, 8, 2, 2, 'F');
+    const badgeWidth = 75;
+    doc.roundedRect(pageWidth - 20 - badgeWidth, 32, badgeWidth, 10, 2, 2, 'F');
     doc.setTextColor(...colors.primary);
-    doc.text(`Financiamento: ${bankConfig.name}`, pageWidth - 20 - badgeWidth / 2, 35.5, { align: 'center' });
+    doc.setFont('helvetica', 'bold');
+    doc.text(`Financiamento: ${storedBank.name}`, pageWidth - 20 - badgeWidth / 2, 38.5, { align: 'center' });
   }
   
-  return colors.isOwn ? 56 : 52;
+  return colors.isOwn ? 58 : 54;
 }
 
 /**
@@ -97,7 +107,7 @@ function drawFooter(doc: jsPDF, documentType: string): void {
   
   // Footer line
   doc.setDrawColor(200, 200, 200);
-  doc.line(20, pageHeight - 28, pageWidth - 20, pageHeight - 28);
+  doc.line(20, pageHeight - 25, pageWidth - 20, pageHeight - 25);
   
   // Footer text
   doc.setFontSize(7);
@@ -105,19 +115,19 @@ function drawFooter(doc: jsPDF, documentType: string): void {
   doc.text(
     `${company.fantasyName} | CNPJ: ${company.cnpj}`,
     pageWidth / 2,
-    pageHeight - 21,
+    pageHeight - 18,
     { align: 'center' }
   );
   doc.text(
     formatCompanyAddress(),
     pageWidth / 2,
-    pageHeight - 15,
+    pageHeight - 12,
     { align: 'center' }
   );
   doc.text(
     `Documento gerado eletronicamente - ${documentType}`,
     pageWidth / 2,
-    pageHeight - 9,
+    pageHeight - 6,
     { align: 'center' }
   );
 }
@@ -146,9 +156,9 @@ function drawSectionBox(
 }
 
 /**
- * Draw info row
+ * Draw info row with label and value
  */
-function drawInfoRow(doc: jsPDF, label: string, value: string, x: number, y: number): void {
+function drawInfoRow(doc: jsPDF, label: string, value: string, x: number, y: number, labelWidth: number = 45): void {
   doc.setFontSize(9);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(100, 100, 100);
@@ -156,7 +166,70 @@ function drawInfoRow(doc: jsPDF, label: string, value: string, x: number, y: num
   
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(30, 30, 30);
-  doc.text(value, x + 50, y);
+  doc.text(value, x + labelWidth, y);
+}
+
+/**
+ * Draw signature section with proper spacing
+ */
+function drawSignatureSection(
+  doc: jsPDF,
+  y: number,
+  clientSignature: string | undefined,
+  vendorSignature: string | undefined,
+  clientName: string,
+  vendorName: string,
+  privacyMode: boolean
+): number {
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const sigBoxWidth = 70;
+  const sigBoxHeight = 25;
+  const leftSigX = 30;
+  const rightSigX = pageWidth - 30 - sigBoxWidth;
+  
+  // Signature label
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(60, 60, 60);
+  doc.text('ASSINATURAS', pageWidth / 2, y, { align: 'center' });
+  y += 8;
+  
+  // Client signature box
+  if (clientSignature && !privacyMode) {
+    try {
+      doc.addImage(clientSignature, 'PNG', leftSigX + 5, y + 2, sigBoxWidth - 10, sigBoxHeight - 4);
+    } catch (e) {
+      console.error('Error adding client signature:', e);
+    }
+  }
+  
+  doc.setDrawColor(120, 120, 120);
+  doc.setLineWidth(0.5);
+  doc.line(leftSigX, y + sigBoxHeight, leftSigX + sigBoxWidth, y + sigBoxHeight);
+  
+  doc.setFontSize(8);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(80, 80, 80);
+  doc.text('Assinatura do Cliente', leftSigX + sigBoxWidth / 2, y + sigBoxHeight + 5, { align: 'center' });
+  doc.setFontSize(7);
+  doc.text(privacyMode ? clientName.split(' ')[0] + ' ***' : clientName, leftSigX + sigBoxWidth / 2, y + sigBoxHeight + 10, { align: 'center' });
+  
+  // Vendor signature box
+  if (vendorSignature && !privacyMode) {
+    try {
+      doc.addImage(vendorSignature, 'PNG', rightSigX + 5, y + 2, sigBoxWidth - 10, sigBoxHeight - 4);
+    } catch (e) {
+      console.error('Error adding vendor signature:', e);
+    }
+  }
+  
+  doc.line(rightSigX, y + sigBoxHeight, rightSigX + sigBoxWidth, y + sigBoxHeight);
+  doc.setFontSize(8);
+  doc.text('Assinatura do Vendedor', rightSigX + sigBoxWidth / 2, y + sigBoxHeight + 5, { align: 'center' });
+  doc.setFontSize(7);
+  doc.text(vendorName, rightSigX + sigBoxWidth / 2, y + sigBoxHeight + 10, { align: 'center' });
+  
+  return y + sigBoxHeight + 15;
 }
 
 /**
@@ -169,6 +242,7 @@ export function generateReceiptPDF(receipt: Receipt, options: PDFOptions = {}): 
   
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
   const colors = getPDFColors(); // Always use company colors for receipts
   
   // Privacy mode handling
@@ -188,7 +262,7 @@ export function generateReceiptPDF(receipt: Receipt, options: PDFOptions = {}): 
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(30, 30, 30);
   doc.text('RECIBO DE PAGAMENTO', pageWidth / 2, y + 8.5, { align: 'center' });
-  y += 20;
+  y += 18;
   
   // Receipt number and date
   doc.setFontSize(10);
@@ -196,10 +270,10 @@ export function generateReceiptPDF(receipt: Receipt, options: PDFOptions = {}): 
   doc.setTextColor(80, 80, 80);
   doc.text(`Nº ${privacyMode ? '****' : receipt.number}`, 20, y);
   doc.text(`Data: ${formatDateDisplay(receipt.paymentDate)}`, pageWidth - 20, y, { align: 'right' });
-  y += 12;
+  y += 10;
   
   // Payment reference badge
-  const refText = paymentRefLabels[receipt.reference] || receipt.reference.toUpperCase();
+  const refText = paymentRefLabels[receipt.reference] || receipt.reference?.toUpperCase() || 'PAGAMENTO';
   const refWidth = Math.max(doc.getTextWidth(refText) + 16, 50);
   doc.setFillColor(...colors.primary);
   doc.roundedRect(15, y, refWidth, 8, 2, 2, 'F');
@@ -207,19 +281,19 @@ export function generateReceiptPDF(receipt: Receipt, options: PDFOptions = {}): 
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(255, 255, 255);
   doc.text(refText, 15 + refWidth / 2, y + 5.5, { align: 'center' });
-  y += 18;
+  y += 15;
   
   // Amount box with prominent styling
-  doc.setFillColor(245, 245, 245);
+  doc.setFillColor(248, 248, 248);
   doc.setDrawColor(...colors.primary);
   doc.setLineWidth(1);
   doc.rect(15, y, pageWidth - 30, 28, 'FD');
   
-  doc.setFontSize(12);
+  doc.setFontSize(11);
   doc.setTextColor(80, 80, 80);
   doc.text('Valor recebido:', 25, y + 10);
   
-  doc.setFontSize(22);
+  doc.setFontSize(20);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(30, 30, 30);
   doc.text(displayAmount, 25, y + 22);
@@ -231,33 +305,41 @@ export function generateReceiptPDF(receipt: Receipt, options: PDFOptions = {}): 
   const wordsLines = doc.splitTextToSize(wordsText, pageWidth - 100);
   doc.text(wordsLines, 100, y + 14);
   
-  y += 38;
+  y += 35;
   
   // Receipt body text
-  doc.setFontSize(11);
+  doc.setFontSize(10);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(30, 30, 30);
   
-  const bodyText = `Recebi(emos) de ${displayName}, portador(a) do CPF ${displayCPF}, a importância de ${displayAmount} (${amountInWords}), referente a ${paymentRefLabels[receipt.reference]?.toLowerCase() || receipt.reference}${vehicle ? ` do veículo ${vehicle.brand} ${vehicle.model} ano ${vehicle.year}` : ''}.`;
+  const bodyText = `Recebi(emos) de ${displayName}, portador(a) do CPF ${displayCPF}, a importância de ${displayAmount} (${amountInWords}), referente a ${paymentRefLabels[receipt.reference]?.toLowerCase() || 'pagamento'}${vehicle ? ` do veículo ${vehicle.brand} ${vehicle.model} ano ${vehicle.year}` : ''}.`;
   
   const bodyLines = doc.splitTextToSize(bodyText, pageWidth - 40);
   doc.text(bodyLines, 20, y);
-  y += bodyLines.length * 6 + 15;
+  y += bodyLines.length * 5 + 12;
   
   // Payment details box
   y = drawSectionBox(doc, y, 'DETALHES DO PAGAMENTO', colors);
   
   doc.setFillColor(250, 250, 250);
-  doc.rect(15, y, pageWidth - 30, 25, 'F');
+  doc.rect(15, y, pageWidth - 30, 28, 'F');
   
-  drawInfoRow(doc, 'Forma de Pagamento:', paymentMethodLabels[receipt.paymentMethod] || receipt.paymentMethod, 20, y + 8);
-  drawInfoRow(doc, 'Data do Pagamento:', formatDateDisplay(receipt.paymentDate), 20, y + 16);
-  drawInfoRow(doc, 'Local:', receipt.location, 120, y + 8);
+  drawInfoRow(doc, 'Forma:', paymentMethodLabels[receipt.paymentMethod] || receipt.paymentMethod, 20, y + 8, 35);
+  drawInfoRow(doc, 'Data:', formatDateDisplay(receipt.paymentDate), 20, y + 18, 35);
+  drawInfoRow(doc, 'Local:', receipt.location, 105, y + 8, 30);
   if (vendor) {
-    drawInfoRow(doc, 'Atendido por:', vendor.name, 120, y + 16);
+    drawInfoRow(doc, 'Atendido:', vendor.name, 105, y + 18, 30);
   }
   
   y += 35;
+  
+  // Vendor contact
+  if (vendor?.phone) {
+    doc.setFontSize(9);
+    doc.setTextColor(80, 80, 80);
+    doc.text(`Contato do Vendedor: ${formatPhone(vendor.phone)}`, 20, y);
+    y += 8;
+  }
   
   // Description if exists
   if (receipt.description) {
@@ -265,77 +347,45 @@ export function generateReceiptPDF(receipt: Receipt, options: PDFOptions = {}): 
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(80, 80, 80);
     doc.text('Observações:', 20, y);
-    y += 6;
+    y += 5;
     doc.setFont('helvetica', 'normal');
     const descLines = doc.splitTextToSize(receipt.description, pageWidth - 40);
     doc.text(descLines, 20, y);
-    y += descLines.length * 5 + 10;
+    y += descLines.length * 4 + 8;
   }
   
-  // Signatures section - position with margin from footer
-  const pageHeight = doc.internal.pageSize.getHeight();
-  const footerStart = pageHeight - 35; // Footer starts at this Y position
-  const sigBoxHeight = 30;
-  const sigTextSpace = 18; // Space for text below signature
-  const legalTextSpace = 12; // Space for legal text
+  // Calculate signature position - ensure proper spacing from footer
+  const footerStart = pageHeight - 30;
+  const signatureHeight = 45; // Height needed for signatures
+  const legalTextHeight = 15;
+  const minY = Math.max(y + 10, 160); // Minimum Y position for signatures
+  const maxY = footerStart - signatureHeight - legalTextHeight - 5;
+  y = Math.min(minY, maxY);
   
-  // Calculate Y position to fit signatures above footer - closer to content
-  const requiredSpace = sigBoxHeight + sigTextSpace + legalTextSpace + 8;
-  y = Math.min(Math.max(y + 8, footerStart - requiredSpace - 25), footerStart - requiredSpace);
+  // Signatures
+  y = drawSignatureSection(
+    doc, y,
+    receipt.clientSignature,
+    receipt.vendorSignature,
+    displayName,
+    vendor?.name || '',
+    privacyMode
+  );
   
-  // Signature boxes - clean style without gray background
-  const sigBoxWidth = 75;
-  const leftSigX = 25;
-  const rightSigX = pageWidth - 25 - sigBoxWidth;
-  
-  // Client signature
-  if (receipt.clientSignature && !privacyMode) {
-    try {
-      doc.addImage(receipt.clientSignature, 'PNG', leftSigX + 5, y + 2, sigBoxWidth - 10, sigBoxHeight - 8);
-    } catch (e) {
-      console.error('Error adding client signature:', e);
-    }
-  }
-  
-  doc.setDrawColor(100, 100, 100);
-  doc.setLineWidth(0.5);
-  doc.line(leftSigX, y + sigBoxHeight, leftSigX + sigBoxWidth, y + sigBoxHeight);
-  doc.setFontSize(9);
-  doc.setTextColor(80, 80, 80);
-  doc.text('Assinatura do Pagador', leftSigX + sigBoxWidth / 2, y + sigBoxHeight + 6, { align: 'center' });
-  doc.setFontSize(8);
-  doc.text(displayName, leftSigX + sigBoxWidth / 2, y + sigBoxHeight + 12, { align: 'center' });
-  
-  // Vendor signature
-  if (receipt.vendorSignature && !privacyMode) {
-    try {
-      doc.addImage(receipt.vendorSignature, 'PNG', rightSigX + 5, y + 2, sigBoxWidth - 10, sigBoxHeight - 8);
-    } catch (e) {
-      console.error('Error adding vendor signature:', e);
-    }
-  }
-  
-  doc.line(rightSigX, y + sigBoxHeight, rightSigX + sigBoxWidth, y + sigBoxHeight);
-  doc.text('Assinatura do Recebedor', rightSigX + sigBoxWidth / 2, y + sigBoxHeight + 6, { align: 'center' });
-  if (vendor) {
-    doc.text(vendor.name, rightSigX + sigBoxWidth / 2, y + sigBoxHeight + 12, { align: 'center' });
-  }
-  
-  // Legal text - positioned between signatures and footer
-  const legalY = y + sigBoxHeight + 18;
-  doc.setFontSize(8);
+  // Legal text
+  doc.setFontSize(7);
   doc.setFont('helvetica', 'italic');
   doc.setTextColor(100, 100, 100);
   doc.text(
     'Para maior clareza, firmo(amos) o presente recibo para que produza os seus devidos efeitos legais.',
     pageWidth / 2,
-    legalY,
+    y,
     { align: 'center' }
   );
   doc.text(
     `${receipt.location}, ${formatDateFullPtBr(receipt.paymentDate)}`,
     pageWidth / 2,
-    legalY + 5,
+    y + 5,
     { align: 'center' }
   );
   
@@ -357,22 +407,30 @@ export function generateProposalPDF(proposal: Proposal, options: PDFOptions = {}
   
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.getWidth();
-  const colors = getPDFColors(proposal.bank);
-  const bankConfig = proposal.bank ? getBankConfigByName(proposal.bank) : undefined;
+  const pageHeight = doc.internal.pageSize.getHeight();
+  
+  // Determine if it's own financing
+  const isOwnFinancing = proposal.isOwnFinancing || 
+    !proposal.bank || 
+    proposal.bank?.toLowerCase().includes('próprio') ||
+    proposal.bank?.toLowerCase().includes('autos da serra');
+  
+  const colors = getPDFColors(isOwnFinancing ? undefined : proposal.bank);
   
   // Privacy mode handling
   const privacyMode = options.privacyMode || false;
   const displayClientName = privacyMode ? client.name.split(' ')[0] + ' ***' : client.name;
   const displayCPF = privacyMode ? '***.***.***-**' : formatCPF(client.cpf);
-  const displayPhone = privacyMode ? '(**) *****-****' : client.phone;
+  const displayPhone = privacyMode ? '(**) *****-****' : formatPhone(client.phone);
   const displayPrice = privacyMode ? 'R$ *****,**' : formatCurrency(proposal.vehiclePrice);
+  const displayCashPrice = privacyMode ? 'R$ *****,**' : formatCurrency(proposal.cashPrice || proposal.vehiclePrice);
   const displayDown = privacyMode ? 'R$ *****,**' : formatCurrency(proposal.downPayment);
   const displayFinanced = privacyMode ? 'R$ *****,**' : formatCurrency(proposal.financedAmount);
   const displayInstallment = privacyMode ? 'R$ *****,**' : formatCurrency(proposal.installmentValue);
   const displayTotal = privacyMode ? 'R$ *****,**' : formatCurrency(proposal.totalValue);
   
   // Header with bank branding if applicable
-  let y = drawHeader(doc, { bankName: proposal.bank });
+  let y = drawHeader(doc, { bankName: isOwnFinancing ? undefined : proposal.bank });
   
   // Document title
   const titleBgColor = colors.isOwn ? colors.secondary : colors.primary;
@@ -384,7 +442,7 @@ export function generateProposalPDF(proposal: Proposal, options: PDFOptions = {}
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(titleTextColor[0], titleTextColor[1], titleTextColor[2]);
   doc.text('PROPOSTA DE VENDA', pageWidth / 2, y + 8.5, { align: 'center' });
-  y += 20;
+  y += 18;
   
   // Proposal number and date
   doc.setFontSize(10);
@@ -397,68 +455,99 @@ export function generateProposalPDF(proposal: Proposal, options: PDFOptions = {}
   if (vendor) {
     y += 6;
     doc.setFontSize(9);
-    doc.text(`Vendedor: ${vendor.name}`, 20, y);
+    doc.text(`Vendedor: ${vendor.name}${vendor.phone ? ` | Tel: ${formatPhone(vendor.phone)}` : ''}`, 20, y);
   }
-  y += 12;
+  y += 10;
   
   // Client section
   y = drawSectionBox(doc, y, 'DADOS DO CLIENTE', colors);
   
   doc.setFillColor(250, 250, 250);
-  doc.rect(15, y, pageWidth - 30, 20, 'F');
+  doc.rect(15, y, pageWidth - 30, 18, 'F');
   
-  drawInfoRow(doc, 'Nome:', displayClientName, 20, y + 8);
-  drawInfoRow(doc, 'CPF:', displayCPF, 20, y + 16);
+  drawInfoRow(doc, 'Nome:', displayClientName, 20, y + 7, 35);
+  drawInfoRow(doc, 'CPF:', displayCPF, 20, y + 14, 35);
   if (client.phone) {
-    drawInfoRow(doc, 'Telefone:', displayPhone, 120, y + 8);
+    drawInfoRow(doc, 'Telefone:', displayPhone, 110, y + 7, 35);
   }
   
-  y += 28;
+  y += 24;
   
   // Vehicle section
   y = drawSectionBox(doc, y, 'DADOS DO VEÍCULO', colors);
   
+  const vehicleBoxHeight = vehicle.images && vehicle.images.length > 0 ? 45 : 26;
   doc.setFillColor(250, 250, 250);
-  doc.rect(15, y, pageWidth - 30, 28, 'F');
+  doc.rect(15, y, pageWidth - 30, vehicleBoxHeight, 'F');
   
-  drawInfoRow(doc, 'Veículo:', `${vehicle.brand} ${vehicle.model}`, 20, y + 8);
-  drawInfoRow(doc, 'Ano:', String(vehicle.year), 20, y + 16);
-  drawInfoRow(doc, 'Cor:', vehicle.color, 20, y + 24);
-  drawInfoRow(doc, 'Combustível:', vehicle.fuel, 120, y + 8);
-  drawInfoRow(doc, 'Câmbio:', vehicle.transmission, 120, y + 16);
-  if (vehicle.plate && !privacyMode) {
-    drawInfoRow(doc, 'Placa:', vehicle.plate, 120, y + 24);
+  // Vehicle image if available
+  if (vehicle.images && vehicle.images.length > 0 && !privacyMode) {
+    try {
+      doc.addImage(vehicle.images[0], 'JPEG', 18, y + 3, 40, 30);
+    } catch (e) {
+      console.error('Error adding vehicle image:', e);
+    }
+    
+    drawInfoRow(doc, 'Veículo:', `${vehicle.brand} ${vehicle.model}`, 65, y + 7, 35);
+    drawInfoRow(doc, 'Ano:', String(vehicle.year), 65, y + 14, 35);
+    drawInfoRow(doc, 'Cor:', vehicle.color, 65, y + 21, 35);
+    drawInfoRow(doc, 'Combustível:', vehicle.fuel, 130, y + 7, 40);
+    drawInfoRow(doc, 'Câmbio:', vehicle.transmission, 130, y + 14, 40);
+    if (vehicle.plate && !privacyMode) {
+      drawInfoRow(doc, 'Placa:', vehicle.plate, 130, y + 21, 40);
+    }
+    y += vehicleBoxHeight + 6;
+  } else {
+    drawInfoRow(doc, 'Veículo:', `${vehicle.brand} ${vehicle.model}`, 20, y + 7, 35);
+    drawInfoRow(doc, 'Ano:', String(vehicle.year), 20, y + 14, 35);
+    drawInfoRow(doc, 'Cor:', vehicle.color, 20, y + 21, 35);
+    drawInfoRow(doc, 'Combustível:', vehicle.fuel, 110, y + 7, 40);
+    drawInfoRow(doc, 'Câmbio:', vehicle.transmission, 110, y + 14, 40);
+    if (vehicle.plate && !privacyMode) {
+      drawInfoRow(doc, 'Placa:', vehicle.plate, 110, y + 21, 40);
+    }
+    y += vehicleBoxHeight + 6;
   }
   
-  y += 36;
+  // Cash Price section (if available)
+  if (proposal.cashPrice && proposal.cashPrice > 0) {
+    doc.setFillColor(...colors.secondary);
+    doc.rect(15, y, pageWidth - 30, 14, 'F');
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(30, 30, 30);
+    doc.text('VALOR À VISTA:', 25, y + 9);
+    doc.setFontSize(14);
+    doc.text(displayCashPrice, pageWidth - 25, y + 9, { align: 'right' });
+    y += 20;
+  }
   
   // Financial section
-  y = drawSectionBox(doc, y, 'CONDIÇÕES DE PAGAMENTO', colors);
+  y = drawSectionBox(doc, y, isOwnFinancing ? 'FINANCIAMENTO PRÓPRIO (SEM JUROS)' : 'CONDIÇÕES DE FINANCIAMENTO', colors);
   
   doc.setFillColor(250, 250, 250);
-  doc.rect(15, y, pageWidth - 30, 45, 'F');
+  doc.rect(15, y, pageWidth - 30, 42, 'F');
   
   // Left column
-  drawInfoRow(doc, 'Valor do Veículo:', displayPrice, 20, y + 10);
-  drawInfoRow(doc, 'Entrada:', displayDown, 20, y + 20);
-  drawInfoRow(doc, 'Valor Financiado:', displayFinanced, 20, y + 30);
+  drawInfoRow(doc, 'Valor do Veículo:', displayPrice, 20, y + 8, 50);
+  drawInfoRow(doc, 'Entrada:', displayDown, 20, y + 16, 50);
+  drawInfoRow(doc, 'Valor Financiado:', displayFinanced, 20, y + 24, 50);
   
   // Right column
-  drawInfoRow(doc, 'Parcelas:', `${proposal.installments}x de ${displayInstallment}`, 105, y + 10);
-  if (proposal.bank) {
-    const finType = bankConfig?.isOwn ? 'Financiamento Direto' : `Banco: ${proposal.bank}`;
-    drawInfoRow(doc, 'Tipo:', finType, 105, y + 20);
-  }
+  drawInfoRow(doc, 'Parcelas:', `${proposal.installments}x de ${displayInstallment}`, 105, y + 8, 35);
+  
+  const finType = isOwnFinancing ? 'Financiamento Próprio' : `Banco: ${proposal.bank}`;
+  drawInfoRow(doc, 'Tipo:', finType, 105, y + 16, 35);
   
   // Total highlight
   doc.setFillColor(...colors.primary);
-  doc.roundedRect(105, y + 28, 80, 12, 2, 2, 'F');
+  doc.roundedRect(105, y + 26, 80, 12, 2, 2, 'F');
   doc.setFontSize(10);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(255, 255, 255);
-  doc.text(`Total: ${displayTotal}`, 145, y + 36, { align: 'center' });
+  doc.text(`Total: ${displayTotal}`, 145, y + 34, { align: 'center' });
   
-  y += 55;
+  y += 50;
   
   // Notes if exists
   if (proposal.notes) {
@@ -466,75 +555,45 @@ export function generateProposalPDF(proposal: Proposal, options: PDFOptions = {}
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(80, 80, 80);
     doc.text('Observações:', 20, y);
-    y += 6;
+    y += 5;
     doc.setFont('helvetica', 'normal');
     const notesLines = doc.splitTextToSize(proposal.notes, pageWidth - 40);
     doc.text(notesLines, 20, y);
-    y += notesLines.length * 5 + 10;
+    y += notesLines.length * 4 + 8;
   }
   
-  // Signatures section - position with margin from footer
-  const pageHeight = doc.internal.pageSize.getHeight();
-  const footerStart = pageHeight - 35;
-  const sigBoxHeight = 30;
-  const sigTextSpace = 18;
-  const legalTextSpace = 12;
+  // Calculate signature position - ensure proper spacing from footer
+  const footerStart = pageHeight - 30;
+  const signatureHeight = 45;
+  const legalTextHeight = 15;
+  const minY = Math.max(y + 8, 170);
+  const maxY = footerStart - signatureHeight - legalTextHeight - 5;
+  y = Math.min(minY, maxY);
   
-  const requiredSpace = sigBoxHeight + sigTextSpace + legalTextSpace + 8;
-  y = Math.min(Math.max(y + 8, footerStart - requiredSpace - 25), footerStart - requiredSpace);
+  // Signatures
+  y = drawSignatureSection(
+    doc, y,
+    proposal.clientSignature,
+    proposal.vendorSignature,
+    displayClientName,
+    vendor?.name || '',
+    privacyMode
+  );
   
-  const sigBoxWidth = 75;
-  const leftSigX = 25;
-  const rightSigX = pageWidth - 25 - sigBoxWidth;
-  
-  // Client signature
-  if (proposal.clientSignature && !privacyMode) {
-    try {
-      doc.addImage(proposal.clientSignature, 'PNG', leftSigX + 5, y + 2, sigBoxWidth - 10, sigBoxHeight - 8);
-    } catch (e) {
-      console.error('Error adding client signature:', e);
-    }
-  }
-  
-  doc.setDrawColor(100, 100, 100);
-  doc.setLineWidth(0.5);
-  doc.line(leftSigX, y + sigBoxHeight, leftSigX + sigBoxWidth, y + sigBoxHeight);
-  doc.setFontSize(9);
-  doc.setTextColor(80, 80, 80);
-  doc.text('Assinatura do Cliente', leftSigX + sigBoxWidth / 2, y + sigBoxHeight + 6, { align: 'center' });
-  doc.setFontSize(8);
-  doc.text(displayClientName, leftSigX + sigBoxWidth / 2, y + sigBoxHeight + 12, { align: 'center' });
-  
-  // Vendor signature
-  if (proposal.vendorSignature && !privacyMode) {
-    try {
-      doc.addImage(proposal.vendorSignature, 'PNG', rightSigX + 5, y + 2, sigBoxWidth - 10, sigBoxHeight - 8);
-    } catch (e) {
-      console.error('Error adding vendor signature:', e);
-    }
-  }
-  
-  doc.line(rightSigX, y + sigBoxHeight, rightSigX + sigBoxWidth, y + sigBoxHeight);
-  doc.text('Assinatura do Vendedor', rightSigX + sigBoxWidth / 2, y + sigBoxHeight + 6, { align: 'center' });
-  if (vendor) {
-    doc.text(vendor.name, rightSigX + sigBoxWidth / 2, y + sigBoxHeight + 12, { align: 'center' });
-  }
-  
-  // Legal text - positioned between signatures and footer
-  const legalY = y + sigBoxHeight + 18;
-  doc.setFontSize(8);
+  // Legal text
+  doc.setFontSize(7);
   doc.setFont('helvetica', 'italic');
   doc.setTextColor(100, 100, 100);
   doc.text(
     'Esta proposta tem validade de 5 dias úteis e está sujeita a aprovação de crédito.',
     pageWidth / 2,
-    legalY,
+    y,
     { align: 'center' }
   );
   doc.text(
     `${formatCompanyShortAddress()}, ${formatDateFullPtBr(proposal.createdAt)}`,
     pageWidth / 2,
-    legalY + 5,
+    y + 5,
     { align: 'center' }
   );
   
@@ -542,4 +601,116 @@ export function generateProposalPDF(proposal: Proposal, options: PDFOptions = {}
   drawFooter(doc, 'Proposta de Venda');
   
   doc.save(`proposta-${proposal.number}.pdf`);
+}
+
+/**
+ * Generate Client Registration PDF
+ */
+export function generateClientPDF(client: Client): void {
+  const vendor = userStorage.getById(client.vendorId);
+  const company = getCompanyConfig();
+  const colors = getPDFColors();
+  
+  const doc = new jsPDF();
+  const pageWidth = doc.internal.pageSize.getWidth();
+  
+  // Header
+  let y = drawHeader(doc);
+  
+  // Document title
+  doc.setFillColor(...colors.secondary);
+  doc.rect(15, y, pageWidth - 30, 12, 'F');
+  doc.setFontSize(16);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(30, 30, 30);
+  doc.text('FICHA DE CADASTRO DO CLIENTE', pageWidth / 2, y + 8.5, { align: 'center' });
+  y += 22;
+  
+  // Registration date
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(80, 80, 80);
+  doc.text(`Data de Cadastro: ${formatDateDisplay(client.createdAt)}`, 20, y);
+  y += 12;
+  
+  // Client data section
+  y = drawSectionBox(doc, y, 'DADOS PESSOAIS', colors);
+  
+  doc.setFillColor(250, 250, 250);
+  doc.rect(15, y, pageWidth - 30, 32, 'F');
+  
+  drawInfoRow(doc, 'Nome Completo:', client.name, 20, y + 8, 50);
+  drawInfoRow(doc, 'CPF:', formatCPF(client.cpf), 20, y + 16, 50);
+  drawInfoRow(doc, 'Telefone:', formatPhone(client.phone), 20, y + 24, 50);
+  if (client.email) {
+    drawInfoRow(doc, 'E-mail:', client.email, 110, y + 8, 30);
+  }
+  
+  y += 40;
+  
+  // Address section
+  if (client.address) {
+    y = drawSectionBox(doc, y, 'ENDEREÇO', colors);
+    
+    doc.setFillColor(250, 250, 250);
+    doc.rect(15, y, pageWidth - 30, 28, 'F');
+    
+    const fullAddress = `${client.address.street}, ${client.address.number}${client.address.complement ? ` - ${client.address.complement}` : ''}`;
+    drawInfoRow(doc, 'Logradouro:', fullAddress, 20, y + 8, 45);
+    drawInfoRow(doc, 'Bairro:', client.address.neighborhood, 20, y + 16, 45);
+    drawInfoRow(doc, 'Cidade:', `${client.address.city} - ${client.address.state}`, 110, y + 8, 30);
+    if (client.address.zipCode) {
+      drawInfoRow(doc, 'CEP:', client.address.zipCode, 110, y + 16, 30);
+    }
+    
+    y += 36;
+  }
+  
+  // Vendor section
+  y = drawSectionBox(doc, y, 'RESPONSÁVEL PELO ATENDIMENTO', colors);
+  
+  doc.setFillColor(250, 250, 250);
+  doc.rect(15, y, pageWidth - 30, 18, 'F');
+  
+  if (vendor) {
+    drawInfoRow(doc, 'Vendedor:', vendor.name, 20, y + 8, 40);
+    if (vendor.phone) {
+      drawInfoRow(doc, 'Contato:', formatPhone(vendor.phone), 110, y + 8, 35);
+    }
+  }
+  
+  y += 26;
+  
+  // Notes section
+  if (client.notes) {
+    y = drawSectionBox(doc, y, 'OBSERVAÇÕES', colors);
+    
+    doc.setFillColor(250, 250, 250);
+    doc.rect(15, y, pageWidth - 30, 25, 'F');
+    
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(50, 50, 50);
+    const notesLines = doc.splitTextToSize(client.notes, pageWidth - 40);
+    doc.text(notesLines, 20, y + 8);
+    y += 30;
+  }
+  
+  // Signature area for client
+  y += 20;
+  doc.setDrawColor(120, 120, 120);
+  doc.setLineWidth(0.5);
+  
+  const sigLineWidth = 80;
+  const sigX = pageWidth / 2 - sigLineWidth / 2;
+  doc.line(sigX, y, sigX + sigLineWidth, y);
+  
+  doc.setFontSize(9);
+  doc.setTextColor(80, 80, 80);
+  doc.text('Assinatura do Cliente', pageWidth / 2, y + 6, { align: 'center' });
+  
+  // Footer
+  drawFooter(doc, 'Ficha de Cadastro');
+  
+  doc.save(`cadastro-${client.name.toLowerCase().replace(/\s+/g, '-')}.pdf`);
 }
