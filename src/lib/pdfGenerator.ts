@@ -275,13 +275,13 @@ export function generateReceiptPDF(receipt: Receipt, options: PDFOptions = {}): 
   // Signatures section - position with margin from footer
   const pageHeight = doc.internal.pageSize.getHeight();
   const footerStart = pageHeight - 35; // Footer starts at this Y position
-  const sigBoxHeight = 35;
-  const sigTextSpace = 20; // Space for text below signature
-  const legalTextSpace = 15; // Space for legal text
+  const sigBoxHeight = 30;
+  const sigTextSpace = 18; // Space for text below signature
+  const legalTextSpace = 12; // Space for legal text
   
-  // Calculate Y position to fit signatures above footer
-  const requiredSpace = sigBoxHeight + sigTextSpace + legalTextSpace + 10;
-  y = Math.min(Math.max(y + 15, 180), footerStart - requiredSpace);
+  // Calculate Y position to fit signatures above footer - closer to content
+  const requiredSpace = sigBoxHeight + sigTextSpace + legalTextSpace + 8;
+  y = Math.min(Math.max(y + 8, footerStart - requiredSpace - 25), footerStart - requiredSpace);
   
   // Signature boxes - clean style without gray background
   const sigBoxWidth = 75;
@@ -476,12 +476,12 @@ export function generateProposalPDF(proposal: Proposal, options: PDFOptions = {}
   // Signatures section - position with margin from footer
   const pageHeight = doc.internal.pageSize.getHeight();
   const footerStart = pageHeight - 35;
-  const sigBoxHeight = 35;
-  const sigTextSpace = 20;
-  const legalTextSpace = 15;
+  const sigBoxHeight = 30;
+  const sigTextSpace = 18;
+  const legalTextSpace = 12;
   
-  const requiredSpace = sigBoxHeight + sigTextSpace + legalTextSpace + 10;
-  y = Math.min(Math.max(y + 15, 180), footerStart - requiredSpace);
+  const requiredSpace = sigBoxHeight + sigTextSpace + legalTextSpace + 8;
+  y = Math.min(Math.max(y + 8, footerStart - requiredSpace - 25), footerStart - requiredSpace);
   
   const sigBoxWidth = 75;
   const leftSigX = 25;
