@@ -272,12 +272,19 @@ export function generateReceiptPDF(receipt: Receipt, options: PDFOptions = {}): 
     y += descLines.length * 5 + 10;
   }
   
-  // Signatures section
-  y = Math.max(y + 10, 200);
+  // Signatures section - position with margin from footer
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const footerStart = pageHeight - 35; // Footer starts at this Y position
+  const sigBoxHeight = 35;
+  const sigTextSpace = 20; // Space for text below signature
+  const legalTextSpace = 15; // Space for legal text
+  
+  // Calculate Y position to fit signatures above footer
+  const requiredSpace = sigBoxHeight + sigTextSpace + legalTextSpace + 10;
+  y = Math.min(Math.max(y + 15, 180), footerStart - requiredSpace);
   
   // Signature boxes - clean style without gray background
   const sigBoxWidth = 75;
-  const sigBoxHeight = 35;
   const leftSigX = 25;
   const rightSigX = pageWidth - 25 - sigBoxWidth;
   
@@ -295,9 +302,9 @@ export function generateReceiptPDF(receipt: Receipt, options: PDFOptions = {}): 
   doc.line(leftSigX, y + sigBoxHeight, leftSigX + sigBoxWidth, y + sigBoxHeight);
   doc.setFontSize(9);
   doc.setTextColor(80, 80, 80);
-  doc.text('Assinatura do Pagador', leftSigX + sigBoxWidth / 2, y + sigBoxHeight + 8, { align: 'center' });
+  doc.text('Assinatura do Pagador', leftSigX + sigBoxWidth / 2, y + sigBoxHeight + 6, { align: 'center' });
   doc.setFontSize(8);
-  doc.text(displayName, leftSigX + sigBoxWidth / 2, y + sigBoxHeight + 14, { align: 'center' });
+  doc.text(displayName, leftSigX + sigBoxWidth / 2, y + sigBoxHeight + 12, { align: 'center' });
   
   // Vendor signature
   if (receipt.vendorSignature && !privacyMode) {
@@ -309,13 +316,13 @@ export function generateReceiptPDF(receipt: Receipt, options: PDFOptions = {}): 
   }
   
   doc.line(rightSigX, y + sigBoxHeight, rightSigX + sigBoxWidth, y + sigBoxHeight);
-  doc.text('Assinatura do Recebedor', rightSigX + sigBoxWidth / 2, y + sigBoxHeight + 8, { align: 'center' });
+  doc.text('Assinatura do Recebedor', rightSigX + sigBoxWidth / 2, y + sigBoxHeight + 6, { align: 'center' });
   if (vendor) {
-    doc.text(vendor.name, rightSigX + sigBoxWidth / 2, y + sigBoxHeight + 14, { align: 'center' });
+    doc.text(vendor.name, rightSigX + sigBoxWidth / 2, y + sigBoxHeight + 12, { align: 'center' });
   }
   
-  // Legal text
-  const legalY = y + sigBoxHeight + 24;
+  // Legal text - positioned between signatures and footer
+  const legalY = y + sigBoxHeight + 18;
   doc.setFontSize(8);
   doc.setFont('helvetica', 'italic');
   doc.setTextColor(100, 100, 100);
@@ -328,7 +335,7 @@ export function generateReceiptPDF(receipt: Receipt, options: PDFOptions = {}): 
   doc.text(
     `${receipt.location}, ${formatDateFullPtBr(receipt.paymentDate)}`,
     pageWidth / 2,
-    legalY + 6,
+    legalY + 5,
     { align: 'center' }
   );
   
@@ -466,11 +473,17 @@ export function generateProposalPDF(proposal: Proposal, options: PDFOptions = {}
     y += notesLines.length * 5 + 10;
   }
   
-  // Signatures section - clean style without boxes
-  y = Math.max(y + 10, 200);
+  // Signatures section - position with margin from footer
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const footerStart = pageHeight - 35;
+  const sigBoxHeight = 35;
+  const sigTextSpace = 20;
+  const legalTextSpace = 15;
+  
+  const requiredSpace = sigBoxHeight + sigTextSpace + legalTextSpace + 10;
+  y = Math.min(Math.max(y + 15, 180), footerStart - requiredSpace);
   
   const sigBoxWidth = 75;
-  const sigBoxHeight = 35;
   const leftSigX = 25;
   const rightSigX = pageWidth - 25 - sigBoxWidth;
   
@@ -488,9 +501,9 @@ export function generateProposalPDF(proposal: Proposal, options: PDFOptions = {}
   doc.line(leftSigX, y + sigBoxHeight, leftSigX + sigBoxWidth, y + sigBoxHeight);
   doc.setFontSize(9);
   doc.setTextColor(80, 80, 80);
-  doc.text('Assinatura do Cliente', leftSigX + sigBoxWidth / 2, y + sigBoxHeight + 8, { align: 'center' });
+  doc.text('Assinatura do Cliente', leftSigX + sigBoxWidth / 2, y + sigBoxHeight + 6, { align: 'center' });
   doc.setFontSize(8);
-  doc.text(displayClientName, leftSigX + sigBoxWidth / 2, y + sigBoxHeight + 14, { align: 'center' });
+  doc.text(displayClientName, leftSigX + sigBoxWidth / 2, y + sigBoxHeight + 12, { align: 'center' });
   
   // Vendor signature
   if (proposal.vendorSignature && !privacyMode) {
@@ -502,13 +515,13 @@ export function generateProposalPDF(proposal: Proposal, options: PDFOptions = {}
   }
   
   doc.line(rightSigX, y + sigBoxHeight, rightSigX + sigBoxWidth, y + sigBoxHeight);
-  doc.text('Assinatura do Vendedor', rightSigX + sigBoxWidth / 2, y + sigBoxHeight + 8, { align: 'center' });
+  doc.text('Assinatura do Vendedor', rightSigX + sigBoxWidth / 2, y + sigBoxHeight + 6, { align: 'center' });
   if (vendor) {
-    doc.text(vendor.name, rightSigX + sigBoxWidth / 2, y + sigBoxHeight + 14, { align: 'center' });
+    doc.text(vendor.name, rightSigX + sigBoxWidth / 2, y + sigBoxHeight + 12, { align: 'center' });
   }
   
-  // Legal text
-  const legalY = y + sigBoxHeight + 24;
+  // Legal text - positioned between signatures and footer
+  const legalY = y + sigBoxHeight + 18;
   doc.setFontSize(8);
   doc.setFont('helvetica', 'italic');
   doc.setTextColor(100, 100, 100);
@@ -521,7 +534,7 @@ export function generateProposalPDF(proposal: Proposal, options: PDFOptions = {}
   doc.text(
     `${formatCompanyShortAddress()}, ${formatDateFullPtBr(proposal.createdAt)}`,
     pageWidth / 2,
-    legalY + 6,
+    legalY + 5,
     { align: 'center' }
   );
   
