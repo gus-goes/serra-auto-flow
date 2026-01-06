@@ -224,12 +224,12 @@ export default function ReceiptsPage() {
                 </div>
                 <div className="space-y-2">
                   <Label>Veículo (opcional)</Label>
-                  <Select value={form.vehicleId} onValueChange={(v) => setForm({ ...form, vehicleId: v })}>
+                  <Select value={form.vehicleId || 'none'} onValueChange={(v) => setForm({ ...form, vehicleId: v === 'none' ? '' : v })}>
                     <SelectTrigger>
                       <SelectValue placeholder="Selecione" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Nenhum</SelectItem>
+                      <SelectItem value="none">Nenhum</SelectItem>
                       {vehicles.map(v => (
                         <SelectItem key={v.id} value={v.id}>
                           {v.brand} {v.model} {v.year}
