@@ -4,6 +4,7 @@ import { usePrivacy } from '@/contexts/PrivacyContext';
 import { clientStorage, generateId } from '@/lib/storage';
 import type { Client, FunnelStage } from '@/types';
 import { formatCPF, formatPhone, formatDate, isValidCPF, cleanCPF, cleanPhone } from '@/lib/formatters';
+import { generateClientPDF } from '@/lib/pdfGenerator';
 import { useToast } from '@/hooks/use-toast';
 import { PrivacyMask } from '@/components/PrivacyMask';
 import { Button } from '@/components/ui/button';
@@ -22,7 +23,8 @@ import {
   Trash2,
   Phone,
   Mail,
-  MapPin
+  MapPin,
+  Download
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -157,6 +159,14 @@ export default function ClientsPage() {
         description: 'O cliente foi removido do sistema.',
       });
     }
+  };
+
+  const handleGeneratePDF = (client: Client) => {
+    generateClientPDF(client);
+    toast({
+      title: 'PDF gerado',
+      description: 'A ficha de cadastro foi baixada.',
+    });
   };
 
   const resetForm = () => {
@@ -373,7 +383,7 @@ export default function ClientsPage() {
                   <TableHead>Contato</TableHead>
                   <TableHead>Etapa</TableHead>
                   <TableHead>Cadastrado em</TableHead>
-                  <TableHead className="w-24">Ações</TableHead>
+                  <TableHead className="w-32">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -419,6 +429,15 @@ export default function ClientsPage() {
                     </TableCell>
                     <TableCell>
                       <div className="flex gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => handleGeneratePDF(client)}
+                          title="Baixar ficha de cadastro"
+                        >
+                          <Download className="h-4 w-4" />
+                        </Button>
                         <Button
                           variant="ghost"
                           size="icon"

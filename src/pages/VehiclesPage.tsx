@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { vehicleStorage, generateId } from '@/lib/storage';
 import { usePrivacy } from '@/contexts/PrivacyContext';
 import type { Vehicle } from '@/types';
@@ -22,7 +22,10 @@ import {
   Fuel,
   Gauge,
   Calendar,
-  DollarSign
+  DollarSign,
+  ImagePlus,
+  X,
+  Image
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -36,6 +39,9 @@ const statusLabels = {
   vendido: 'Vendido',
 };
 
+const MAX_IMAGES = 5;
+const MAX_IMAGE_SIZE = 500 * 1024; // 500KB per image
+
 export default function VehiclesPage() {
   const { privacyMode } = usePrivacy();
   const [vehicles, setVehicles] = useState<Vehicle[]>(vehicleStorage.getAll());
@@ -43,6 +49,8 @@ export default function VehiclesPage() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(null);
+  const [viewingImages, setViewingImages] = useState<Vehicle | null>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
   const [form, setForm] = useState({
@@ -57,6 +65,7 @@ export default function VehiclesPage() {
     plate: '',
     status: 'disponivel' as Vehicle['status'],
     description: '',
+    images: [] as string[],
   });
 
   const filteredVehicles = vehicles.filter(v => {
@@ -65,14 +74,75 @@ export default function VehiclesPage() {
     return matchesSearch && matchesStatus;
   });
 
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+
+    const currentImages = form.images;
+    const remainingSlots = MAX_IMAGES - currentImages.length;
+
+    if (files.length > remainingSlots) {
+      toast({
+        title: 'Limite de imagens',
+        description: `Você pode adicionar no máximo ${MAX_IMAGES} fotos por veículo.`,
+        variant: 'destructive',
+      });
+    }
+
+    const filesToProcess = Array.from(files).slice(0, remainingSlots);
+    
+    filesToProcess.forEach(file => {
+      if (file.size > MAX_IMAGE_SIZE) {
+        toast({
+          title: 'Imagem muito grande',
+          description: `A imagem ${file.name} excede 500KB. Por favor, use uma imagem menor.`,
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const base64 = event.target?.result as string;
+        setForm(prev => ({
+          ...prev,
+          images: [...prev.images, base64].slice(0, MAX_IMAGES)
+        }));
+      };
+      reader.readAsDataURL(file);
+    });
+
+    // Clear input
+    if (imageInputRef.current) {
+      imageInputRef.current.value = '';
+    }
+  };
+
+  const removeImage = (index: number) => {
+    setForm(prev => ({
+      ...prev,
+      images: prev.images.filter((_, i) => i !== index)
+    }));
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
     const now = new Date().toISOString();
     const vehicle: Vehicle = {
       id: editingVehicle?.id || generateId(),
-      ...form,
-      images: editingVehicle?.images || [],
+      brand: form.brand,
+      model: form.model,
+      year: form.year,
+      price: form.price,
+      mileage: form.mileage,
+      fuel: form.fuel,
+      transmission: form.transmission,
+      color: form.color,
+      plate: form.plate || undefined,
+      status: form.status,
+      description: form.description || undefined,
+      images: form.images,
       createdAt: editingVehicle?.createdAt || now,
       updatedAt: now,
     };
@@ -102,6 +172,7 @@ export default function VehiclesPage() {
       plate: vehicle.plate || '',
       status: vehicle.status,
       description: vehicle.description || '',
+      images: vehicle.images || [],
     });
     setIsDialogOpen(true);
   };
@@ -131,6 +202,7 @@ export default function VehiclesPage() {
       plate: '',
       status: 'disponivel',
       description: '',
+      images: [],
     });
   };
 
@@ -280,6 +352,60 @@ export default function VehiclesPage() {
                 </div>
               </div>
 
+              {/* Image Upload Section */}
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  <ImagePlus className="h-4 w-4" />
+                  Fotos do Veículo ({form.images.length}/{MAX_IMAGES})
+                </Label>
+                <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-4">
+                  <input
+                    ref={imageInputRef}
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={handleImageUpload}
+                    className="hidden"
+                  />
+                  
+                  {form.images.length > 0 && (
+                    <div className="grid grid-cols-5 gap-2 mb-4">
+                      {form.images.map((img, idx) => (
+                        <div key={idx} className="relative group">
+                          <img 
+                            src={img} 
+                            alt={`Foto ${idx + 1}`} 
+                            className="h-16 w-full object-cover rounded border"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => removeImage(idx)}
+                            className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => imageInputRef.current?.click()}
+                    disabled={form.images.length >= MAX_IMAGES}
+                    className="w-full"
+                  >
+                    <ImagePlus className="h-4 w-4 mr-2" />
+                    {form.images.length >= MAX_IMAGES ? 'Limite atingido' : 'Adicionar Fotos'}
+                  </Button>
+                  <p className="text-xs text-muted-foreground text-center mt-2">
+                    Máximo de {MAX_IMAGES} fotos, até 500KB cada
+                  </p>
+                </div>
+              </div>
+
               <div className="space-y-2">
                 <Label htmlFor="description">Descrição</Label>
                 <Textarea
@@ -303,6 +429,27 @@ export default function VehiclesPage() {
           </DialogContent>
         </Dialog>
       </div>
+
+      {/* Image Gallery Dialog */}
+      <Dialog open={!!viewingImages} onOpenChange={() => setViewingImages(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>
+              Fotos - {viewingImages?.brand} {viewingImages?.model}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="grid grid-cols-2 gap-4">
+            {viewingImages?.images.map((img, idx) => (
+              <img 
+                key={idx} 
+                src={img} 
+                alt={`Foto ${idx + 1}`} 
+                className="w-full h-48 object-cover rounded-lg"
+              />
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-4">
@@ -338,8 +485,27 @@ export default function VehiclesPage() {
               className="overflow-hidden hover:shadow-lg transition-all duration-200 animate-slide-up"
               style={{ animationDelay: `${index * 50}ms` }}
             >
-              <div className="h-40 bg-gradient-to-br from-muted to-muted/50 flex items-center justify-center">
-                <Car className="h-16 w-16 text-muted-foreground/30" />
+              <div 
+                className="h-40 bg-gradient-to-br from-muted to-muted/50 flex items-center justify-center cursor-pointer relative group"
+                onClick={() => vehicle.images?.length > 0 && setViewingImages(vehicle)}
+              >
+                {vehicle.images && vehicle.images.length > 0 ? (
+                  <>
+                    <img 
+                      src={vehicle.images[0]} 
+                      alt={`${vehicle.brand} ${vehicle.model}`}
+                      className="h-full w-full object-cover"
+                    />
+                    {vehicle.images.length > 1 && (
+                      <div className="absolute bottom-2 right-2 bg-black/60 text-white text-xs px-2 py-1 rounded flex items-center gap-1">
+                        <Image className="h-3 w-3" />
+                        {vehicle.images.length}
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <Car className="h-16 w-16 text-muted-foreground/30" />
+                )}
               </div>
               <CardContent className="p-4">
                 <div className="flex items-start justify-between mb-3">
