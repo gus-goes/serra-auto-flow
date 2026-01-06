@@ -22,7 +22,6 @@ export function formatPhone(phone: string): string {
  * @deprecated Use formatDateDisplay from dateUtils.ts instead
  */
 export function formatDate(date: string | Date): string {
-  // Import the proper function from dateUtils
   const { formatDateDisplay } = require('./dateUtils');
   return formatDateDisplay(date);
 }
@@ -43,82 +42,132 @@ export function formatPercent(value: number): string {
   return value.toFixed(2).replace('.', ',') + '%';
 }
 
+/**
+ * Convert a number to words in Portuguese (Brazilian)
+ * Fixed implementation to handle all edge cases without undefined
+ */
 export function numberToWords(value: number): string {
+  if (value === undefined || value === null || isNaN(value)) {
+    return 'zero reais';
+  }
+
   const units = ['', 'um', 'dois', 'três', 'quatro', 'cinco', 'seis', 'sete', 'oito', 'nove'];
   const teens = ['dez', 'onze', 'doze', 'treze', 'quatorze', 'quinze', 'dezesseis', 'dezessete', 'dezoito', 'dezenove'];
   const tens = ['', '', 'vinte', 'trinta', 'quarenta', 'cinquenta', 'sessenta', 'setenta', 'oitenta', 'noventa'];
   const hundreds = ['', 'cento', 'duzentos', 'trezentos', 'quatrocentos', 'quinhentos', 'seiscentos', 'setecentos', 'oitocentos', 'novecentos'];
 
   if (value === 0) return 'zero reais';
-  if (value === 100) return 'cem reais';
 
-  const intPart = Math.floor(value);
-  const decPart = Math.round((value - intPart) * 100);
+  const intPart = Math.floor(Math.abs(value));
+  const decPart = Math.round((Math.abs(value) - intPart) * 100);
 
   let result = '';
 
-  // Thousands
-  if (intPart >= 1000) {
-    const thousands = Math.floor(intPart / 1000);
-    if (thousands === 1) {
-      result += 'mil';
-    } else if (thousands < 10) {
-      result += units[thousands] + ' mil';
-    } else if (thousands < 20) {
-      result += teens[thousands - 10] + ' mil';
+  // Handle millions
+  if (intPart >= 1000000) {
+    const millions = Math.floor(intPart / 1000000);
+    if (millions === 1) {
+      result += 'um milhão';
     } else {
-      const t = Math.floor(thousands / 10);
-      const u = thousands % 10;
-      result += tens[t] + (u > 0 ? ' e ' + units[u] : '') + ' mil';
+      result += convertHundreds(millions, units, teens, tens, hundreds) + ' milhões';
     }
   }
 
-  // Hundreds
-  const remainder = intPart % 1000;
-  if (remainder >= 100) {
+  // Handle thousands
+  const thousandsPart = Math.floor((intPart % 1000000) / 1000);
+  if (thousandsPart > 0) {
     if (result) result += ' ';
-    const h = Math.floor(remainder / 100);
+    if (thousandsPart === 1) {
+      result += 'mil';
+    } else {
+      result += convertHundreds(thousandsPart, units, teens, tens, hundreds) + ' mil';
+    }
+  }
+
+  // Handle hundreds, tens, and units
+  const remainder = intPart % 1000;
+  if (remainder > 0) {
+    if (result) {
+      result += ' e ';
+    }
     if (remainder === 100) {
       result += 'cem';
     } else {
-      result += hundreds[h];
+      result += convertHundreds(remainder, units, teens, tens, hundreds);
     }
   }
 
-  // Tens and units
-  const tensUnits = remainder % 100;
-  if (tensUnits > 0) {
-    if (result && remainder >= 100) result += ' e ';
-    else if (result) result += ' e ';
-
-    if (tensUnits < 10) {
-      result += units[tensUnits];
-    } else if (tensUnits < 20) {
-      result += teens[tensUnits - 10];
-    } else {
-      const t = Math.floor(tensUnits / 10);
-      const u = tensUnits % 10;
-      result += tens[t] + (u > 0 ? ' e ' + units[u] : '');
-    }
+  // Handle case where intPart is 0 but we have decimals
+  if (intPart === 0 && decPart > 0) {
+    result = '';
+  } else if (intPart > 0) {
+    result += intPart === 1 ? ' real' : ' reais';
   }
 
-  result += intPart === 1 ? ' real' : ' reais';
-
+  // Handle cents
   if (decPart > 0) {
-    result += ' e ';
+    if (intPart > 0) {
+      result += ' e ';
+    }
     if (decPart < 10) {
-      result += units[decPart];
+      result += units[decPart] || '';
     } else if (decPart < 20) {
-      result += teens[decPart - 10];
+      result += teens[decPart - 10] || '';
     } else {
       const t = Math.floor(decPart / 10);
       const u = decPart % 10;
-      result += tens[t] + (u > 0 ? ' e ' + units[u] : '');
+      result += (tens[t] || '') + (u > 0 ? ' e ' + (units[u] || '') : '');
     }
     result += decPart === 1 ? ' centavo' : ' centavos';
   }
 
-  return result.charAt(0).toUpperCase() + result.slice(1);
+  // Capitalize first letter
+  const finalResult = result.trim();
+  if (!finalResult) return 'zero reais';
+  
+  return finalResult.charAt(0).toUpperCase() + finalResult.slice(1);
+}
+
+/**
+ * Helper function to convert numbers up to 999 to words
+ */
+function convertHundreds(
+  num: number,
+  units: string[],
+  teens: string[],
+  tens: string[],
+  hundreds: string[]
+): string {
+  let result = '';
+
+  // Hundreds
+  if (num >= 100) {
+    const h = Math.floor(num / 100);
+    const remainder = num % 100;
+    if (num === 100) {
+      return 'cem';
+    }
+    result += hundreds[h] || '';
+    if (remainder > 0) {
+      result += ' e ';
+    }
+  }
+
+  // Tens and units
+  const tensUnits = num % 100;
+  if (tensUnits > 0) {
+    if (tensUnits < 10) {
+      result += units[tensUnits] || '';
+    } else if (tensUnits < 20) {
+      result += teens[tensUnits - 10] || '';
+    } else {
+      const t = Math.floor(tensUnits / 10);
+      const u = tensUnits % 10;
+      result += (tens[t] || '') + (u > 0 ? ' e ' + (units[u] || '') : '');
+    }
+  }
+
+  return result;
 }
 
 export function cleanCPF(cpf: string): string {
@@ -151,4 +200,32 @@ export function isValidCPF(cpf: string): boolean {
   if (parseInt(cleaned.charAt(10)) !== digit) return false;
 
   return true;
+}
+
+/**
+ * Mask sensitive data for privacy mode
+ */
+export function maskCPF(cpf: string): string {
+  return '***.***.***-**';
+}
+
+export function maskPhone(phone: string): string {
+  return '(**) *****-****';
+}
+
+export function maskCurrency(value: number): string {
+  return 'R$ *****,**';
+}
+
+export function maskName(name: string): string {
+  if (!name) return '';
+  const parts = name.split(' ');
+  if (parts.length === 1) return parts[0].charAt(0) + '.';
+  const first = parts[0];
+  const lastInitials = parts.slice(1).map(p => p.charAt(0) + '.').join(' ');
+  return `${first} ${lastInitials}`;
+}
+
+export function maskNumber(num: string): string {
+  return '****';
 }
