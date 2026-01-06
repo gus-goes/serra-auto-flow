@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { usePrivacy } from '@/contexts/PrivacyContext';
 import { receiptStorage, clientStorage, vehicleStorage, proposalStorage, generateId, generateNumber } from '@/lib/storage';
 import type { Receipt, PaymentMethod, PaymentReference } from '@/types';
-import { formatCurrency, formatCPF } from '@/lib/formatters';
+import { formatCurrency, formatCPF, maskCPF, maskCurrency, maskName } from '@/lib/formatters';
 import { formatDateDisplay, getCurrentDateString, getCurrentTimestamp } from '@/lib/dateUtils';
 import { generateReceiptPDF } from '@/lib/pdfGenerator';
 import { useToast } from '@/hooks/use-toast';
@@ -15,6 +16,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { SignaturePad } from '@/components/ui/signature-pad';
+import { Badge } from '@/components/ui/badge';
 import { 
   Receipt as ReceiptIcon, 
   Plus, 
@@ -52,6 +54,7 @@ const paymentReferenceLabels: Record<PaymentReference, string> = {
 
 export default function ReceiptsPage() {
   const { user, isAdmin } = useAuth();
+  const { privacyMode } = usePrivacy();
   const { toast } = useToast();
   
   const [receipts, setReceipts] = useState<Receipt[]>(() => {
@@ -163,11 +166,11 @@ export default function ReceiptsPage() {
     }
   };
 
-  const handleGeneratePDF = (receipt: Receipt) => {
-    generateReceiptPDF(receipt);
+  const handleGeneratePDF = (receipt: Receipt, withPrivacy: boolean = false) => {
+    generateReceiptPDF(receipt, { privacyMode: withPrivacy });
     toast({
       title: 'PDF gerado',
-      description: 'O recibo foi baixado com sucesso.',
+      description: withPrivacy ? 'Recibo com dados ocultos baixado.' : 'O recibo foi baixado com sucesso.',
     });
   };
 
