@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { vehicleStorage, generateId } from '@/lib/storage';
+import { usePrivacy } from '@/contexts/PrivacyContext';
 import type { Vehicle } from '@/types';
 import { formatCurrency, formatMileage } from '@/lib/formatters';
 import { useToast } from '@/hooks/use-toast';
+import { PrivacyMask } from '@/components/PrivacyMask';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -35,6 +37,7 @@ const statusLabels = {
 };
 
 export default function VehiclesPage() {
+  const { privacyMode } = usePrivacy();
   const [vehicles, setVehicles] = useState<Vehicle[]>(vehicleStorage.getAll());
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -341,8 +344,12 @@ export default function VehiclesPage() {
               <CardContent className="p-4">
                 <div className="flex items-start justify-between mb-3">
                   <div>
-                    <h3 className="font-semibold">{vehicle.brand} {vehicle.model}</h3>
-                    <p className="text-sm text-muted-foreground">{vehicle.year} • {vehicle.color}</p>
+                    <h3 className="font-semibold">
+                      <PrivacyMask type="blur">{vehicle.brand} {vehicle.model}</PrivacyMask>
+                    </h3>
+                    <p className="text-sm text-muted-foreground">
+                      <PrivacyMask type="hide" placeholder="••••">{vehicle.year} • {vehicle.color}</PrivacyMask>
+                    </p>
                   </div>
                   <span className={cn('badge-status', `badge-${vehicle.status}`)}>
                     {statusLabels[vehicle.status]}
@@ -352,11 +359,19 @@ export default function VehiclesPage() {
                 <div className="grid grid-cols-2 gap-2 text-sm mb-4">
                   <div className="flex items-center gap-2 text-muted-foreground">
                     <DollarSign className="h-4 w-4" />
-                    <span className="font-medium text-foreground">{formatCurrency(vehicle.price)}</span>
+                    <span className="font-medium text-foreground">
+                      <PrivacyMask type="hide" placeholder="R$ •••••">
+                        {formatCurrency(vehicle.price)}
+                      </PrivacyMask>
+                    </span>
                   </div>
                   <div className="flex items-center gap-2 text-muted-foreground">
                     <Gauge className="h-4 w-4" />
-                    <span>{formatMileage(vehicle.mileage)}</span>
+                    <span>
+                      <PrivacyMask type="hide" placeholder="••• km">
+                        {formatMileage(vehicle.mileage)}
+                      </PrivacyMask>
+                    </span>
                   </div>
                   <div className="flex items-center gap-2 text-muted-foreground">
                     <Fuel className="h-4 w-4" />

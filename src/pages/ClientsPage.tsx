@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { usePrivacy } from '@/contexts/PrivacyContext';
 import { clientStorage, generateId } from '@/lib/storage';
 import type { Client, FunnelStage } from '@/types';
 import { formatCPF, formatPhone, formatDate, isValidCPF, cleanCPF, cleanPhone } from '@/lib/formatters';
 import { useToast } from '@/hooks/use-toast';
+import { PrivacyMask } from '@/components/PrivacyMask';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -44,6 +46,7 @@ const funnelColors: Record<FunnelStage, string> = {
 
 export default function ClientsPage() {
   const { user, isAdmin } = useAuth();
+  const { privacyMode } = usePrivacy();
   const [clients, setClients] = useState<Client[]>(() => {
     const all = clientStorage.getAll();
     return isAdmin ? all : all.filter(c => c.vendorId === user?.id);
@@ -378,20 +381,30 @@ export default function ClientsPage() {
                   <TableRow key={client.id} className="table-row-hover">
                     <TableCell>
                       <div>
-                        <p className="font-medium">{client.name}</p>
-                        <p className="text-sm text-muted-foreground">{formatCPF(client.cpf)}</p>
+                        <p className="font-medium">
+                          <PrivacyMask type="blur">{client.name}</PrivacyMask>
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          <PrivacyMask type="hide" placeholder="•••.•••.•••-••">
+                            {formatCPF(client.cpf)}
+                          </PrivacyMask>
+                        </p>
                       </div>
                     </TableCell>
                     <TableCell>
                       <div className="space-y-1">
                         <div className="flex items-center gap-2 text-sm">
                           <Phone className="h-3 w-3 text-muted-foreground" />
-                          {formatPhone(client.phone)}
+                          <PrivacyMask type="hide" placeholder="(••) •••••-••••">
+                            {formatPhone(client.phone)}
+                          </PrivacyMask>
                         </div>
                         {client.email && (
                           <div className="flex items-center gap-2 text-sm text-muted-foreground">
                             <Mail className="h-3 w-3" />
-                            {client.email}
+                            <PrivacyMask type="hide" placeholder="•••@•••.•••">
+                              {client.email}
+                            </PrivacyMask>
                           </div>
                         )}
                       </div>

@@ -1,7 +1,9 @@
 import { useAuth } from '@/contexts/AuthContext';
+import { usePrivacy } from '@/contexts/PrivacyContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { vehicleStorage, clientStorage, proposalStorage, receiptStorage, saleStorage, userStorage } from '@/lib/storage';
 import { formatCurrency } from '@/lib/formatters';
+import { PrivacyMask } from '@/components/PrivacyMask';
 import { 
   Car, 
   Users, 
@@ -10,12 +12,14 @@ import {
   TrendingUp, 
   DollarSign,
   Clock,
-  CheckCircle2
+  CheckCircle2,
+  EyeOff
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 
 export default function DashboardPage() {
   const { user, isAdmin } = useAuth();
+  const { privacyMode } = usePrivacy();
 
   // Get data based on role
   const vehicles = vehicleStorage.getAll();
@@ -118,7 +122,11 @@ export default function DashboardPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground mb-1">{stat.title}</p>
-                  <p className="text-2xl font-bold">{stat.value}</p>
+                  <p className="text-2xl font-bold">
+                    <PrivacyMask type="hide" placeholder="•••">
+                      {stat.value}
+                    </PrivacyMask>
+                  </p>
                 </div>
                 <div className={`h-12 w-12 rounded-lg ${stat.bg} flex items-center justify-center`}>
                   <stat.icon className={`h-6 w-6 ${stat.color}`} />
@@ -130,54 +138,65 @@ export default function DashboardPage() {
       </div>
 
       {/* Charts */}
-      <div className="grid gap-6 lg:grid-cols-2">
-        {/* Vehicle Status */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Car className="h-5 w-5 text-primary" />
-              Status dos Veículos
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={vehicleStatusData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={60}
-                    outerRadius={90}
-                    paddingAngle={5}
-                    dataKey="value"
-                  >
-                    {vehicleStatusData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: 'hsl(var(--card))',
-                      border: '1px solid hsl(var(--border))',
-                      borderRadius: '8px',
-                    }}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-            <div className="flex justify-center gap-6 mt-4">
-              {vehicleStatusData.map((item, index) => (
-                <div key={index} className="flex items-center gap-2">
-                  <div className="h-3 w-3 rounded-full" style={{ backgroundColor: item.color }} />
-                  <span className="text-sm text-muted-foreground">
-                    {item.name}: {item.value}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </CardContent>
+      {privacyMode ? (
+        <Card className="p-12">
+          <div className="text-center">
+            <EyeOff className="h-12 w-12 text-muted-foreground/30 mx-auto mb-4" />
+            <h3 className="text-lg font-medium mb-1">Modo Privacidade Ativo</h3>
+            <p className="text-muted-foreground">
+              Os gráficos e dados detalhados estão ocultos. Desative o modo privacidade para visualizar.
+            </p>
+          </div>
         </Card>
+      ) : (
+        <div className="grid gap-6 lg:grid-cols-2">
+          {/* Vehicle Status */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Car className="h-5 w-5 text-primary" />
+                Status dos Veículos
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={vehicleStatusData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={90}
+                      paddingAngle={5}
+                      dataKey="value"
+                    >
+                      {vehicleStatusData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: 'hsl(var(--card))',
+                        border: '1px solid hsl(var(--border))',
+                        borderRadius: '8px',
+                      }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="flex justify-center gap-6 mt-4">
+                {vehicleStatusData.map((item, index) => (
+                  <div key={index} className="flex items-center gap-2">
+                    <div className="h-3 w-3 rounded-full" style={{ backgroundColor: item.color }} />
+                    <span className="text-sm text-muted-foreground">
+                      {item.name}: {item.value}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
 
         {/* Sales by Vendor (Admin) or Recent Activity */}
         {isAdmin ? (
@@ -247,8 +266,8 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
         )}
-      </div>
-
+        </div>
+      )}
       {/* Quick Stats */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card className="bg-gradient-to-br from-primary/10 to-primary/5 border-primary/20">
@@ -257,7 +276,9 @@ export default function DashboardPage() {
               <FileText className="h-5 w-5 text-primary" />
             </div>
             <div>
-              <p className="text-2xl font-bold">{proposals.length}</p>
+              <p className="text-2xl font-bold">
+                <PrivacyMask type="hide" placeholder="•">{proposals.length}</PrivacyMask>
+              </p>
               <p className="text-xs text-muted-foreground">Total Propostas</p>
             </div>
           </CardContent>
@@ -269,7 +290,9 @@ export default function DashboardPage() {
               <CheckCircle2 className="h-5 w-5 text-success" />
             </div>
             <div>
-              <p className="text-2xl font-bold">{sales.length}</p>
+              <p className="text-2xl font-bold">
+                <PrivacyMask type="hide" placeholder="•">{sales.length}</PrivacyMask>
+              </p>
               <p className="text-xs text-muted-foreground">Vendas Realizadas</p>
             </div>
           </CardContent>
@@ -281,7 +304,9 @@ export default function DashboardPage() {
               <Receipt className="h-5 w-5 text-info" />
             </div>
             <div>
-              <p className="text-2xl font-bold">{receipts.length}</p>
+              <p className="text-2xl font-bold">
+                <PrivacyMask type="hide" placeholder="•">{receipts.length}</PrivacyMask>
+              </p>
               <p className="text-xs text-muted-foreground">Recibos Emitidos</p>
             </div>
           </CardContent>
@@ -293,7 +318,9 @@ export default function DashboardPage() {
               <Car className="h-5 w-5 text-warning" />
             </div>
             <div>
-              <p className="text-2xl font-bold">{vehiclesSold}</p>
+              <p className="text-2xl font-bold">
+                <PrivacyMask type="hide" placeholder="•">{vehiclesSold}</PrivacyMask>
+              </p>
               <p className="text-xs text-muted-foreground">Veículos Vendidos</p>
             </div>
           </CardContent>
