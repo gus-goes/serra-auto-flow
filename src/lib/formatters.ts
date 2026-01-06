@@ -1,3 +1,5 @@
+import { formatDateDisplay, formatDateTimeDisplay } from './dateUtils';
+
 export function formatCurrency(value: number): string {
   return new Intl.NumberFormat('pt-BR', {
     style: 'currency',
@@ -22,7 +24,6 @@ export function formatPhone(phone: string): string {
  * @deprecated Use formatDateDisplay from dateUtils.ts instead
  */
 export function formatDate(date: string | Date): string {
-  const { formatDateDisplay } = require('./dateUtils');
   return formatDateDisplay(date);
 }
 
@@ -30,7 +31,6 @@ export function formatDate(date: string | Date): string {
  * @deprecated Use formatDateTimeDisplay from dateUtils.ts instead
  */
 export function formatDateTime(date: string | Date): string {
-  const { formatDateTimeDisplay } = require('./dateUtils');
   return formatDateTimeDisplay(date);
 }
 
