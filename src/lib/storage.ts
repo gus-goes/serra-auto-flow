@@ -1,4 +1,4 @@
-import type { User, Vehicle, Client, Bank, Simulation, Proposal, Receipt, Sale, ActivityLog } from '@/types';
+import type { User, Vehicle, Client, Bank, Simulation, Proposal, Receipt, Sale, ActivityLog, Contract, Warranty, TransferAuthorization, WithdrawalDeclaration, Reservation } from '@/types';
 import { hashPassword } from './passwordUtils';
 import { getCurrentDateString, getCurrentTimestamp } from './dateUtils';
 import { BANK_CONFIGS } from './bankConfig';
@@ -17,6 +17,12 @@ const STORAGE_KEYS = {
   ACTIVITY_LOG: 'autos_serra_activity_log',
   SETTINGS: 'autos_serra_settings',
   INITIALIZED: 'autos_serra_initialized_v2',
+  // Documentos
+  CONTRACTS: 'autos_serra_contracts',
+  WARRANTIES: 'autos_serra_warranties',
+  TRANSFER_AUTHORIZATIONS: 'autos_serra_transfer_authorizations',
+  WITHDRAWAL_DECLARATIONS: 'autos_serra_withdrawal_declarations',
+  RESERVATIONS: 'autos_serra_reservations',
 };
 
 // Generic storage functions
@@ -375,6 +381,113 @@ export const activityLog = {
   },
 };
 
+// Contract storage
+export const contractStorage = {
+  getAll: (): Contract[] => getItem<Contract[]>(STORAGE_KEYS.CONTRACTS, []),
+  getById: (id: string): Contract | undefined => contractStorage.getAll().find(c => c.id === id),
+  getByClient: (clientId: string): Contract[] => contractStorage.getAll().filter(c => c.clientId === clientId),
+  save: (contract: Contract): void => {
+    const contracts = contractStorage.getAll();
+    const index = contracts.findIndex(c => c.id === contract.id);
+    if (index >= 0) {
+      contracts[index] = contract;
+    } else {
+      contracts.push(contract);
+    }
+    setItem(STORAGE_KEYS.CONTRACTS, contracts);
+  },
+  delete: (id: string): void => {
+    const contracts = contractStorage.getAll().filter(c => c.id !== id);
+    setItem(STORAGE_KEYS.CONTRACTS, contracts);
+  },
+};
+
+// Warranty storage
+export const warrantyStorage = {
+  getAll: (): Warranty[] => getItem<Warranty[]>(STORAGE_KEYS.WARRANTIES, []),
+  getById: (id: string): Warranty | undefined => warrantyStorage.getAll().find(w => w.id === id),
+  getByClient: (clientId: string): Warranty[] => warrantyStorage.getAll().filter(w => w.clientId === clientId),
+  save: (warranty: Warranty): void => {
+    const warranties = warrantyStorage.getAll();
+    const index = warranties.findIndex(w => w.id === warranty.id);
+    if (index >= 0) {
+      warranties[index] = warranty;
+    } else {
+      warranties.push(warranty);
+    }
+    setItem(STORAGE_KEYS.WARRANTIES, warranties);
+  },
+  delete: (id: string): void => {
+    const warranties = warrantyStorage.getAll().filter(w => w.id !== id);
+    setItem(STORAGE_KEYS.WARRANTIES, warranties);
+  },
+};
+
+// Transfer Authorization storage
+export const transferAuthStorage = {
+  getAll: (): TransferAuthorization[] => getItem<TransferAuthorization[]>(STORAGE_KEYS.TRANSFER_AUTHORIZATIONS, []),
+  getById: (id: string): TransferAuthorization | undefined => transferAuthStorage.getAll().find(t => t.id === id),
+  getByClient: (clientId: string): TransferAuthorization[] => transferAuthStorage.getAll().filter(t => t.clientId === clientId),
+  save: (transfer: TransferAuthorization): void => {
+    const transfers = transferAuthStorage.getAll();
+    const index = transfers.findIndex(t => t.id === transfer.id);
+    if (index >= 0) {
+      transfers[index] = transfer;
+    } else {
+      transfers.push(transfer);
+    }
+    setItem(STORAGE_KEYS.TRANSFER_AUTHORIZATIONS, transfers);
+  },
+  delete: (id: string): void => {
+    const transfers = transferAuthStorage.getAll().filter(t => t.id !== id);
+    setItem(STORAGE_KEYS.TRANSFER_AUTHORIZATIONS, transfers);
+  },
+};
+
+// Withdrawal Declaration storage
+export const withdrawalStorage = {
+  getAll: (): WithdrawalDeclaration[] => getItem<WithdrawalDeclaration[]>(STORAGE_KEYS.WITHDRAWAL_DECLARATIONS, []),
+  getById: (id: string): WithdrawalDeclaration | undefined => withdrawalStorage.getAll().find(w => w.id === id),
+  getByClient: (clientId: string): WithdrawalDeclaration[] => withdrawalStorage.getAll().filter(w => w.clientId === clientId),
+  save: (declaration: WithdrawalDeclaration): void => {
+    const declarations = withdrawalStorage.getAll();
+    const index = declarations.findIndex(d => d.id === declaration.id);
+    if (index >= 0) {
+      declarations[index] = declaration;
+    } else {
+      declarations.push(declaration);
+    }
+    setItem(STORAGE_KEYS.WITHDRAWAL_DECLARATIONS, declarations);
+  },
+  delete: (id: string): void => {
+    const declarations = withdrawalStorage.getAll().filter(d => d.id !== id);
+    setItem(STORAGE_KEYS.WITHDRAWAL_DECLARATIONS, declarations);
+  },
+};
+
+// Reservation storage
+export const reservationStorage = {
+  getAll: (): Reservation[] => getItem<Reservation[]>(STORAGE_KEYS.RESERVATIONS, []),
+  getById: (id: string): Reservation | undefined => reservationStorage.getAll().find(r => r.id === id),
+  getByClient: (clientId: string): Reservation[] => reservationStorage.getAll().filter(r => r.clientId === clientId),
+  getByVehicle: (vehicleId: string): Reservation[] => reservationStorage.getAll().filter(r => r.vehicleId === vehicleId),
+  getActive: (): Reservation[] => reservationStorage.getAll().filter(r => r.status === 'ativa'),
+  save: (reservation: Reservation): void => {
+    const reservations = reservationStorage.getAll();
+    const index = reservations.findIndex(r => r.id === reservation.id);
+    if (index >= 0) {
+      reservations[index] = reservation;
+    } else {
+      reservations.push(reservation);
+    }
+    setItem(STORAGE_KEYS.RESERVATIONS, reservations);
+  },
+  delete: (id: string): void => {
+    const reservations = reservationStorage.getAll().filter(r => r.id !== id);
+    setItem(STORAGE_KEYS.RESERVATIONS, reservations);
+  },
+};
+
 // Backup functions
 export const backup = {
   export: (): string => {
@@ -388,6 +501,11 @@ export const backup = {
       receipts: receiptStorage.getAll(),
       sales: saleStorage.getAll(),
       activityLog: activityLog.getAll(),
+      contracts: contractStorage.getAll(),
+      warranties: warrantyStorage.getAll(),
+      transferAuthorizations: transferAuthStorage.getAll(),
+      withdrawalDeclarations: withdrawalStorage.getAll(),
+      reservations: reservationStorage.getAll(),
       exportedAt: getCurrentTimestamp(),
     };
     return JSON.stringify(data, null, 2);
@@ -404,6 +522,11 @@ export const backup = {
       if (data.receipts) setItem(STORAGE_KEYS.RECEIPTS, data.receipts);
       if (data.sales) setItem(STORAGE_KEYS.SALES, data.sales);
       if (data.activityLog) setItem(STORAGE_KEYS.ACTIVITY_LOG, data.activityLog);
+      if (data.contracts) setItem(STORAGE_KEYS.CONTRACTS, data.contracts);
+      if (data.warranties) setItem(STORAGE_KEYS.WARRANTIES, data.warranties);
+      if (data.transferAuthorizations) setItem(STORAGE_KEYS.TRANSFER_AUTHORIZATIONS, data.transferAuthorizations);
+      if (data.withdrawalDeclarations) setItem(STORAGE_KEYS.WITHDRAWAL_DECLARATIONS, data.withdrawalDeclarations);
+      if (data.reservations) setItem(STORAGE_KEYS.RESERVATIONS, data.reservations);
       return true;
     } catch {
       return false;

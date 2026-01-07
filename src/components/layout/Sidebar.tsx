@@ -33,6 +33,7 @@ const menuItems = [
   { icon: Calculator, label: 'Simulador', path: '/simulador', adminOnly: false },
   { icon: FileText, label: 'Propostas', path: '/propostas', adminOnly: false },
   { icon: Receipt, label: 'Recibos', path: '/recibos', adminOnly: false },
+  { icon: FileText, label: 'Documentos', path: '/documentos', adminOnly: false },
   { icon: TrendingUp, label: 'Funil de Vendas', path: '/funil', adminOnly: false },
   { icon: UserCog, label: 'Vendedores', path: '/vendedores', adminOnly: true },
   { icon: Settings, label: 'Configurações', path: '/configuracoes', adminOnly: true },

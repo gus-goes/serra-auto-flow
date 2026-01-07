@@ -25,6 +25,9 @@ export interface Vehicle {
   transmission: 'Manual' | 'Automático' | 'CVT' | 'Automatizado';
   color: string;
   plate?: string;
+  chassis?: string; // Número do chassi (17 caracteres)
+  renavam?: string; // Código Renavam (11 dígitos)
+  crv?: string; // Número do CRV (Certificado de Registro de Veículo)
   status: 'disponivel' | 'reservado' | 'vendido';
   images: string[]; // Base64 encoded images
   description?: string;
@@ -177,4 +180,89 @@ export interface ActivityLog {
   action: string;
   details: string;
   timestamp: string;
+}
+
+// ===== DOCUMENTOS =====
+
+// Contrato de Compra e Venda
+export interface Contract {
+  id: string;
+  number: string;
+  proposalId?: string;
+  clientId: string;
+  vehicleId: string;
+  vendorId: string;
+  vehiclePrice: number;
+  paymentType: 'avista' | 'parcelado';
+  downPayment?: number;
+  installments?: number;
+  installmentValue?: number;
+  deliveryDate?: string;
+  clientSignature?: string;
+  vendorSignature?: string;
+  witness1?: { name: string; rg: string; cpf: string };
+  witness2?: { name: string; rg: string; cpf: string };
+  createdAt: string;
+}
+
+// Termo de Garantia
+export interface Warranty {
+  id: string;
+  number: string;
+  contractId?: string;
+  clientId: string;
+  vehicleId: string;
+  vendorId: string;
+  warrantyPeriod: string; // Ex: "3 meses" ou "90 dias"
+  warrantyCoverage: string; // Ex: "motor" ou "motor e câmbio"
+  warrantyKm?: number; // Km limite
+  conditions: string;
+  clientSignature?: string;
+  createdAt: string;
+}
+
+// Autorização de Transferência (ATPV)
+export interface TransferAuthorization {
+  id: string;
+  number: string;
+  contractId?: string;
+  clientId: string;
+  vehicleId: string;
+  vendorId: string;
+  vehicleValue: number;
+  transferDate: string;
+  location: string;
+  vendorSignature?: string;
+  clientSignature?: string;
+  createdAt: string;
+}
+
+// Declaração de Desistência
+export interface WithdrawalDeclaration {
+  id: string;
+  number: string;
+  clientId: string;
+  vehicleId: string;
+  vendorId: string;
+  reason?: string;
+  declarationDate: string;
+  clientSignature?: string;
+  createdAt: string;
+}
+
+// Termo de Reserva
+export type ReservationStatus = 'ativa' | 'convertida' | 'cancelada' | 'expirada';
+
+export interface Reservation {
+  id: string;
+  number: string;
+  clientId: string;
+  vehicleId: string;
+  vendorId: string;
+  depositAmount?: number;
+  reservationDate: string;
+  validUntil: string; // 10 dias padrão
+  status: ReservationStatus;
+  clientSignature?: string;
+  createdAt: string;
 }
