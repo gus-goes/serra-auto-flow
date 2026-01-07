@@ -273,13 +273,18 @@ export function generateContractPDF(contract: Contract): void {
   // ===== CLÁUSULA QUARTA - DA ENTREGA =====
   y = drawClauseTitle('CLÁUSULA QUARTA – DA ENTREGA DO VEÍCULO');
   
-  // Calcula valor exigido para entrega: se parcelado = entrada, se à vista = 50%
+  // Calcula valor exigido para entrega: se parcelado = entrada, se à vista = porcentagem customizada
+  const deliveryPercentage = contract.deliveryPercentage ?? 50;
   const valorEntrega = contract.paymentType === 'parcelado' 
     ? (contract.downPayment || 0) 
-    : contract.vehiclePrice * 0.5;
+    : contract.vehiclePrice * (deliveryPercentage / 100);
   const valorEntregaExtenso = numberToWords(valorEntrega);
   
-  y = drawSubClause('4.1.', `O veículo será transferido ao(à) COMPRADOR(A) juntamente com a entrega das chaves, sendo realizada a entrega e transporte do veículo mediante o pagamento ${contract.paymentType === 'parcelado' ? 'do valor total da entrada de' : 'de 50% (cinquenta por cento) do valor do veículo, correspondente a'} ${formatCurrency(valorEntrega)} (${valorEntregaExtenso}), pelo(a) COMPRADOR(A) ao(à) VENDEDOR(A). As despesas referentes ao registro da documentação serão de responsabilidade do(a) COMPRADOR(A).`);
+  const percentText = deliveryPercentage === 50 
+    ? '50% (cinquenta por cento)' 
+    : `${deliveryPercentage}% (${numberToWords(deliveryPercentage).replace(' reais', '').replace(' real', '').trim()} por cento)`;
+  
+  y = drawSubClause('4.1.', `O veículo será transferido ao(à) COMPRADOR(A) juntamente com a entrega das chaves, sendo realizada a entrega e transporte do veículo mediante o pagamento ${contract.paymentType === 'parcelado' ? 'do valor total da entrada de' : `de ${percentText} do valor do veículo, correspondente a`} ${formatCurrency(valorEntrega)} (${valorEntregaExtenso}), pelo(a) COMPRADOR(A) ao(à) VENDEDOR(A). As despesas referentes ao registro da documentação serão de responsabilidade do(a) COMPRADOR(A).`);
   
   y = drawSubClause('4.2.', `A transferência do veículo pelo(a) COMPRADOR(A) junto ao Departamento de Trânsito está condicionada ao pagamento do valor de ${formatCurrency(valorEntrega)} (${valorEntregaExtenso}) para que seja realizada a entrega efetiva do veículo. A inobservância da referida obrigação acarretará no dever de responder por encargos, multas e demais desdobramentos decorrentes desta omissão.`);
   

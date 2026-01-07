@@ -44,6 +44,7 @@ interface ContractData {
   installmentValue: number;
   dueDay: number; // Dia de vencimento (1-31)
   firstDueDate: string; // YYYY-MM-DD
+  deliveryPercentage: number; // Porcentagem exigida para entrega à vista (padrão 50)
 }
 
 interface ContractPreviewDialogProps {
@@ -108,6 +109,7 @@ export function ContractPreviewDialog({
     installmentValue: initialInstallmentValue,
     dueDay: 10,
     firstDueDate: '',
+    deliveryPercentage: 50,
   });
 
   // Load data when dialog opens (avoid depending on object references)
@@ -144,6 +146,7 @@ export function ContractPreviewDialog({
       installmentValue: initialInstallmentValue,
       dueDay: 10,
       firstDueDate: '',
+      deliveryPercentage: 50,
     });
 
     setActiveTab('cliente');
@@ -423,6 +426,32 @@ export function ContractPreviewDialog({
                     </Select>
                   </div>
                   
+                  {data.paymentType === 'avista' && (
+                    <>
+                      <Separator />
+                      <div className="space-y-2">
+                        <Label>% exigido para entrega</Label>
+                        <div className="flex items-center gap-2">
+                          <Input 
+                            type="number" 
+                            value={data.deliveryPercentage} 
+                            onChange={(e) => setData({ ...data, deliveryPercentage: parseFloat(e.target.value) || 50 })}
+                            min={0}
+                            max={100}
+                            className="w-24"
+                          />
+                          <span className="text-muted-foreground">%</span>
+                          <span className="text-sm text-muted-foreground">
+                            = {formatCurrency(data.vehiclePrice * (data.deliveryPercentage / 100))}
+                          </span>
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          Porcentagem do valor do veículo exigida antes da entrega das chaves
+                        </p>
+                      </div>
+                    </>
+                  )}
+
                   {data.paymentType === 'parcelado' && (
                     <>
                       <Separator />
