@@ -69,23 +69,39 @@ Deno.serve(async (req) => {
       )
     }
 
-    console.log(`Staff ${callerUserId} attempting to delete user with email`)
+    console.log(`Staff ${callerUserId} attempting to delete user by email`) 
 
-    // Find user by email in auth.users
-    const { data: users, error: listError } = await supabaseAdmin.auth.admin.listUsers()
-    
-    if (listError) {
-      console.error('Error listing users:', listError.message)
-      return new Response(
-        JSON.stringify({ error: 'Erro ao buscar usuários' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+    // Find user by email in auth.users (paginate to avoid missing users)
+    const targetEmail = String(email).toLowerCase()
+    const perPage = 1000
+    let page = 1
+    let userToDelete: { id: string; email?: string | null } | undefined
+
+    while (!userToDelete) {
+      const { data: usersPage, error: listError } = await supabaseAdmin.auth.admin.listUsers({
+        page,
+        perPage,
+      })
+
+      if (listError) {
+        console.error('Error listing users:', listError.message)
+        return new Response(
+          JSON.stringify({ error: 'Erro ao buscar usuários' }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+
+      userToDelete = usersPage.users.find((u) => (u.email || '').toLowerCase() === targetEmail)
+
+      // No more pages
+      if (usersPage.users.length < perPage) break
+      page++
+
+      // Safety cap
+      if (page > 50) break
     }
 
-    const userToDelete = users.users.find(u => u.email?.toLowerCase() === email.toLowerCase())
-
     if (!userToDelete) {
-      // User doesn't exist in auth, nothing to delete
       console.log('No auth user found for email')
       return new Response(
         JSON.stringify({ success: true, message: 'Nenhum usuário de autenticação encontrado' }),
