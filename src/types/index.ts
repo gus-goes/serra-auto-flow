@@ -197,11 +197,34 @@ export interface Contract {
   downPayment?: number;
   installments?: number;
   installmentValue?: number;
+  dueDay?: number; // Dia de vencimento das parcelas (1-31)
   deliveryDate?: string;
   clientSignature?: string;
   vendorSignature?: string;
   witness1?: { name: string; rg: string; cpf: string };
   witness2?: { name: string; rg: string; cpf: string };
+  // Dados editáveis no preview
+  clientData?: {
+    name: string;
+    cpf: string;
+    rg: string;
+    email: string;
+    maritalStatus: string;
+    occupation: string;
+    address: string;
+  };
+  vehicleData?: {
+    brand: string;
+    model: string;
+    year: number;
+    color: string;
+    plate: string;
+    chassis: string;
+    renavam: string;
+    fuel: string;
+    transmission: string;
+    mileage: number;
+  };
   createdAt: string;
 }
 
