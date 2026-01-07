@@ -229,3 +229,25 @@ export function maskName(name: string): string {
 export function maskNumber(num: string): string {
   return '****';
 }
+
+export function isValidEmail(email: string): boolean {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email);
+}
+
+export function formatRG(rg: string): string {
+  // RG can have different formats, just clean and return formatted
+  return rg.replace(/[^\w]/g, '').toUpperCase();
+}
+
+export function cleanRG(rg: string): string {
+  return rg.replace(/[^\w]/g, '').toUpperCase();
+}
+
+export const maritalStatusLabels: Record<string, string> = {
+  solteiro: 'Solteiro(a)',
+  casado: 'Casado(a)',
+  divorciado: 'Divorciado(a)',
+  viuvo: 'Viúvo(a)',
+  uniao_estavel: 'União Estável',
+};
