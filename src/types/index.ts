@@ -198,6 +198,7 @@ export interface Contract {
   installments?: number;
   installmentValue?: number;
   dueDay?: number; // Dia de vencimento das parcelas (1-31)
+  firstDueDate?: string; // Data exata do 1º vencimento (YYYY-MM-DD)
   deliveryDate?: string;
   clientSignature?: string;
   vendorSignature?: string;

@@ -11,7 +11,8 @@ import { Separator } from '@/components/ui/separator';
 import { clientStorage, vehicleStorage } from '@/lib/storage';
 import { getCompanyConfig } from '@/lib/companyConfig';
 import { formatCurrency, formatCPF, formatRG, maritalStatusLabels } from '@/lib/formatters';
-import type { Client, Vehicle } from '@/types';
+import { useToast } from '@/hooks/use-toast';
+import type { Client } from '@/types';
 import { FileText, User, Car, CreditCard, Download, Edit2 } from 'lucide-react';
 
 interface ContractData {
@@ -42,6 +43,7 @@ interface ContractData {
   installments: number;
   installmentValue: number;
   dueDay: number; // Dia de vencimento (1-31)
+  firstDueDate: string; // YYYY-MM-DD
 }
 
 interface ContractPreviewDialogProps {
@@ -71,16 +73,15 @@ export function ContractPreviewDialog({
 }: ContractPreviewDialogProps) {
   const [activeTab, setActiveTab] = useState('cliente');
   const [isEditing, setIsEditing] = useState(false);
-  
-  const client = clientStorage.getById(clientId);
-  const vehicle = vehicleStorage.getById(vehicleId);
+  const { toast } = useToast();
+
   const company = getCompanyConfig();
-  
+
   const buildClientAddress = (c: Client) => {
     if (!c.address) return '';
     return `${c.address.street}, ${c.address.number}${c.address.complement ? ', ' + c.address.complement : ''}, ${c.address.neighborhood}, ${c.address.city}/${c.address.state}, CEP ${c.address.zipCode}`;
   };
-  
+
   const [data, setData] = useState<ContractData>({
     clientName: '',
     clientCpf: '',
@@ -106,45 +107,64 @@ export function ContractPreviewDialog({
     installments: initialInstallments,
     installmentValue: initialInstallmentValue,
     dueDay: 10,
+    firstDueDate: '',
   });
-  
-  // Load data when dialog opens
+
+  // Load data when dialog opens (avoid depending on object references)
   useEffect(() => {
-    if (open && client && vehicle) {
-      setData({
-        clientName: client.name,
-        clientCpf: client.cpf,
-        clientRg: client.rg,
-        clientEmail: client.email || '',
-        clientPhone: client.phone || '',
-        clientMaritalStatus: maritalStatusLabels[client.maritalStatus] || '',
-        clientOccupation: client.occupation || '',
-        clientAddress: buildClientAddress(client),
-        vehicleBrand: vehicle.brand,
-        vehicleModel: vehicle.model,
-        vehicleYear: vehicle.year,
-        vehicleColor: vehicle.color,
-        vehiclePlate: vehicle.plate || '',
-        vehicleChassis: vehicle.chassis || '',
-        vehicleRenavam: vehicle.renavam || '',
-        vehicleFuel: vehicle.fuel,
-        vehicleTransmission: vehicle.transmission,
-        vehicleMileage: vehicle.mileage,
-        vehiclePrice: initialPrice || vehicle.price,
-        paymentType: initialPaymentType,
-        downPayment: initialDownPayment,
-        installments: initialInstallments,
-        installmentValue: initialInstallmentValue,
-        dueDay: 10,
-      });
-      setActiveTab('cliente');
-      setIsEditing(false);
-    }
-  }, [open, client, vehicle, initialPrice, initialPaymentType, initialDownPayment, initialInstallments, initialInstallmentValue]);
-  
+    if (!open) return;
+
+    const client = clientStorage.getById(clientId);
+    const vehicle = vehicleStorage.getById(vehicleId);
+    if (!client || !vehicle) return;
+
+    setData({
+      clientName: client.name,
+      clientCpf: client.cpf,
+      clientRg: client.rg,
+      clientEmail: client.email || '',
+      clientPhone: client.phone || '',
+      clientMaritalStatus: maritalStatusLabels[client.maritalStatus] || '',
+      clientOccupation: client.occupation || '',
+      clientAddress: buildClientAddress(client),
+      vehicleBrand: vehicle.brand,
+      vehicleModel: vehicle.model,
+      vehicleYear: vehicle.year,
+      vehicleColor: vehicle.color,
+      vehiclePlate: vehicle.plate || '',
+      vehicleChassis: vehicle.chassis || '',
+      vehicleRenavam: vehicle.renavam || '',
+      vehicleFuel: vehicle.fuel,
+      vehicleTransmission: vehicle.transmission,
+      vehicleMileage: vehicle.mileage,
+      vehiclePrice: initialPrice || vehicle.price,
+      paymentType: initialPaymentType,
+      downPayment: initialDownPayment,
+      installments: initialInstallments,
+      installmentValue: initialInstallmentValue,
+      dueDay: 10,
+      firstDueDate: '',
+    });
+
+    setActiveTab('cliente');
+    setIsEditing(false);
+  }, [open, clientId, vehicleId, initialPrice, initialPaymentType, initialDownPayment, initialInstallments, initialInstallmentValue]);
+
+  const client = clientStorage.getById(clientId);
+  const vehicle = vehicleStorage.getById(vehicleId);
   if (!client || !vehicle) return null;
-  
+
   const handleConfirm = () => {
+    if (data.paymentType === 'parcelado' && !data.firstDueDate) {
+      setActiveTab('pagamento');
+      toast({
+        title: 'Data do 1º vencimento',
+        description: 'Informe a data exata do primeiro vencimento.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     onConfirm(data);
     onOpenChange(false);
   };
@@ -452,6 +472,14 @@ export function ContractPreviewDialog({
                             </SelectContent>
                           </Select>
                         </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Data do 1º vencimento</Label>
+                        <Input
+                          type="date"
+                          value={data.firstDueDate}
+                          onChange={(e) => setData({ ...data, firstDueDate: e.target.value })}
+                        />
                       </div>
                       <div className="p-3 bg-primary/10 rounded-lg border border-primary/20">
                         <p className="text-sm text-muted-foreground">Saldo a Financiar:</p>
