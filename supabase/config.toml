@@ -1,7 +1,4 @@
 project_id = "mubpztohsgzvuxzqvulp"
 
-[functions.create-admin]
-verify_jwt = false
-
 [functions.create-user]
 verify_jwt = false
