@@ -1,7 +1,7 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useBanks, useCreateBank, useUpdateBank, useDeleteBank, useUploadBankLogo } from '@/hooks/useBanks';
-import { getCompanyConfig, saveCompanyConfig, type CompanyConfig, type LegalRepresentative } from '@/lib/companyConfig';
+import { useLegalRepresentative, useUpdateLegalRepresentative, type LegalRepresentative } from '@/hooks/useCompanySettings';
 import { formatPercent } from '@/lib/formatters';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
@@ -35,11 +35,15 @@ export default function SettingsPage() {
   const { user, isAdmin } = useAuth();
   const { toast } = useToast();
   
-  const { data: banks = [], isLoading } = useBanks();
+  const { data: banks = [], isLoading: banksLoading } = useBanks();
   const createBank = useCreateBank();
   const updateBank = useUpdateBank();
   const deleteBank = useDeleteBank();
   const uploadLogo = useUploadBankLogo();
+  
+  // Legal representative from Supabase
+  const { data: legalRepData, isLoading: legalRepLoading } = useLegalRepresentative();
+  const updateLegalRep = useUpdateLegalRepresentative();
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingBank, setEditingBank] = useState<typeof banks[0] | null>(null);
@@ -48,9 +52,8 @@ export default function SettingsPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const logoInputRef = useRef<HTMLInputElement>(null);
 
-  // Company config state
-  const [companyConfig, setCompanyConfig] = useState<CompanyConfig>(getCompanyConfig());
-  const [legalRep, setLegalRep] = useState<LegalRepresentative>(companyConfig.legalRepresentative || {
+  // Local state for legal rep form
+  const [legalRep, setLegalRep] = useState<LegalRepresentative>({
     name: '',
     nationality: 'Brasileiro',
     maritalStatus: 'solteiro(a)',
@@ -59,6 +62,13 @@ export default function SettingsPage() {
     cpf: '',
     signature: '',
   });
+  
+  // Sync legal rep data from Supabase
+  useEffect(() => {
+    if (legalRepData) {
+      setLegalRep(legalRepData);
+    }
+  }, [legalRepData]);
 
   const [form, setForm] = useState({
     name: '',
@@ -296,7 +306,7 @@ export default function SettingsPage() {
     </Table>
   );
 
-  if (isLoading) {
+  if (banksLoading || legalRepLoading) {
     return (
       <div className="space-y-6 animate-fade-in">
         <div>
@@ -579,13 +589,14 @@ export default function SettingsPage() {
 
             <Button 
               className="w-full btn-primary"
-              onClick={() => {
-                saveCompanyConfig({ ...companyConfig, legalRepresentative: legalRep });
-                setCompanyConfig({ ...companyConfig, legalRepresentative: legalRep });
-                toast({ title: 'Salvo', description: 'Dados do representante atualizados.' });
-              }}
+              onClick={() => updateLegalRep.mutate(legalRep)}
+              disabled={updateLegalRep.isPending}
             >
-              <Save className="h-4 w-4 mr-2" />
+              {updateLegalRep.isPending ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Save className="h-4 w-4 mr-2" />
+              )}
               Salvar Representante
             </Button>
           </CardContent>

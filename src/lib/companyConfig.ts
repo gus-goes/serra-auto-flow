@@ -1,5 +1,7 @@
 /**
  * Company configuration - fixed data for PDFs and documents
+ * Note: Legal representative data is now stored in Supabase (company_settings table)
+ * Use the useLegalRepresentative hook for the latest data
  */
 
 export interface LegalRepresentative {
@@ -29,7 +31,16 @@ export interface CompanyConfig {
   legalRepresentative?: LegalRepresentative;
 }
 
-const STORAGE_KEY = 'autos_serra_company_config';
+// Default legal representative (Jackson Delfes de Moraes)
+export const DEFAULT_LEGAL_REPRESENTATIVE: LegalRepresentative = {
+  name: 'Jackson Delfes de Moraes',
+  nationality: 'Brasileiro',
+  maritalStatus: 'casado(a)',
+  occupation: 'Empresário',
+  rg: '4.663.620',
+  cpf: '039.855.889-05',
+  signature: '',
+};
 
 const DEFAULT_COMPANY: CompanyConfig = {
   name: 'Autos da Serra',
@@ -44,32 +55,22 @@ const DEFAULT_COMPANY: CompanyConfig = {
   },
   phone: '(49) 9999-9999',
   email: 'jacksonautomoveislages@gmail.com',
-  legalRepresentative: {
-    name: 'Jackson Delfes de Moraes',
-    nationality: 'Brasileiro',
-    maritalStatus: 'casado(a)',
-    occupation: 'Empresário',
-    rg: '4.663.620',
-    cpf: '039.855.889-05',
-  },
+  legalRepresentative: DEFAULT_LEGAL_REPRESENTATIVE,
 };
 
 export function getCompanyConfig(): CompanyConfig {
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      return { ...DEFAULT_COMPANY, ...JSON.parse(stored) };
-    }
-  } catch {
-    // Ignore parse errors
-  }
   return DEFAULT_COMPANY;
 }
 
-export function saveCompanyConfig(config: Partial<CompanyConfig>): void {
-  const current = getCompanyConfig();
-  const updated = { ...current, ...config };
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+/**
+ * Get company config with a specific legal representative
+ * Used by PDF generators that fetch the legal rep from Supabase
+ */
+export function getCompanyConfigWithLegalRep(legalRep?: LegalRepresentative): CompanyConfig {
+  return {
+    ...DEFAULT_COMPANY,
+    legalRepresentative: legalRep || DEFAULT_LEGAL_REPRESENTATIVE,
+  };
 }
 
 export function formatCompanyAddress(): string {
