@@ -498,7 +498,7 @@ export default function VehiclesPage() {
               <div className="space-y-2">
                 <Label className="flex items-center gap-2">
                   <ImagePlus className="h-4 w-4" />
-                  Fotos ({(editingVehicle?.vehicle_photos?.length || 0) + pendingImages.length}/{MAX_IMAGES})
+                  Fotos ({(editingVehicle?.photos?.length || 0) + pendingImages.length}/{MAX_IMAGES})
                 </Label>
                 <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-4">
                   <input
