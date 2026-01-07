@@ -970,8 +970,9 @@ export function generateWithdrawalPDF(data: WithdrawalPDFData): void {
 // ===== RESERVATION PDF =====
 
 export function generateReservationPDF(data: ReservationPDFData): void {
-  const { reservation, client, vehicle } = data;
+  const { reservation, client, vehicle, options } = data;
   const company = getCompanyConfig();
+  const legalRepSig = options?.legalRepSignature || company.legalRepresentative?.signature;
   
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.getWidth();
@@ -991,20 +992,20 @@ export function generateReservationPDF(data: ReservationPDFData): void {
   doc.setFillColor(250, 250, 250);
   doc.rect(15, y, pageWidth - 30, 36, 'F');
   
-  drawInfoRow(doc, 'Nome:', client.name, 20, y + 7, 30);
-  drawInfoRow(doc, 'RG:', formatRG(client.rg), 20, y + 14, 30);
-  drawInfoRow(doc, 'CPF:', formatCPF(client.cpf), 100, y + 14, 25);
+  drawInfoRow(doc, 'Nome:', client.name, 20, y + 7, 25);
+  drawInfoRow(doc, 'RG:', formatRG(client.rg), 20, y + 14, 25);
+  drawInfoRow(doc, 'CPF:', formatCPF(client.cpf), 100, y + 14, 20);
   
   const addressStr = client.address ? 
     `${client.address.street}, ${client.address.number} - ${client.address.neighborhood}` : '';
-  drawInfoRow(doc, 'Endereço:', addressStr, 20, y + 21, 35);
+  drawInfoRow(doc, 'Endereço:', addressStr, 20, y + 21, 25);
   
   const cityStr = client.address ? `${client.address.city}/${client.address.state}` : '';
-  drawInfoRow(doc, 'Cidade/UF:', cityStr, 20, y + 28, 35);
-  drawInfoRow(doc, 'Telefone:', formatPhone(client.phone), 100, y + 28, 35);
+  drawInfoRow(doc, 'Cidade/UF:', cityStr, 20, y + 28, 25);
+  drawInfoRow(doc, 'Telefone:', formatPhone(client.phone), 100, y + 28, 25);
   
   if (client.email) {
-    drawInfoRow(doc, 'E-mail:', client.email, 20, y + 35, 30);
+    drawInfoRow(doc, 'E-mail:', client.email, 20, y + 35, 25);
   }
   
   y += 44;
@@ -1014,10 +1015,10 @@ export function generateReservationPDF(data: ReservationPDFData): void {
   doc.setFillColor(250, 250, 250);
   doc.rect(15, y, pageWidth - 30, 24, 'F');
   
-  drawInfoRow(doc, 'Veículo:', `${vehicle.brand} ${vehicle.model}`, 20, y + 8, 35);
-  drawInfoRow(doc, 'Ano:', String(vehicle.year), 120, y + 8, 20);
-  drawInfoRow(doc, 'Placa:', vehicle.plate || '-', 20, y + 16, 35);
-  drawInfoRow(doc, 'Chassi:', vehicle.chassis || '-', 120, y + 16, 30);
+  drawInfoRow(doc, 'Veículo:', `${vehicle.brand} ${vehicle.model}`, 20, y + 8, 25);
+  drawInfoRow(doc, 'Ano:', String(vehicle.year), 120, y + 8, 15);
+  drawInfoRow(doc, 'Placa:', vehicle.plate || '-', 20, y + 16, 25);
+  drawInfoRow(doc, 'Chassi:', vehicle.chassis || '-', 120, y + 16, 25);
   
   y += 32;
   
@@ -1081,7 +1082,12 @@ export function generateReservationPDF(data: ReservationPDFData): void {
   doc.text('SOLICITANTE', leftX + sigWidth / 2, y + 30, { align: 'center' });
   doc.text(client.name, leftX + sigWidth / 2, y + 35, { align: 'center' });
   
-  // Store signature
+  // Store signature - use legal representative signature if available
+  if (legalRepSig) {
+    try {
+      doc.addImage(legalRepSig, 'PNG', rightX + 5, y, sigWidth - 10, 20);
+    } catch (e) {}
+  }
   doc.line(rightX, y + 25, rightX + sigWidth, y + 25);
   doc.text('LOJA', rightX + sigWidth / 2, y + 30, { align: 'center' });
   doc.text(company.fantasyName, rightX + sigWidth / 2, y + 35, { align: 'center' });
