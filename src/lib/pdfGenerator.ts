@@ -1,10 +1,11 @@
 import { jsPDF } from 'jspdf';
 import { formatCurrency, formatCPF, numberToWords, formatPhone, formatRG, maritalStatusLabels } from './formatters';
 import { formatDateDisplay, formatDateFullPtBr } from './dateUtils';
-import { getPDFColors, getBankConfigByName } from './bankConfig';
+import { getPDFColors, getBankConfigByName, BANK_CONFIGS } from './bankConfig';
 import { getCompanyConfig, formatCompanyAddress, formatCompanyShortAddress } from './companyConfig';
 import type { Receipt, Proposal, Client } from '@/types';
 import { clientStorage, vehicleStorage, userStorage, bankStorage } from './storage';
+import companyLogo from '@/assets/logo.png';
 
 /**
  * Professional PDF Generator for Receipts, Proposals and Client Registration
@@ -46,6 +47,9 @@ function drawHeader(doc: jsPDF, options: PDFOptions = {}): number {
     options.bankName!.toLowerCase().includes(b.name.toLowerCase())
   ) : undefined;
   
+  // Determine if this is a bank document or company document
+  const isBankDocument = bankConfig && !bankConfig.isOwn;
+  
   // Header background
   doc.setFillColor(...colors.primary);
   doc.rect(0, 0, pageWidth, 45, 'F');
@@ -56,42 +60,65 @@ function drawHeader(doc: jsPDF, options: PDFOptions = {}): number {
     doc.rect(0, 45, pageWidth, 4, 'F');
   }
   
+  // Logo positioning
+  const logoX = 15;
+  const logoY = 8;
+  const logoWidth = 28;
+  const logoHeight = 28;
+  const textStartX = logoX + logoWidth + 8;
+  
+  // Draw logo
+  if (isBankDocument && storedBank) {
+    // Try to use stored bank logo first, then default bank logo
+    const bankLogoToUse = storedBank.logo || BANK_CONFIGS.find(b => b.id === bankConfig.id)?.logo;
+    if (bankLogoToUse) {
+      try {
+        doc.addImage(bankLogoToUse, 'PNG', logoX, logoY, logoWidth, logoHeight);
+      } catch (e) {
+        console.error('Error adding bank logo:', e);
+      }
+    }
+  } else {
+    // Company document - use company logo
+    try {
+      doc.addImage(companyLogo, 'PNG', logoX, logoY, logoWidth, logoHeight);
+    } catch (e) {
+      console.error('Error adding company logo:', e);
+    }
+  }
+  
   // Company name
   doc.setTextColor(...colors.text);
   doc.setFontSize(22);
   doc.setFont('helvetica', 'bold');
-  doc.text(company.fantasyName, 20, 18);
+  doc.text(company.fantasyName, textStartX, 18);
   
   // Tagline
   doc.setFontSize(10);
   doc.setFont('helvetica', 'normal');
-  doc.text('Multimarcas', 20, 26);
+  doc.text('Multimarcas', textStartX, 26);
   
   // CNPJ
   doc.setFontSize(8);
-  doc.text(`CNPJ: ${company.cnpj}`, 20, 33);
+  doc.text(`CNPJ: ${company.cnpj}`, textStartX, 33);
   
   // Address
   doc.setFontSize(7);
-  doc.text(formatCompanyAddress(), 20, 40);
+  doc.text(formatCompanyAddress(), textStartX, 40);
   
-  // Contact info on the right
+  // Location on the right (without phone)
   doc.setFontSize(9);
   doc.text(formatCompanyShortAddress(), pageWidth - 20, 18, { align: 'right' });
-  if (company.phone) {
-    doc.text(company.phone, pageWidth - 20, 25, { align: 'right' });
-  }
   
-  // Bank logo/badge if applicable (external bank)
-  if (bankConfig && !bankConfig.isOwn && storedBank) {
-    // Show bank name badge
+  // Bank badge if applicable (external bank)
+  if (isBankDocument && storedBank) {
     doc.setFontSize(8);
     doc.setFillColor(255, 255, 255);
     const badgeWidth = 75;
-    doc.roundedRect(pageWidth - 20 - badgeWidth, 32, badgeWidth, 10, 2, 2, 'F');
+    doc.roundedRect(pageWidth - 20 - badgeWidth, 28, badgeWidth, 10, 2, 2, 'F');
     doc.setTextColor(...colors.primary);
     doc.setFont('helvetica', 'bold');
-    doc.text(`Financiamento: ${storedBank.name}`, pageWidth - 20 - badgeWidth / 2, 38.5, { align: 'center' });
+    doc.text(`Financiamento: ${storedBank.name}`, pageWidth - 20 - badgeWidth / 2, 34.5, { align: 'center' });
   }
   
   return colors.isOwn ? 58 : 54;
