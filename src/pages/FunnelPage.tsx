@@ -21,7 +21,6 @@ import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 
 const funnelStages: { key: FunnelStage; label: string; icon: typeof Users; color: string }[] = [
-  { key: 'lead', label: 'Lead', icon: UserPlus, color: 'bg-muted' },
   { key: 'atendimento', label: 'Atendimento', icon: Headphones, color: 'bg-info/10 border-info/30' },
   { key: 'simulacao', label: 'Simulação', icon: Calculator, color: 'bg-warning/10 border-warning/30' },
   { key: 'proposta', label: 'Proposta', icon: FileText, color: 'bg-primary/10 border-primary/30' },
@@ -41,7 +40,6 @@ export default function FunnelPage() {
 
   const clientsByStage = useMemo(() => {
     const grouped: Record<FunnelStage, Client[]> = {
-      lead: [],
       atendimento: [],
       simulacao: [],
       proposta: [],
