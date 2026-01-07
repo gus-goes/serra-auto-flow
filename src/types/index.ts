@@ -32,13 +32,28 @@ export interface Vehicle {
   updatedAt: string;
 }
 
+export type MaritalStatus = 'solteiro' | 'casado' | 'divorciado' | 'viuvo' | 'uniao_estavel';
+
 export interface Client {
   id: string;
   name: string;
-  cpf: string;
+  rg: string; // Required
+  cpf: string; // Required
   phone: string;
-  email?: string;
-  address?: {
+  email: string; // Required
+  maritalStatus: MaritalStatus; // Required
+  birthDate?: string; // Optional - YYYY-MM-DD
+  occupation?: string; // Optional
+  address: { // Required
+    street: string;
+    number: string;
+    complement?: string;
+    neighborhood: string;
+    city: string;
+    state: string;
+    zipCode: string;
+  };
+  deliveryAddress?: { // Optional - different delivery address
     street: string;
     number: string;
     complement?: string;

@@ -1,5 +1,5 @@
 import { jsPDF } from 'jspdf';
-import { formatCurrency, formatCPF, numberToWords, formatPhone } from './formatters';
+import { formatCurrency, formatCPF, numberToWords, formatPhone, formatRG, maritalStatusLabels } from './formatters';
 import { formatDateDisplay, formatDateFullPtBr } from './dateUtils';
 import { getPDFColors, getBankConfigByName } from './bankConfig';
 import { getCompanyConfig, formatCompanyAddress, formatCompanyShortAddress } from './companyConfig';
@@ -604,7 +604,7 @@ export function generateProposalPDF(proposal: Proposal, options: PDFOptions = {}
 }
 
 /**
- * Generate Client Registration PDF
+ * Generate Client Registration PDF - Professional Layout
  */
 export function generateClientPDF(client: Client): void {
   const vendor = userStorage.getById(client.vendorId);
@@ -613,6 +613,7 @@ export function generateClientPDF(client: Client): void {
   
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
   
   // Header
   let y = drawHeader(doc);
@@ -633,34 +634,92 @@ export function generateClientPDF(client: Client): void {
   doc.text(`Data de Cadastro: ${formatDateDisplay(client.createdAt)}`, 20, y);
   y += 12;
   
-  // Client data section
-  y = drawSectionBox(doc, y, 'DADOS PESSOAIS', colors);
+  // Personal data section
+  y = drawSectionBox(doc, y, 'DADOS PESSOAIS (CAMPOS OBRIGATÓRIOS)', colors);
+  
+  doc.setFillColor(250, 250, 250);
+  doc.rect(15, y, pageWidth - 30, 44, 'F');
+  
+  // Row 1
+  drawInfoRow(doc, 'Nome Completo:', client.name, 20, y + 8, 50);
+  
+  // Row 2
+  drawInfoRow(doc, 'RG:', formatRG(client.rg), 20, y + 16, 50);
+  drawInfoRow(doc, 'CPF:', formatCPF(client.cpf), 110, y + 16, 30);
+  
+  // Row 3
+  drawInfoRow(doc, 'E-mail:', client.email, 20, y + 24, 50);
+  
+  // Row 4
+  const maritalLabel = maritalStatusLabels[client.maritalStatus] || client.maritalStatus;
+  drawInfoRow(doc, 'Estado Civil:', maritalLabel, 20, y + 32, 50);
+  if (client.phone) {
+    drawInfoRow(doc, 'Telefone:', formatPhone(client.phone), 110, y + 32, 30);
+  }
+  
+  // Row 5 - Optional fields
+  if (client.birthDate || client.occupation) {
+    doc.setDrawColor(200, 200, 200);
+    doc.line(20, y + 38, pageWidth - 20, y + 38);
+    
+    if (client.birthDate) {
+      drawInfoRow(doc, 'Nascimento:', formatDateDisplay(client.birthDate), 20, y + 44, 50);
+    }
+    if (client.occupation) {
+      drawInfoRow(doc, 'Ocupação:', client.occupation, 110, y + 44, 35);
+    }
+  }
+  
+  y += 52;
+  
+  // Address section
+  y = drawSectionBox(doc, y, 'ENDEREÇO (OBRIGATÓRIO)', colors);
   
   doc.setFillColor(250, 250, 250);
   doc.rect(15, y, pageWidth - 30, 32, 'F');
   
-  drawInfoRow(doc, 'Nome Completo:', client.name, 20, y + 8, 50);
-  drawInfoRow(doc, 'CPF:', formatCPF(client.cpf), 20, y + 16, 50);
-  drawInfoRow(doc, 'Telefone:', formatPhone(client.phone), 20, y + 24, 50);
-  if (client.email) {
-    drawInfoRow(doc, 'E-mail:', client.email, 110, y + 8, 30);
+  const fullAddress = `${client.address.street}, ${client.address.number}${client.address.complement ? ` - ${client.address.complement}` : ''}`;
+  const addressLines = doc.splitTextToSize(fullAddress, 120);
+  
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(100, 100, 100);
+  doc.text('Logradouro:', 20, y + 8);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(30, 30, 30);
+  doc.text(addressLines, 55, y + 8);
+  
+  drawInfoRow(doc, 'Bairro:', client.address.neighborhood, 20, y + 16, 35);
+  drawInfoRow(doc, 'Cidade:', `${client.address.city} - ${client.address.state}`, 110, y + 16, 30);
+  
+  if (client.address.zipCode) {
+    drawInfoRow(doc, 'CEP:', client.address.zipCode, 20, y + 24, 35);
   }
   
   y += 40;
   
-  // Address section
-  if (client.address) {
-    y = drawSectionBox(doc, y, 'ENDEREÇO', colors);
+  // Delivery address section (if different)
+  if (client.deliveryAddress) {
+    y = drawSectionBox(doc, y, 'ENDEREÇO PARA ENTREGA (OPCIONAL)', colors);
     
     doc.setFillColor(250, 250, 250);
     doc.rect(15, y, pageWidth - 30, 28, 'F');
     
-    const fullAddress = `${client.address.street}, ${client.address.number}${client.address.complement ? ` - ${client.address.complement}` : ''}`;
-    drawInfoRow(doc, 'Logradouro:', fullAddress, 20, y + 8, 45);
-    drawInfoRow(doc, 'Bairro:', client.address.neighborhood, 20, y + 16, 45);
-    drawInfoRow(doc, 'Cidade:', `${client.address.city} - ${client.address.state}`, 110, y + 8, 30);
-    if (client.address.zipCode) {
-      drawInfoRow(doc, 'CEP:', client.address.zipCode, 110, y + 16, 30);
+    const deliveryFullAddress = `${client.deliveryAddress.street}, ${client.deliveryAddress.number}${client.deliveryAddress.complement ? ` - ${client.deliveryAddress.complement}` : ''}`;
+    
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(100, 100, 100);
+    doc.text('Logradouro:', 20, y + 8);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(30, 30, 30);
+    doc.text(deliveryFullAddress, 55, y + 8);
+    
+    drawInfoRow(doc, 'Bairro:', client.deliveryAddress.neighborhood, 20, y + 16, 35);
+    drawInfoRow(doc, 'Cidade:', `${client.deliveryAddress.city} - ${client.deliveryAddress.state}`, 110, y + 16, 30);
+    
+    if (client.deliveryAddress.zipCode) {
+      drawInfoRow(doc, 'CEP:', client.deliveryAddress.zipCode, 20, y + 24, 35);
     }
     
     y += 36;
@@ -673,9 +732,9 @@ export function generateClientPDF(client: Client): void {
   doc.rect(15, y, pageWidth - 30, 18, 'F');
   
   if (vendor) {
-    drawInfoRow(doc, 'Vendedor:', vendor.name, 20, y + 8, 40);
+    drawInfoRow(doc, 'Vendedor:', vendor.name, 20, y + 10, 40);
     if (vendor.phone) {
-      drawInfoRow(doc, 'Contato:', formatPhone(vendor.phone), 110, y + 8, 35);
+      drawInfoRow(doc, 'Contato:', formatPhone(vendor.phone), 110, y + 10, 35);
     }
   }
   
@@ -686,31 +745,48 @@ export function generateClientPDF(client: Client): void {
     y = drawSectionBox(doc, y, 'OBSERVAÇÕES', colors);
     
     doc.setFillColor(250, 250, 250);
-    doc.rect(15, y, pageWidth - 30, 25, 'F');
+    const notesLines = doc.splitTextToSize(client.notes, pageWidth - 50);
+    const notesHeight = Math.max(20, notesLines.length * 5 + 10);
+    doc.rect(15, y, pageWidth - 30, notesHeight, 'F');
     
     doc.setFontSize(9);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(50, 50, 50);
-    const notesLines = doc.splitTextToSize(client.notes, pageWidth - 40);
     doc.text(notesLines, 20, y + 8);
-    y += 30;
+    y += notesHeight + 8;
   }
   
+  // Required fields legend
+  y += 8;
+  doc.setFontSize(8);
+  doc.setFont('helvetica', 'italic');
+  doc.setTextColor(120, 120, 120);
+  doc.text('* Campos marcados como "obrigatórios" são necessários para a validação do cadastro.', pageWidth / 2, y, { align: 'center' });
+  y += 10;
+  
+  // Calculate signature position - ensure proper spacing from footer
+  const footerStart = pageHeight - 30;
+  const signatureHeight = 40;
+  const maxY = footerStart - signatureHeight - 10;
+  const sigY = Math.min(y + 15, maxY);
+  
   // Signature area for client
-  y += 20;
   doc.setDrawColor(120, 120, 120);
   doc.setLineWidth(0.5);
   
-  const sigLineWidth = 80;
+  const sigLineWidth = 85;
   const sigX = pageWidth / 2 - sigLineWidth / 2;
-  doc.line(sigX, y, sigX + sigLineWidth, y);
+  doc.line(sigX, sigY + 20, sigX + sigLineWidth, sigY + 20);
   
   doc.setFontSize(9);
+  doc.setFont('helvetica', 'normal');
   doc.setTextColor(80, 80, 80);
-  doc.text('Assinatura do Cliente', pageWidth / 2, y + 6, { align: 'center' });
+  doc.text('Assinatura do Cliente', pageWidth / 2, sigY + 26, { align: 'center' });
+  doc.setFontSize(8);
+  doc.text(client.name, pageWidth / 2, sigY + 32, { align: 'center' });
   
   // Footer
   drawFooter(doc, 'Ficha de Cadastro');
   
-  doc.save(`cadastro-${client.name.toLowerCase().replace(/\s+/g, '-')}.pdf`);
+  doc.save(`ficha-cadastro-${client.name.toLowerCase().replace(/\s+/g, '-')}.pdf`);
 }
