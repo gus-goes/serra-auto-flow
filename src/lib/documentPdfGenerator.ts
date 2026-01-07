@@ -563,7 +563,7 @@ export function generateWarrantyPDF(warranty: Warranty): void {
   const warrantyTerms = [
     {
       num: '1.',
-      text: `A ${company.fantasyName} concede uma cobertura de garantia para os conjuntos de motor e câmbio, para o veículo identificado acima, pelo período de ${warranty.warrantyPeriod || '180 dias'} ou ${warranty.warrantyKm ? warranty.warrantyKm.toLocaleString('pt-BR') : '10.000'} km, a partir da data de entrega e quilometragem especificada, prevalecendo a condição que primeiro ocorrer.`
+      text: `A ${company.fantasyName} concede uma cobertura de garantia para os conjuntos de motor e câmbio, para o veículo identificado acima, pelo período de 6 meses ou 200.000 km, a partir da data de entrega e quilometragem especificada, prevalecendo a condição que primeiro ocorrer.`
     },
     {
       num: '2.',
