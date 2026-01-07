@@ -587,6 +587,38 @@ export default function SettingsPage() {
               </div>
             </div>
 
+            {/* Signature Section */}
+            <div className="space-y-3 pt-4 border-t">
+              <Label className="text-sm font-medium">Rubrica / Assinatura Digital</Label>
+              {legalRep.signature ? (
+                <div className="space-y-2">
+                  <div className="border border-input rounded-lg p-4 bg-muted/30">
+                    <img 
+                      src={legalRep.signature} 
+                      alt="Assinatura do Representante" 
+                      className="max-h-24 mx-auto"
+                    />
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setLegalRep({ ...legalRep, signature: '' })}
+                  >
+                    Alterar Assinatura
+                  </Button>
+                </div>
+              ) : (
+                <SignaturePad
+                  label="Desenhe a rubrica do representante legal"
+                  onSave={(sig) => setLegalRep({ ...legalRep, signature: sig })}
+                />
+              )}
+              <p className="text-xs text-muted-foreground">
+                Esta assinatura será usada automaticamente nos Contratos e ATPVs quando não houver assinatura específica do vendedor.
+              </p>
+            </div>
+
             <Button 
               className="w-full btn-primary"
               onClick={() => updateLegalRep.mutate(legalRep)}
