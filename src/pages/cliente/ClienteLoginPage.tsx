@@ -9,7 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import logo from '@/assets/logo.png';
 import { Lock, Mail, AlertCircle, Loader2 } from 'lucide-react';
 
-export default function LoginPage() {
+export default function ClienteLoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -23,15 +23,13 @@ export default function LoginPage() {
   // Redirect if already logged in
   useEffect(() => {
     if (!isLoading && user && role) {
-      const from = (location.state as { from?: { pathname: string } })?.from?.pathname;
-      
       if (role === 'cliente') {
         navigate('/cliente', { replace: true });
       } else {
-        navigate(from || '/dashboard', { replace: true });
+        navigate('/dashboard', { replace: true });
       }
     }
-  }, [user, role, isLoading, navigate, location]);
+  }, [user, role, isLoading, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -61,7 +59,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-sidebar via-sidebar to-sidebar/90 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted flex items-center justify-center p-4">
       {/* Background pattern */}
       <div className="absolute inset-0 overflow-hidden">
         <div className="absolute -top-1/2 -right-1/2 w-full h-full bg-primary/5 rounded-full blur-3xl" />
@@ -73,9 +71,9 @@ export default function LoginPage() {
           <div className="flex justify-center mb-4">
             <img src={logo} alt="Autos da Serra" className="h-16 object-contain" />
           </div>
-          <CardTitle className="text-2xl font-bold">Sistema Interno</CardTitle>
+          <CardTitle className="text-2xl font-bold">Área do Cliente</CardTitle>
           <CardDescription className="text-muted-foreground">
-            Acesso para administradores e vendedores
+            Acesse seus documentos e contratos
           </CardDescription>
         </CardHeader>
         
@@ -137,6 +135,10 @@ export default function LoginPage() {
               )}
             </Button>
           </form>
+
+          <p className="text-xs text-muted-foreground text-center mt-6">
+            Suas credenciais foram enviadas pelo vendedor. Caso não tenha recebido, entre em contato.
+          </p>
         </CardContent>
       </Card>
     </div>

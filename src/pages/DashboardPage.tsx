@@ -18,7 +18,7 @@ import {
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 
 export default function DashboardPage() {
-  const { user, isAdmin } = useAuth();
+  const { user, profile, isAdmin } = useAuth();
   const { privacyMode } = usePrivacy();
 
   // Get data based on role
@@ -110,7 +110,7 @@ export default function DashboardPage() {
       <div>
         <h1 className="text-2xl font-bold">Dashboard</h1>
         <p className="text-muted-foreground">
-          Bem-vindo, {user?.name}! {isAdmin ? 'Visão geral do sistema.' : 'Aqui está seu resumo.'}
+          Bem-vindo, {profile?.name?.split(' ')[0] || 'usuário'}! {isAdmin ? 'Visão geral do sistema.' : 'Aqui está seu resumo.'}
         </p>
       </div>
 

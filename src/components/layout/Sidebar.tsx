@@ -46,7 +46,7 @@ interface SidebarProps {
 
 export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
   const location = useLocation();
-  const { user, logout, isAdmin } = useAuth();
+  const { user, profile, logout, isAdmin } = useAuth();
   const [collapsed, setCollapsed] = useState(false);
 
   const filteredItems = menuItems.filter(item => !item.adminOnly || isAdmin);
@@ -135,11 +135,11 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
       <div className="p-3 border-t border-sidebar-border">
         <div className={cn('flex items-center gap-3 mb-3', collapsed && !mobileOpen && 'justify-center')}>
           <div className="h-9 w-9 rounded-full bg-sidebar-primary flex items-center justify-center text-sidebar-primary-foreground font-semibold flex-shrink-0">
-            {user?.name.charAt(0)}
+            {profile?.name?.charAt(0) || user?.email?.charAt(0) || '?'}
           </div>
           {(!collapsed || mobileOpen) && (
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-sidebar-foreground truncate">{user?.name}</p>
+              <p className="text-sm font-medium text-sidebar-foreground truncate">{profile?.name || user?.email}</p>
               <p className="text-xs text-sidebar-foreground/60 truncate">
                 {isAdmin ? 'Administrador' : 'Vendedor'}
               </p>
