@@ -45,12 +45,12 @@ const DEFAULT_COMPANY: CompanyConfig = {
   phone: '(49) 9999-9999',
   email: 'jacksonautomoveislages@gmail.com',
   legalRepresentative: {
-    name: '',
+    name: 'Jackson Delfes de Moraes',
     nationality: 'Brasileiro',
-    maritalStatus: '',
-    occupation: '',
-    rg: '',
-    cpf: '',
+    maritalStatus: 'casado(a)',
+    occupation: 'Empresário',
+    rg: '4.663.620',
+    cpf: '039.855.889-05',
   },
 };
 
