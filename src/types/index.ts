@@ -109,6 +109,7 @@ export interface Simulation {
 }
 
 export type ProposalStatus = 'negociacao' | 'enviada' | 'aprovada' | 'reprovada' | 'vendida';
+export type ProposalType = 'bancario' | 'direto' | 'avista';
 
 export interface Proposal {
   id: string;
@@ -118,15 +119,16 @@ export interface Proposal {
   vendorId: string;
   simulationId?: string;
   status: ProposalStatus;
-  bank?: string;
+  type: ProposalType; // New: proposal type
+  bank?: string; // Only for bancario type
   vehiclePrice: number;
-  cashPrice?: number; // Valor à vista
+  cashPrice?: number; // Only for avista type
   downPayment: number;
   financedAmount: number;
   installments: number;
   installmentValue: number;
   totalValue: number;
-  isOwnFinancing?: boolean; // Financiamento próprio (sem juros)
+  isOwnFinancing?: boolean; // Deprecated, use type === 'direto'
   clientSignature?: string;
   vendorSignature?: string;
   notes?: string;

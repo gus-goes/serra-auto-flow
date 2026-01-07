@@ -396,7 +396,7 @@ export function generateReceiptPDF(receipt: Receipt, options: PDFOptions = {}): 
 }
 
 /**
- * Generate professional Proposal PDF
+ * Generate professional Proposal PDF - Simplified with signature and 5-day validity
  */
 export function generateProposalPDF(proposal: Proposal, options: PDFOptions = {}): void {
   const client = clientStorage.getById(proposal.clientId);
@@ -409,13 +409,13 @@ export function generateProposalPDF(proposal: Proposal, options: PDFOptions = {}
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
   
-  // Determine if it's own financing
-  const isOwnFinancing = proposal.isOwnFinancing || 
-    !proposal.bank || 
-    proposal.bank?.toLowerCase().includes('próprio') ||
-    proposal.bank?.toLowerCase().includes('autos da serra');
+  // Determine proposal type
+  const proposalType = proposal.type || (proposal.isOwnFinancing ? 'direto' : (proposal.cashPrice && !proposal.bank ? 'avista' : 'bancario'));
+  const isAvista = proposalType === 'avista';
+  const isDireto = proposalType === 'direto';
+  const isBancario = proposalType === 'bancario';
   
-  const colors = getPDFColors(isOwnFinancing ? undefined : proposal.bank);
+  const colors = getPDFColors(isBancario ? proposal.bank : undefined);
   
   // Privacy mode handling
   const privacyMode = options.privacyMode || false;
@@ -430,18 +430,23 @@ export function generateProposalPDF(proposal: Proposal, options: PDFOptions = {}
   const displayTotal = privacyMode ? 'R$ *****,**' : formatCurrency(proposal.totalValue);
   
   // Header with bank branding if applicable
-  let y = drawHeader(doc, { bankName: isOwnFinancing ? undefined : proposal.bank });
+  let y = drawHeader(doc, { bankName: isBancario ? proposal.bank : undefined });
   
-  // Document title
-  const titleBgColor = colors.isOwn ? colors.secondary : colors.primary;
-  const titleTextColor = colors.isOwn ? [30, 30, 30] : [255, 255, 255];
+  // Document title based on type
+  let titleText = 'PROPOSTA DE VENDA';
+  if (isAvista) titleText = 'PROPOSTA DE VENDA - À VISTA';
+  else if (isDireto) titleText = 'PROPOSTA DE VENDA - FINANCIAMENTO DIRETO';
+  else if (isBancario) titleText = 'PROPOSTA DE VENDA - FINANCIAMENTO BANCÁRIO';
+  
+  const titleBgColor = (isDireto || isAvista) ? colors.secondary : colors.primary;
+  const titleTextColor = (isDireto || isAvista) ? [30, 30, 30] : [255, 255, 255];
   
   doc.setFillColor(...titleBgColor);
   doc.rect(15, y, pageWidth - 30, 12, 'F');
-  doc.setFontSize(16);
+  doc.setFontSize(14);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(titleTextColor[0], titleTextColor[1], titleTextColor[2]);
-  doc.text('PROPOSTA DE VENDA', pageWidth / 2, y + 8.5, { align: 'center' });
+  doc.text(titleText, pageWidth / 2, y + 8.5, { align: 'center' });
   y += 18;
   
   // Proposal number and date
@@ -509,45 +514,52 @@ export function generateProposalPDF(proposal: Proposal, options: PDFOptions = {}
     y += vehicleBoxHeight + 6;
   }
   
-  // Cash Price section (if available)
-  if (proposal.cashPrice && proposal.cashPrice > 0) {
-    doc.setFillColor(...colors.secondary);
-    doc.rect(15, y, pageWidth - 30, 14, 'F');
-    doc.setFontSize(12);
+  // Payment section based on type
+  if (isAvista) {
+    // À Vista - Show only cash price prominently
+    y = drawSectionBox(doc, y, 'VALOR À VISTA', colors);
+    
+    doc.setFillColor(250, 250, 250);
+    doc.rect(15, y, pageWidth - 30, 24, 'F');
+    
+    doc.setFontSize(18);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(30, 30, 30);
-    doc.text('VALOR À VISTA:', 25, y + 9);
-    doc.setFontSize(14);
-    doc.text(displayCashPrice, pageWidth - 25, y + 9, { align: 'right' });
-    y += 20;
+    doc.text(displayCashPrice, pageWidth / 2, y + 16, { align: 'center' });
+    
+    y += 32;
+  } else {
+    // Financing section (Bancário or Direto)
+    const sectionTitle = isDireto ? 'FINANCIAMENTO DIRETO (SEM JUROS)' : 'CONDIÇÕES DE FINANCIAMENTO';
+    y = drawSectionBox(doc, y, sectionTitle, colors);
+    
+    doc.setFillColor(250, 250, 250);
+    doc.rect(15, y, pageWidth - 30, 42, 'F');
+    
+    // Left column
+    drawInfoRow(doc, 'Valor do Veículo:', displayPrice, 20, y + 8, 50);
+    drawInfoRow(doc, 'Entrada:', displayDown, 20, y + 16, 50);
+    drawInfoRow(doc, 'Valor Financiado:', displayFinanced, 20, y + 24, 50);
+    
+    // Right column
+    drawInfoRow(doc, 'Parcelas:', `${proposal.installments}x de ${displayInstallment}`, 105, y + 8, 35);
+    
+    if (isBancario && proposal.bank) {
+      drawInfoRow(doc, 'Banco:', proposal.bank, 105, y + 16, 35);
+    } else if (isDireto) {
+      drawInfoRow(doc, 'Tipo:', 'Financiamento Direto', 105, y + 16, 35);
+    }
+    
+    // Total highlight
+    doc.setFillColor(...colors.primary);
+    doc.roundedRect(105, y + 26, 80, 12, 2, 2, 'F');
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(255, 255, 255);
+    doc.text(`Total: ${displayTotal}`, 145, y + 34, { align: 'center' });
+    
+    y += 50;
   }
-  
-  // Financial section
-  y = drawSectionBox(doc, y, isOwnFinancing ? 'FINANCIAMENTO PRÓPRIO (SEM JUROS)' : 'CONDIÇÕES DE FINANCIAMENTO', colors);
-  
-  doc.setFillColor(250, 250, 250);
-  doc.rect(15, y, pageWidth - 30, 42, 'F');
-  
-  // Left column
-  drawInfoRow(doc, 'Valor do Veículo:', displayPrice, 20, y + 8, 50);
-  drawInfoRow(doc, 'Entrada:', displayDown, 20, y + 16, 50);
-  drawInfoRow(doc, 'Valor Financiado:', displayFinanced, 20, y + 24, 50);
-  
-  // Right column
-  drawInfoRow(doc, 'Parcelas:', `${proposal.installments}x de ${displayInstallment}`, 105, y + 8, 35);
-  
-  const finType = isOwnFinancing ? 'Financiamento Próprio' : `Banco: ${proposal.bank}`;
-  drawInfoRow(doc, 'Tipo:', finType, 105, y + 16, 35);
-  
-  // Total highlight
-  doc.setFillColor(...colors.primary);
-  doc.roundedRect(105, y + 26, 80, 12, 2, 2, 'F');
-  doc.setFontSize(10);
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(255, 255, 255);
-  doc.text(`Total: ${displayTotal}`, 145, y + 34, { align: 'center' });
-  
-  y += 50;
   
   // Notes if exists
   if (proposal.notes) {
@@ -564,11 +576,9 @@ export function generateProposalPDF(proposal: Proposal, options: PDFOptions = {}
   
   // Calculate signature position - ensure proper spacing from footer
   const footerStart = pageHeight - 30;
-  const signatureHeight = 45;
-  const legalTextHeight = 15;
-  const minY = Math.max(y + 8, 170);
-  const maxY = footerStart - signatureHeight - legalTextHeight - 5;
-  y = Math.min(minY, maxY);
+  const signatureHeight = 50;
+  const maxY = footerStart - signatureHeight - 10;
+  y = Math.min(Math.max(y + 15, 175), maxY);
   
   // Signatures
   y = drawSignatureSection(
@@ -580,22 +590,12 @@ export function generateProposalPDF(proposal: Proposal, options: PDFOptions = {}
     privacyMode
   );
   
-  // Legal text
-  doc.setFontSize(7);
-  doc.setFont('helvetica', 'italic');
-  doc.setTextColor(100, 100, 100);
-  doc.text(
-    'Esta proposta tem validade de 5 dias úteis e está sujeita a aprovação de crédito.',
-    pageWidth / 2,
-    y,
-    { align: 'center' }
-  );
-  doc.text(
-    `${formatCompanyShortAddress()}, ${formatDateFullPtBr(proposal.createdAt)}`,
-    pageWidth / 2,
-    y + 5,
-    { align: 'center' }
-  );
+  // Validity text only - simplified
+  y += 5;
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(80, 80, 80);
+  doc.text('Esta proposta tem validade de 5 dias úteis.', pageWidth / 2, y, { align: 'center' });
   
   // Footer
   drawFooter(doc, 'Proposta de Venda');
