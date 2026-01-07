@@ -354,43 +354,21 @@ export function generateReceiptPDF(receipt: Receipt, options: PDFOptions = {}): 
     y += descLines.length * 4 + 8;
   }
   
-  // Calculate signature position - ensure proper spacing from footer
-  const footerStart = pageHeight - 30;
-  const signatureHeight = 45; // Height needed for signatures
-  const legalTextHeight = 15;
-  const minY = Math.max(y + 10, 160); // Minimum Y position for signatures
-  const maxY = footerStart - signatureHeight - legalTextHeight - 5;
-  y = Math.min(minY, maxY);
+  // Calculate signature position - position closer to bottom
+  const pageBottom = pageHeight - 15;
+  const signatureHeight = 50;
+  const minY = Math.max(y + 15, 180);
+  const sigY = Math.min(minY, pageBottom - signatureHeight);
   
   // Signatures
-  y = drawSignatureSection(
-    doc, y,
+  drawSignatureSection(
+    doc, sigY,
     receipt.clientSignature,
     receipt.vendorSignature,
     displayName,
     vendor?.name || '',
     privacyMode
   );
-  
-  // Legal text
-  doc.setFontSize(7);
-  doc.setFont('helvetica', 'italic');
-  doc.setTextColor(100, 100, 100);
-  doc.text(
-    'Para maior clareza, firmo(amos) o presente recibo para que produza os seus devidos efeitos legais.',
-    pageWidth / 2,
-    y,
-    { align: 'center' }
-  );
-  doc.text(
-    `${receipt.location}, ${formatDateFullPtBr(receipt.paymentDate)}`,
-    pageWidth / 2,
-    y + 5,
-    { align: 'center' }
-  );
-  
-  // Footer
-  drawFooter(doc, 'Recibo de Pagamento');
   
   doc.save(`recibo-${receipt.number}.pdf`);
 }
@@ -574,15 +552,15 @@ export function generateProposalPDF(proposal: Proposal, options: PDFOptions = {}
     y += notesLines.length * 4 + 8;
   }
   
-  // Calculate signature position - ensure proper spacing from footer
-  const footerStart = pageHeight - 30;
-  const signatureHeight = 50;
-  const maxY = footerStart - signatureHeight - 10;
-  y = Math.min(Math.max(y + 15, 175), maxY);
+  // Calculate signature position - position closer to bottom
+  const pageBottom = pageHeight - 15;
+  const signatureHeight = 55;
+  const minY = Math.max(y + 15, 180);
+  const sigY = Math.min(minY, pageBottom - signatureHeight);
   
   // Signatures
-  y = drawSignatureSection(
-    doc, y,
+  let finalY = drawSignatureSection(
+    doc, sigY,
     proposal.clientSignature,
     proposal.vendorSignature,
     displayClientName,
@@ -590,15 +568,11 @@ export function generateProposalPDF(proposal: Proposal, options: PDFOptions = {}
     privacyMode
   );
   
-  // Validity text only - simplified
-  y += 5;
+  // Validity text only - below signatures
   doc.setFontSize(9);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(80, 80, 80);
-  doc.text('Esta proposta tem validade de 5 dias úteis.', pageWidth / 2, y, { align: 'center' });
-  
-  // Footer
-  drawFooter(doc, 'Proposta de Venda');
+  doc.text('Esta proposta tem validade de 5 dias úteis.', pageWidth / 2, finalY + 5, { align: 'center' });
   
   doc.save(`proposta-${proposal.number}.pdf`);
 }
@@ -756,19 +730,11 @@ export function generateClientPDF(client: Client): void {
     y += notesHeight + 8;
   }
   
-  // Required fields legend
-  y += 8;
-  doc.setFontSize(8);
-  doc.setFont('helvetica', 'italic');
-  doc.setTextColor(120, 120, 120);
-  doc.text('* Campos marcados como "obrigatórios" são necessários para a validação do cadastro.', pageWidth / 2, y, { align: 'center' });
-  y += 10;
-  
-  // Calculate signature position - ensure proper spacing from footer
-  const footerStart = pageHeight - 30;
-  const signatureHeight = 40;
-  const maxY = footerStart - signatureHeight - 10;
-  const sigY = Math.min(y + 15, maxY);
+  // Calculate signature position - position closer to bottom
+  const pageBottom = pageHeight - 15;
+  const signatureHeight = 45;
+  const minY = Math.max(y + 20, 200);
+  const sigY = Math.min(minY, pageBottom - signatureHeight);
   
   // Signature area for client
   doc.setDrawColor(120, 120, 120);
@@ -784,9 +750,6 @@ export function generateClientPDF(client: Client): void {
   doc.text('Assinatura do Cliente', pageWidth / 2, sigY + 26, { align: 'center' });
   doc.setFontSize(8);
   doc.text(client.name, pageWidth / 2, sigY + 32, { align: 'center' });
-  
-  // Footer
-  drawFooter(doc, 'Ficha de Cadastro');
   
   doc.save(`ficha-cadastro-${client.name.toLowerCase().replace(/\s+/g, '-')}.pdf`);
 }
