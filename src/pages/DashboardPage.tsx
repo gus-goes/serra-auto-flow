@@ -5,6 +5,7 @@ import { useDashboardStats, useVehicleStatusChart, useSalesByVendor, useRecentPr
 import { formatCurrency } from '@/lib/formatters';
 import { PrivacyMask } from '@/components/PrivacyMask';
 import { Skeleton } from '@/components/ui/skeleton';
+import { ActivityFeed } from '@/components/ActivityFeed';
 import { 
   Car, 
   Users, 
@@ -185,7 +186,7 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
 
-          {/* Sales by Vendor (Admin) or Recent Activity */}
+          {/* Sales by Vendor (Admin) or Activity Feed */}
           {isAdmin ? (
             <Card>
               <CardHeader>
@@ -249,6 +250,44 @@ export default function DashboardPage() {
               </CardContent>
             </Card>
           )}
+        </div>
+      )}
+
+      {/* Activity Feed - Admin only */}
+      {isAdmin && !privacyMode && (
+        <div className="grid gap-6 lg:grid-cols-2">
+          <ActivityFeed limit={10} maxHeight="350px" />
+          
+          {/* Recent Proposals for Admin */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <FileText className="h-5 w-5 text-primary" />
+                Propostas Recentes
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {(recentProposals || []).length > 0 ? (
+                <div className="space-y-3">
+                  {(recentProposals || []).slice(0, 5).map((proposal) => (
+                    <div key={proposal.id} className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
+                      <div>
+                        <p className="font-medium text-sm">{proposal.client?.name || 'Cliente'}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {proposal.vehicle?.brand} {proposal.vehicle?.model}
+                        </p>
+                      </div>
+                      <span className={`badge-status badge-${proposal.status === 'aprovada' ? 'disponivel' : 'reservado'}`}>
+                        {proposal.status}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-center text-muted-foreground py-8">Nenhuma proposta ainda</p>
+              )}
+            </CardContent>
+          </Card>
         </div>
       )}
 

@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
+import { useLogActivity } from '@/hooks/useActivityLogs';
 import type { Tables, TablesInsert } from '@/integrations/supabase/types';
 
 export type Sale = Tables<'sales'>;
@@ -45,6 +46,7 @@ export function useCreateSale() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { user } = useAuth();
+  const logActivity = useLogActivity();
 
   return useMutation({
     mutationFn: async (sale: Omit<SaleInsert, 'seller_id'>) => {
@@ -59,9 +61,19 @@ export function useCreateSale() {
       if (error) throw error;
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['sales'] });
       queryClient.invalidateQueries({ queryKey: ['vehicles'] });
+      queryClient.invalidateQueries({ queryKey: ['activity-logs'] });
+      
+      // Log activity
+      logActivity.mutate({
+        action: 'create',
+        entityType: 'sale',
+        entityId: data.id,
+        description: `Venda registrada no valor de R$ ${(data.total_value || 0).toLocaleString('pt-BR')}`,
+      });
+      
       toast({
         title: 'Venda registrada',
         description: 'A venda foi registrada com sucesso.',
