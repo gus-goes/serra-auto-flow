@@ -5,10 +5,16 @@ import { useReservations, useCreateReservation, useDeleteReservation } from '@/h
 import { useWarranties, useTransferAuthorizations, useWithdrawalDeclarations, useCreateWarranty, useCreateTransferAuthorization, useCreateWithdrawalDeclaration } from '@/hooks/useDocuments';
 import { useClients } from '@/hooks/useClients';
 import { useVehicles, useUpdateVehicle } from '@/hooks/useVehicles';
+import { useProfiles } from '@/hooks/useProfiles';
 import { 
   generateContractPDF, generateWarrantyPDF, generateTransferAuthPDF,
   generateWithdrawalPDF, generateReservationPDF 
 } from '@/lib/documentPdfGenerator';
+import {
+  mapClientFromDB, mapVehicleFromDB, mapUserFromDB,
+  mapContractFromDB, mapWarrantyFromDB, mapTransferFromDB,
+  mapWithdrawalFromDB, mapReservationFromDB
+} from '@/lib/pdfDataMappers';
 import { formatDateDisplay, getCurrentDateString } from '@/lib/dateUtils';
 import { formatCurrency } from '@/lib/formatters';
 import { useToast } from '@/hooks/use-toast';
@@ -49,6 +55,7 @@ export default function DocumentsPage() {
   const { data: withdrawals = [], isLoading: loadingWithdrawals } = useWithdrawalDeclarations();
   const { data: clients = [], isLoading: loadingClients } = useClients();
   const { data: vehicles = [], isLoading: loadingVehicles } = useVehicles();
+  const { data: profiles = [] } = useProfiles();
 
   // Mutations
   const createContract = useCreateContract();
@@ -266,6 +273,106 @@ export default function DocumentsPage() {
     return v ? `${v.brand} ${v.model}` : '-';
   };
 
+  // PDF Download handlers
+  const handleDownloadContract = (contractId: string) => {
+    const dbContract = contracts.find(c => c.id === contractId);
+    if (!dbContract) return;
+    
+    const dbClient = clients.find(c => c.id === dbContract.client_id);
+    const dbVehicle = vehicles.find(v => v.id === dbContract.vehicle_id);
+    const dbVendor = profiles.find(p => p.id === dbContract.seller_id);
+    
+    if (!dbClient || !dbVehicle) {
+      toast({ title: 'Erro', description: 'Cliente ou veículo não encontrado.', variant: 'destructive' });
+      return;
+    }
+    
+    generateContractPDF({
+      contract: mapContractFromDB(dbContract),
+      client: mapClientFromDB(dbClient),
+      vehicle: mapVehicleFromDB(dbVehicle),
+      vendor: dbVendor ? mapUserFromDB(dbVendor) : null,
+    });
+  };
+
+  const handleDownloadWarranty = (warrantyId: string) => {
+    const dbWarranty = warranties.find(w => w.id === warrantyId);
+    if (!dbWarranty) return;
+    
+    const dbClient = clients.find(c => c.id === dbWarranty.client_id);
+    const dbVehicle = vehicles.find(v => v.id === dbWarranty.vehicle_id);
+    
+    if (!dbClient || !dbVehicle) {
+      toast({ title: 'Erro', description: 'Cliente ou veículo não encontrado.', variant: 'destructive' });
+      return;
+    }
+    
+    generateWarrantyPDF({
+      warranty: mapWarrantyFromDB(dbWarranty),
+      client: mapClientFromDB(dbClient),
+      vehicle: mapVehicleFromDB(dbVehicle),
+    });
+  };
+
+  const handleDownloadTransfer = (transferId: string) => {
+    const dbTransfer = transfers.find(t => t.id === transferId);
+    if (!dbTransfer) return;
+    
+    const dbClient = clients.find(c => c.id === dbTransfer.client_id);
+    const dbVehicle = vehicles.find(v => v.id === dbTransfer.vehicle_id);
+    const dbVendor = profiles.find(p => p.id === dbTransfer.seller_id);
+    
+    if (!dbClient || !dbVehicle) {
+      toast({ title: 'Erro', description: 'Cliente ou veículo não encontrado.', variant: 'destructive' });
+      return;
+    }
+    
+    generateTransferAuthPDF({
+      transfer: mapTransferFromDB(dbTransfer),
+      client: mapClientFromDB(dbClient),
+      vehicle: mapVehicleFromDB(dbVehicle),
+      vendor: dbVendor ? mapUserFromDB(dbVendor) : null,
+    });
+  };
+
+  const handleDownloadWithdrawal = (withdrawalId: string) => {
+    const dbWithdrawal = withdrawals.find(w => w.id === withdrawalId);
+    if (!dbWithdrawal) return;
+    
+    const dbClient = clients.find(c => c.id === dbWithdrawal.client_id);
+    const dbVehicle = vehicles.find(v => v.id === dbWithdrawal.vehicle_id);
+    
+    if (!dbClient || !dbVehicle) {
+      toast({ title: 'Erro', description: 'Cliente ou veículo não encontrado.', variant: 'destructive' });
+      return;
+    }
+    
+    generateWithdrawalPDF({
+      declaration: mapWithdrawalFromDB(dbWithdrawal),
+      client: mapClientFromDB(dbClient),
+      vehicle: mapVehicleFromDB(dbVehicle),
+    });
+  };
+
+  const handleDownloadReservation = (reservationId: string) => {
+    const dbReservation = reservations.find(r => r.id === reservationId);
+    if (!dbReservation) return;
+    
+    const dbClient = clients.find(c => c.id === dbReservation.client_id);
+    const dbVehicle = vehicles.find(v => v.id === dbReservation.vehicle_id);
+    
+    if (!dbClient || !dbVehicle) {
+      toast({ title: 'Erro', description: 'Cliente ou veículo não encontrado.', variant: 'destructive' });
+      return;
+    }
+    
+    generateReservationPDF({
+      reservation: mapReservationFromDB(dbReservation),
+      client: mapClientFromDB(dbClient),
+      vehicle: mapVehicleFromDB(dbVehicle),
+    });
+  };
+
   if (isLoading) {
     return (
       <div className="space-y-6 animate-fade-in">
@@ -420,7 +527,12 @@ export default function DocumentsPage() {
                       <TableCell>{formatDateDisplay(contract.contract_date)}</TableCell>
                       <TableCell>
                         <div className="flex gap-1">
-                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-8 w-8"
+                            onClick={() => handleDownloadContract(contract.id)}
+                          >
                             <Download className="h-4 w-4" />
                           </Button>
                           <Button 
@@ -513,6 +625,7 @@ export default function DocumentsPage() {
                     <TableHead>Veículo</TableHead>
                     <TableHead>Período</TableHead>
                     <TableHead>Data</TableHead>
+                    <TableHead className="w-16">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -523,10 +636,20 @@ export default function DocumentsPage() {
                       <TableCell>{getVehicleInfo(warranty.vehicle_id)}</TableCell>
                       <TableCell>{warranty.warranty_period}</TableCell>
                       <TableCell>{formatDateDisplay(warranty.created_at)}</TableCell>
+                      <TableCell>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-8 w-8"
+                          onClick={() => handleDownloadWarranty(warranty.id)}
+                        >
+                          <Download className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
                     </TableRow>
                   )) : (
                     <TableRow>
-                      <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                         Nenhuma garantia encontrada
                       </TableCell>
                     </TableRow>
@@ -595,6 +718,7 @@ export default function DocumentsPage() {
                     <TableHead>Veículo</TableHead>
                     <TableHead>Valor</TableHead>
                     <TableHead>Data</TableHead>
+                    <TableHead className="w-16">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -605,10 +729,20 @@ export default function DocumentsPage() {
                       <TableCell>{getVehicleInfo(transfer.vehicle_id)}</TableCell>
                       <TableCell>{formatCurrency(Number(transfer.vehicle_value))}</TableCell>
                       <TableCell>{formatDateDisplay(transfer.transfer_date)}</TableCell>
+                      <TableCell>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-8 w-8"
+                          onClick={() => handleDownloadTransfer(transfer.id)}
+                        >
+                          <Download className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
                     </TableRow>
                   )) : (
                     <TableRow>
-                      <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                         Nenhuma ATPV encontrada
                       </TableCell>
                     </TableRow>
@@ -667,6 +801,7 @@ export default function DocumentsPage() {
                     <TableHead>Cliente</TableHead>
                     <TableHead>Veículo</TableHead>
                     <TableHead>Data</TableHead>
+                    <TableHead className="w-16">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -676,10 +811,20 @@ export default function DocumentsPage() {
                       <TableCell>{getClientName(withdrawal.client_id)}</TableCell>
                       <TableCell>{getVehicleInfo(withdrawal.vehicle_id)}</TableCell>
                       <TableCell>{formatDateDisplay(withdrawal.declaration_date)}</TableCell>
+                      <TableCell>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-8 w-8"
+                          onClick={() => handleDownloadWithdrawal(withdrawal.id)}
+                        >
+                          <Download className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
                     </TableRow>
                   )) : (
                     <TableRow>
-                      <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
                         Nenhuma desistência encontrada
                       </TableCell>
                     </TableRow>
@@ -744,6 +889,7 @@ export default function DocumentsPage() {
                     <TableHead>Sinal</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Válido até</TableHead>
+                    <TableHead className="w-16">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -759,10 +905,20 @@ export default function DocumentsPage() {
                         </span>
                       </TableCell>
                       <TableCell>{reservation.valid_until ? formatDateDisplay(reservation.valid_until) : '-'}</TableCell>
+                      <TableCell>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-8 w-8"
+                          onClick={() => handleDownloadReservation(reservation.id)}
+                        >
+                          <Download className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
                     </TableRow>
                   )) : (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                         Nenhuma reserva encontrada
                       </TableCell>
                     </TableRow>
