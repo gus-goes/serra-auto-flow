@@ -5,6 +5,46 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// Simple in-memory rate limiting (per admin user)
+const rateLimitMap = new Map<string, { count: number; resetTime: number }>()
+const RATE_LIMIT_MAX = 10 // Max 10 users per hour per admin
+const RATE_LIMIT_WINDOW = 60 * 60 * 1000 // 1 hour in milliseconds
+
+function checkRateLimit(userId: string): { allowed: boolean; remaining: number; resetIn: number } {
+  const now = Date.now()
+  const userLimit = rateLimitMap.get(userId)
+  
+  if (!userLimit || now > userLimit.resetTime) {
+    // Reset or initialize
+    rateLimitMap.set(userId, { count: 1, resetTime: now + RATE_LIMIT_WINDOW })
+    return { allowed: true, remaining: RATE_LIMIT_MAX - 1, resetIn: RATE_LIMIT_WINDOW }
+  }
+  
+  if (userLimit.count >= RATE_LIMIT_MAX) {
+    return { allowed: false, remaining: 0, resetIn: userLimit.resetTime - now }
+  }
+  
+  userLimit.count++
+  return { allowed: true, remaining: RATE_LIMIT_MAX - userLimit.count, resetIn: userLimit.resetTime - now }
+}
+
+// Input validation helpers
+function isValidEmail(email: string): boolean {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+  return emailRegex.test(email) && email.length <= 255
+}
+
+function sanitizeString(str: string, maxLength: number): string {
+  return str.trim().slice(0, maxLength)
+}
+
+function isValidPhone(phone: string): boolean {
+  // Allow empty or valid phone format (digits, spaces, parentheses, dashes)
+  if (!phone) return true
+  const phoneRegex = /^[\d\s\-\(\)+]{8,20}$/
+  return phoneRegex.test(phone)
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
@@ -55,10 +95,28 @@ Deno.serve(async (req) => {
       )
     }
 
+    // Check rate limit
+    const rateLimit = checkRateLimit(callerUser.id)
+    if (!rateLimit.allowed) {
+      const resetMinutes = Math.ceil(rateLimit.resetIn / 60000)
+      return new Response(
+        JSON.stringify({ error: `Limite de criação de usuários atingido. Tente novamente em ${resetMinutes} minutos.` }),
+        { 
+          status: 429, 
+          headers: { 
+            ...corsHeaders, 
+            'Content-Type': 'application/json',
+            'X-RateLimit-Remaining': '0',
+            'X-RateLimit-Reset': Math.ceil(rateLimit.resetIn / 1000).toString()
+          } 
+        }
+      )
+    }
+
     // Get request body
     const { email, password, name, phone, role } = await req.json()
 
-    // Validate inputs
+    // Validate required inputs
     if (!email || !password || !name) {
       return new Response(
         JSON.stringify({ error: 'Email, senha e nome são obrigatórios' }),
@@ -66,9 +124,37 @@ Deno.serve(async (req) => {
       )
     }
 
-    if (password.length < 6) {
+    // Validate email format
+    const sanitizedEmail = sanitizeString(email, 255).toLowerCase()
+    if (!isValidEmail(sanitizedEmail)) {
       return new Response(
-        JSON.stringify({ error: 'A senha deve ter pelo menos 6 caracteres' }),
+        JSON.stringify({ error: 'Formato de email inválido' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    // Validate password
+    if (typeof password !== 'string' || password.length < 6 || password.length > 128) {
+      return new Response(
+        JSON.stringify({ error: 'A senha deve ter entre 6 e 128 caracteres' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    // Validate and sanitize name
+    const sanitizedName = sanitizeString(name, 255)
+    if (sanitizedName.length < 2) {
+      return new Response(
+        JSON.stringify({ error: 'O nome deve ter pelo menos 2 caracteres' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    // Validate phone if provided
+    const sanitizedPhone = phone ? sanitizeString(phone, 20) : undefined
+    if (sanitizedPhone && !isValidPhone(sanitizedPhone)) {
+      return new Response(
+        JSON.stringify({ error: 'Formato de telefone inválido' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
@@ -76,18 +162,19 @@ Deno.serve(async (req) => {
     const validRoles = ['admin', 'vendedor', 'cliente']
     const userRole = validRoles.includes(role) ? role : 'vendedor'
 
-    console.log(`Creating user: ${email} with role: ${userRole}`)
+    // Log without exposing email (security best practice)
+    console.log(`Admin ${callerUser.id} creating new user with role: ${userRole}`)
 
     // Create user using admin API
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
-      email,
+      email: sanitizedEmail,
       password,
       email_confirm: true,
-      user_metadata: { name, phone }
+      user_metadata: { name: sanitizedName, phone: sanitizedPhone }
     })
 
     if (authError) {
-      console.error('Auth error:', authError)
+      console.error('Auth error:', authError.message)
       // Generic error message to prevent email enumeration
       return new Response(
         JSON.stringify({ error: 'Não foi possível criar a conta. Verifique os dados e tente novamente.' }),
@@ -102,10 +189,10 @@ Deno.serve(async (req) => {
     console.log(`User created with id: ${authData.user.id}`)
 
     // Update profile with phone if provided
-    if (phone) {
+    if (sanitizedPhone) {
       await supabaseAdmin
         .from('profiles')
-        .update({ phone })
+        .update({ phone: sanitizedPhone })
         .eq('id', authData.user.id)
     }
 
@@ -115,7 +202,7 @@ Deno.serve(async (req) => {
       .insert({ user_id: authData.user.id, role: userRole })
 
     if (roleError) {
-      console.error('Role error:', roleError)
+      console.error('Role assignment error for user:', authData.user.id)
       throw roleError
     }
 
@@ -128,18 +215,23 @@ Deno.serve(async (req) => {
         user: {
           id: authData.user.id,
           email: authData.user.email,
-          name,
+          name: sanitizedName,
           role: userRole
         }
       }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { 
+        headers: { 
+          ...corsHeaders, 
+          'Content-Type': 'application/json',
+          'X-RateLimit-Remaining': rateLimit.remaining.toString()
+        } 
+      }
     )
 
   } catch (error: unknown) {
-    console.error('Error creating user:', error)
-    const message = error instanceof Error ? error.message : 'Erro desconhecido'
+    console.error('Error creating user:', error instanceof Error ? error.message : 'Unknown error')
     return new Response(
-      JSON.stringify({ error: message }),
+      JSON.stringify({ error: 'Ocorreu um erro ao criar o usuário. Tente novamente.' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   }
