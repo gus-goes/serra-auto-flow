@@ -179,7 +179,16 @@ Deno.serve(async (req) => {
 
     if (authError) {
       console.error('Auth error:', authError.message)
-      // Generic error message to prevent email enumeration
+      
+      // Check for duplicate email error
+      if (authError.message.includes('already been registered') || authError.message.includes('already exists')) {
+        return new Response(
+          JSON.stringify({ error: 'Este e-mail já possui credenciais de acesso. Use outro e-mail ou exclua o usuário existente primeiro.' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+      
+      // Generic error message for other cases
       return new Response(
         JSON.stringify({ error: 'Não foi possível criar a conta. Verifique os dados e tente novamente.' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
