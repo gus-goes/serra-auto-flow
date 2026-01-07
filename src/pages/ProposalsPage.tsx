@@ -388,7 +388,10 @@ export default function ProposalsPage() {
                       <Input
                         type="number"
                         value={form.installments}
-                        onChange={(e) => setForm({ ...form, installments: parseInt(e.target.value) || 0 })}
+                        onChange={(e) => setForm({ ...form, installments: Math.max(1, parseInt(e.target.value) || 1) })}
+                        min={1}
+                        max={120}
+                        placeholder="Número de parcelas"
                       />
                     </div>
                     <div className="space-y-2">
@@ -434,20 +437,15 @@ export default function ProposalsPage() {
                   </div>
                   
                   <div className="space-y-2">
-                    <Label>Parcelas</Label>
-                    <Select 
-                      value={String(form.installments)} 
-                      onValueChange={(v) => setForm({ ...form, installments: parseInt(v) })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {[6, 12, 18, 24, 30, 36, 42, 48].map(n => (
-                          <SelectItem key={n} value={String(n)}>{n}x</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <Label>Número de Parcelas</Label>
+                    <Input
+                      type="number"
+                      value={form.installments}
+                      onChange={(e) => setForm({ ...form, installments: Math.max(1, parseInt(e.target.value) || 1) })}
+                      min={1}
+                      max={120}
+                      placeholder="Digite o número de parcelas"
+                    />
                   </div>
                   
                   {form.vehiclePrice > 0 && form.downPayment >= 0 && (

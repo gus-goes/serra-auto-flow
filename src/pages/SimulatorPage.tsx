@@ -23,8 +23,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-const installmentOptions = [12, 24, 36, 48, 60] as const;
-const ownInstallmentOptions = [6, 12, 18, 24, 36] as const;
+// Removed fixed installment options - now free input
 
 export default function SimulatorPage() {
   const { user } = useAuth();
@@ -58,10 +57,15 @@ export default function SimulatorPage() {
 
   // Calculate simulations for bank financing
   const bankSimulations = useMemo(() => {
-    if (financedAmount <= 0) return [];
+    if (financedAmount <= 0 || installments <= 0) return [];
 
     return banks.map(bank => {
-      const rate = bank.rates[installments as keyof Bank['rates']] / 100;
+      // Get the closest rate available for the installment count
+      const availableRates = [12, 24, 36, 48, 60] as const;
+      const closestRate = availableRates.reduce((prev, curr) => 
+        Math.abs(curr - installments) < Math.abs(prev - installments) ? curr : prev
+      );
+      const rate = bank.rates[closestRate] / 100;
       
       const monthlyRate = rate;
       const coefficient = (monthlyRate * Math.pow(1 + monthlyRate, installments)) / 
@@ -80,6 +84,7 @@ export default function SimulatorPage() {
         cet,
         vendorCommission,
         storeMargin,
+        usedRate: closestRate,
       };
     }).sort((a, b) => a.installmentValue - b.installmentValue);
   }, [banks, financedAmount, installments, vehiclePrice]);
@@ -118,7 +123,7 @@ export default function SimulatorPage() {
       financedAmount,
       bank: bankName,
       installments,
-      rate: sim.bank.rates[installments as keyof Bank['rates']],
+      rate: sim.bank.rates[sim.usedRate],
       installmentValue: sim.installmentValue,
       totalValue: sim.totalValue,
       cet: sim.cet,
@@ -173,10 +178,10 @@ export default function SimulatorPage() {
   };
 
   // Input section component (shared between tabs)
-  const InputSection = ({ installmentOpts, currentInstallments, onInstallmentsChange }: {
-    installmentOpts: readonly number[];
+  const InputSection = ({ currentInstallments, onInstallmentsChange, isOwnFinancing = false }: {
     currentInstallments: number;
     onInstallmentsChange: (value: number) => void;
+    isOwnFinancing?: boolean;
   }) => (
     <Card className="lg:col-span-1">
       <CardHeader>
@@ -263,23 +268,21 @@ export default function SimulatorPage() {
         </div>
 
         <div className="space-y-2">
-          <Label>Parcelas</Label>
-          <div className="grid grid-cols-5 gap-2">
-            {installmentOpts.map(opt => (
-              <Button
-                key={opt}
-                type="button"
-                variant={currentInstallments === opt ? 'default' : 'outline'}
-                size="sm"
-                className={cn(
-                  currentInstallments === opt && 'btn-primary'
-                )}
-                onClick={() => onInstallmentsChange(opt)}
-              >
-                {opt}x
-              </Button>
-            ))}
-          </div>
+          <Label>Número de Parcelas</Label>
+          <Input
+            type="number"
+            value={currentInstallments}
+            onChange={(e) => {
+              const value = parseInt(e.target.value) || 1;
+              onInstallmentsChange(Math.max(1, Math.min(120, value)));
+            }}
+            min={1}
+            max={120}
+            placeholder="Digite o número de parcelas"
+          />
+          <p className="text-xs text-muted-foreground">
+            {isOwnFinancing ? 'Sem limite de parcelas' : 'Taxa baseada na faixa mais próxima'}
+          </p>
         </div>
 
         <div className="pt-4 border-t space-y-3">
@@ -318,7 +321,6 @@ export default function SimulatorPage() {
         <TabsContent value="bancario" className="space-y-6">
           <div className="grid gap-6 lg:grid-cols-3">
             <InputSection 
-              installmentOpts={installmentOptions}
               currentInstallments={installments}
               onInstallmentsChange={setInstallments}
             />
@@ -360,7 +362,7 @@ export default function SimulatorPage() {
                             <div className="bg-muted/50 p-2 rounded-lg">
                               <p className="text-muted-foreground text-xs">Taxa Mensal</p>
                               <p className="font-medium">
-                                {formatPercent(sim.bank.rates[installments as keyof Bank['rates']])}
+                                {formatPercent(sim.bank.rates[sim.usedRate])}
                               </p>
                             </div>
                             <div className="bg-muted/50 p-2 rounded-lg">
@@ -418,9 +420,9 @@ export default function SimulatorPage() {
         <TabsContent value="proprio" className="space-y-6">
           <div className="grid gap-6 lg:grid-cols-3">
             <InputSection 
-              installmentOpts={ownInstallmentOptions}
               currentInstallments={ownInstallments}
               onInstallmentsChange={setOwnInstallments}
+              isOwnFinancing
             />
 
             <div className="lg:col-span-2 space-y-4">
