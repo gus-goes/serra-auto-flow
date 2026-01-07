@@ -1,6 +1,5 @@
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -17,8 +16,7 @@ import {
   Heart,
   Save,
   Loader2,
-  CheckCircle2,
-  Sparkles
+  CheckCircle2
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import logo from '@/assets/logo.png';
@@ -91,7 +89,6 @@ export default function ClienteProfilePage() {
   const handleChange = (field: keyof ClientProfileUpdate, value: string | null) => {
     setFormData(prev => ({ ...prev, [field]: value }));
     setHasChanges(true);
-    // Clear error when user types
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: '' }));
     }
@@ -102,7 +99,6 @@ export default function ClienteProfilePage() {
     
     if (!clientRecord?.id) return;
 
-    // Validate
     const result = profileSchema.safeParse(formData);
     if (!result.success) {
       const fieldErrors: Record<string, string> = {};
@@ -115,7 +111,6 @@ export default function ClienteProfilePage() {
       return;
     }
 
-    // Clean data before sending
     const cleanData: ClientProfileUpdate = {
       phone: formData.phone?.trim() || null,
       address: formData.address?.trim() || null,
@@ -131,7 +126,6 @@ export default function ClienteProfilePage() {
     setHasChanges(false);
   };
 
-  // Format phone input
   const formatPhoneInput = (value: string) => {
     const numbers = value.replace(/\D/g, '');
     if (numbers.length <= 2) return numbers;
@@ -140,7 +134,6 @@ export default function ClienteProfilePage() {
     return `(${numbers.slice(0, 2)}) ${numbers.slice(2, 7)}-${numbers.slice(7, 11)}`;
   };
 
-  // Format CEP input
   const formatCEPInput = (value: string) => {
     const numbers = value.replace(/\D/g, '');
     if (numbers.length <= 5) return numbers;
@@ -148,42 +141,49 @@ export default function ClienteProfilePage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/30">
+    <div className="min-h-screen bg-[hsl(220,20%,8%)]">
       {/* Header */}
-      <header className="relative overflow-hidden bg-gradient-to-r from-sidebar-background via-sidebar-background to-sidebar-accent border-b border-sidebar-border">
-        <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGRlZnM+PHBhdHRlcm4gaWQ9ImdyaWQiIHdpZHRoPSI2MCIgaGVpZ2h0PSI2MCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHBhdGggZD0iTSA2MCAwIEwgMCAwIDAgNjAiIGZpbGw9Im5vbmUiIHN0cm9rZT0icmdiYSgyNTUsMjU1LDI1NSwwLjAzKSIgc3Ryb2tlLXdpZHRoPSIxIi8+PC9wYXR0ZXJuPjwvZGVmcz48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSJ1cmwoI2dyaWQpIi8+PC9zdmc+')] opacity-50" />
+      <header className="relative overflow-hidden bg-[hsl(220,20%,6%)] border-b-2 border-primary">
+        <div className="absolute inset-0 opacity-10">
+          <div className="absolute inset-0" style={{
+            backgroundImage: `repeating-linear-gradient(
+              45deg,
+              transparent,
+              transparent 10px,
+              hsl(48, 100%, 50%) 10px,
+              hsl(48, 100%, 50%) 11px
+            )`
+          }} />
+        </div>
         
-        <div className="container mx-auto px-4 py-6 relative">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Button 
-                variant="ghost" 
-                size="icon"
-                onClick={() => navigate('/cliente')}
-                className="text-sidebar-foreground/80 hover:text-white hover:bg-white/10"
-              >
-                <ArrowLeft className="h-5 w-5" />
-              </Button>
-              <div className="flex items-center gap-3">
-                <div className="relative">
-                  <div className="absolute -inset-1 bg-primary/20 rounded-xl blur-sm" />
-                  <img src={logo} alt="Logo" className="relative h-10 w-10 object-contain rounded-lg" />
+        <div className="container mx-auto px-4 py-5 relative">
+          <div className="flex items-center gap-4">
+            <Button 
+              variant="ghost" 
+              size="icon"
+              onClick={() => navigate('/cliente')}
+              className="text-gray-400 hover:text-primary hover:bg-primary/10 transition-colors"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <div className="flex items-center gap-3">
+              <div className="relative">
+                <div className="absolute -inset-1 bg-primary rounded-lg opacity-40 blur-md" />
+                <div className="relative bg-[hsl(220,20%,10%)] p-2 rounded-lg border border-primary/50">
+                  <img src={logo} alt="Logo" className="h-8 w-8 object-contain" />
                 </div>
-                <div>
-                  <h1 className="text-lg font-bold text-white flex items-center gap-2">
-                    Meu Perfil
-                    <Sparkles className="h-4 w-4 text-primary" />
-                  </h1>
-                  <p className="text-xs text-sidebar-foreground/70">
-                    Atualize suas informações
-                  </p>
-                </div>
+              </div>
+              <div>
+                <h1 className="text-lg font-bold text-white">
+                  Meu <span className="text-primary">Perfil</span>
+                </h1>
+                <p className="text-xs text-gray-500">
+                  Atualize suas informações
+                </p>
               </div>
             </div>
           </div>
         </div>
-        
-        <div className="h-1 bg-gradient-to-r from-primary via-primary/80 to-transparent" />
       </header>
 
       {/* Main Content */}
@@ -191,95 +191,93 @@ export default function ClienteProfilePage() {
         <div className="max-w-2xl mx-auto space-y-6 animate-fade-in">
           
           {isLoading ? (
-            <Card>
-              <CardHeader>
-                <Skeleton className="h-6 w-48" />
-                <Skeleton className="h-4 w-72 mt-2" />
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {[1, 2, 3, 4].map(i => (
-                  <div key={i} className="space-y-2">
-                    <Skeleton className="h-4 w-24" />
-                    <Skeleton className="h-10 w-full" />
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
+            <div className="rounded-2xl bg-[hsl(220,20%,10%)] border border-[hsl(220,18%,18%)] p-6 space-y-6">
+              <div className="space-y-3">
+                <Skeleton className="h-5 w-40 bg-[hsl(220,20%,16%)]" />
+                <Skeleton className="h-10 w-full bg-[hsl(220,20%,16%)]" />
+              </div>
+              <div className="space-y-3">
+                <Skeleton className="h-5 w-40 bg-[hsl(220,20%,16%)]" />
+                <Skeleton className="h-10 w-full bg-[hsl(220,20%,16%)]" />
+              </div>
+              <div className="space-y-3">
+                <Skeleton className="h-5 w-40 bg-[hsl(220,20%,16%)]" />
+                <Skeleton className="h-10 w-full bg-[hsl(220,20%,16%)]" />
+              </div>
+            </div>
           ) : !clientRecord ? (
-            <Card className="border-warning/50 bg-warning/5">
-              <CardContent className="pt-6 text-center">
-                <p className="text-muted-foreground">
-                  Cadastro não encontrado. Entre em contato com a loja.
-                </p>
-                <Button 
-                  variant="outline" 
-                  className="mt-4"
-                  onClick={() => navigate('/cliente')}
-                >
-                  <ArrowLeft className="h-4 w-4 mr-2" />
-                  Voltar
-                </Button>
-              </CardContent>
-            </Card>
+            <div className="rounded-2xl bg-yellow-500/10 border border-yellow-500/30 p-8 text-center">
+              <p className="text-gray-300">
+                Cadastro não encontrado. Entre em contato com a loja.
+              </p>
+              <Button 
+                variant="outline" 
+                className="mt-4 border-primary text-primary hover:bg-primary hover:text-black"
+                onClick={() => navigate('/cliente')}
+              >
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Voltar
+              </Button>
+            </div>
           ) : (
-            <form onSubmit={handleSubmit}>
+            <form onSubmit={handleSubmit} className="space-y-6">
               {/* Personal Info Card */}
-              <Card className="mb-6">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
+              <div className="rounded-2xl bg-[hsl(220,20%,10%)] border border-[hsl(220,18%,18%)] overflow-hidden">
+                <div className="p-5 border-b border-[hsl(220,18%,18%)] flex items-center gap-3">
+                  <div className="p-2.5 rounded-xl bg-primary/10">
                     <User className="h-5 w-5 text-primary" />
-                    Informações Pessoais
-                  </CardTitle>
-                  <CardDescription>
-                    Dados que você pode visualizar (não editáveis)
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-white">Informações Pessoais</h3>
+                    <p className="text-xs text-gray-500">Dados não editáveis</p>
+                  </div>
+                </div>
+                <div className="p-5 space-y-4">
                   <div className="grid gap-4 sm:grid-cols-2">
                     <div className="space-y-2">
-                      <Label className="text-muted-foreground flex items-center gap-2">
+                      <Label className="text-gray-400 text-sm flex items-center gap-2">
                         <User className="h-3.5 w-3.5" />
                         Nome
                       </Label>
                       <Input 
                         value={clientRecord.name} 
                         disabled 
-                        className="bg-muted/50"
+                        className="bg-[hsl(220,20%,14%)] border-[hsl(220,18%,20%)] text-gray-400"
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label className="text-muted-foreground flex items-center gap-2">
+                      <Label className="text-gray-400 text-sm flex items-center gap-2">
                         <Mail className="h-3.5 w-3.5" />
                         E-mail
                       </Label>
                       <Input 
                         value={clientRecord.email || ''} 
                         disabled 
-                        className="bg-muted/50"
+                        className="bg-[hsl(220,20%,14%)] border-[hsl(220,18%,20%)] text-gray-400"
                       />
                     </div>
                   </div>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-xs text-gray-600">
                     Para alterar nome ou e-mail, entre em contato com a loja.
                   </p>
-                </CardContent>
-              </Card>
+                </div>
+              </div>
 
-              {/* Editable Info Card */}
-              <Card className="mb-6">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <MapPin className="h-5 w-5 text-info" />
-                    Dados de Contato
-                  </CardTitle>
-                  <CardDescription>
-                    Atualize seu telefone e endereço
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
+              {/* Contact Info Card */}
+              <div className="rounded-2xl bg-[hsl(220,20%,10%)] border border-[hsl(220,18%,18%)] overflow-hidden">
+                <div className="p-5 border-b border-[hsl(220,18%,18%)] flex items-center gap-3">
+                  <div className="p-2.5 rounded-xl bg-blue-500/10">
+                    <MapPin className="h-5 w-5 text-blue-400" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-white">Dados de Contato</h3>
+                    <p className="text-xs text-gray-500">Telefone e endereço</p>
+                  </div>
+                </div>
+                <div className="p-5 space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="phone" className="flex items-center gap-2">
-                      <Phone className="h-3.5 w-3.5" />
+                    <Label htmlFor="phone" className="text-gray-300 text-sm flex items-center gap-2">
+                      <Phone className="h-3.5 w-3.5 text-primary" />
                       Telefone
                     </Label>
                     <Input 
@@ -288,13 +286,14 @@ export default function ClienteProfilePage() {
                       value={formData.phone || ''}
                       onChange={(e) => handleChange('phone', formatPhoneInput(e.target.value))}
                       maxLength={16}
+                      className="bg-[hsl(220,20%,12%)] border-[hsl(220,18%,20%)] text-white placeholder:text-gray-600 focus:border-primary focus:ring-primary/20"
                     />
-                    {errors.phone && <p className="text-xs text-destructive">{errors.phone}</p>}
+                    {errors.phone && <p className="text-xs text-red-400">{errors.phone}</p>}
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="address" className="flex items-center gap-2">
-                      <MapPin className="h-3.5 w-3.5" />
+                    <Label htmlFor="address" className="text-gray-300 text-sm flex items-center gap-2">
+                      <MapPin className="h-3.5 w-3.5 text-primary" />
                       Endereço
                     </Label>
                     <Input 
@@ -303,14 +302,15 @@ export default function ClienteProfilePage() {
                       value={formData.address || ''}
                       onChange={(e) => handleChange('address', e.target.value)}
                       maxLength={200}
+                      className="bg-[hsl(220,20%,12%)] border-[hsl(220,18%,20%)] text-white placeholder:text-gray-600 focus:border-primary focus:ring-primary/20"
                     />
-                    {errors.address && <p className="text-xs text-destructive">{errors.address}</p>}
+                    {errors.address && <p className="text-xs text-red-400">{errors.address}</p>}
                   </div>
 
                   <div className="grid gap-4 sm:grid-cols-3">
                     <div className="space-y-2">
-                      <Label htmlFor="city" className="flex items-center gap-2">
-                        <Building2 className="h-3.5 w-3.5" />
+                      <Label htmlFor="city" className="text-gray-300 text-sm flex items-center gap-2">
+                        <Building2 className="h-3.5 w-3.5 text-primary" />
                         Cidade
                       </Label>
                       <Input 
@@ -319,58 +319,58 @@ export default function ClienteProfilePage() {
                         value={formData.city || ''}
                         onChange={(e) => handleChange('city', e.target.value)}
                         maxLength={100}
+                        className="bg-[hsl(220,20%,12%)] border-[hsl(220,18%,20%)] text-white placeholder:text-gray-600 focus:border-primary focus:ring-primary/20"
                       />
-                      {errors.city && <p className="text-xs text-destructive">{errors.city}</p>}
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="state">Estado</Label>
+                      <Label htmlFor="state" className="text-gray-300 text-sm">Estado</Label>
                       <Select 
                         value={formData.state || ''} 
                         onValueChange={(v) => handleChange('state', v)}
                       >
-                        <SelectTrigger>
+                        <SelectTrigger className="bg-[hsl(220,20%,12%)] border-[hsl(220,18%,20%)] text-white focus:border-primary focus:ring-primary/20">
                           <SelectValue placeholder="UF" />
                         </SelectTrigger>
-                        <SelectContent>
+                        <SelectContent className="bg-[hsl(220,20%,12%)] border-[hsl(220,18%,20%)]">
                           {brazilianStates.map(state => (
-                            <SelectItem key={state} value={state}>{state}</SelectItem>
+                            <SelectItem key={state} value={state} className="text-white hover:bg-primary/20 focus:bg-primary/20">{state}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="zip_code">CEP</Label>
+                      <Label htmlFor="zip_code" className="text-gray-300 text-sm">CEP</Label>
                       <Input 
                         id="zip_code"
                         placeholder="00000-000"
                         value={formData.zip_code || ''}
                         onChange={(e) => handleChange('zip_code', formatCEPInput(e.target.value))}
                         maxLength={9}
+                        className="bg-[hsl(220,20%,12%)] border-[hsl(220,18%,20%)] text-white placeholder:text-gray-600 focus:border-primary focus:ring-primary/20"
                       />
-                      {errors.zip_code && <p className="text-xs text-destructive">{errors.zip_code}</p>}
                     </div>
                   </div>
-                </CardContent>
-              </Card>
+                </div>
+              </div>
 
               {/* Additional Info Card */}
-              <Card className="mb-6">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Briefcase className="h-5 w-5 text-success" />
-                    Informações Adicionais
-                  </CardTitle>
-                  <CardDescription>
-                    Dados complementares do seu cadastro
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
+              <div className="rounded-2xl bg-[hsl(220,20%,10%)] border border-[hsl(220,18%,18%)] overflow-hidden">
+                <div className="p-5 border-b border-[hsl(220,18%,18%)] flex items-center gap-3">
+                  <div className="p-2.5 rounded-xl bg-green-500/10">
+                    <Briefcase className="h-5 w-5 text-green-400" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-white">Informações Adicionais</h3>
+                    <p className="text-xs text-gray-500">Dados complementares</p>
+                  </div>
+                </div>
+                <div className="p-5 space-y-4">
                   <div className="grid gap-4 sm:grid-cols-2">
                     <div className="space-y-2">
-                      <Label htmlFor="occupation" className="flex items-center gap-2">
-                        <Briefcase className="h-3.5 w-3.5" />
+                      <Label htmlFor="occupation" className="text-gray-300 text-sm flex items-center gap-2">
+                        <Briefcase className="h-3.5 w-3.5 text-primary" />
                         Profissão
                       </Label>
                       <Input 
@@ -379,13 +379,13 @@ export default function ClienteProfilePage() {
                         value={formData.occupation || ''}
                         onChange={(e) => handleChange('occupation', e.target.value)}
                         maxLength={100}
+                        className="bg-[hsl(220,20%,12%)] border-[hsl(220,18%,20%)] text-white placeholder:text-gray-600 focus:border-primary focus:ring-primary/20"
                       />
-                      {errors.occupation && <p className="text-xs text-destructive">{errors.occupation}</p>}
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="birth_date" className="flex items-center gap-2">
-                        <Calendar className="h-3.5 w-3.5" />
+                      <Label htmlFor="birth_date" className="text-gray-300 text-sm flex items-center gap-2">
+                        <Calendar className="h-3.5 w-3.5 text-primary" />
                         Data de Nascimento
                       </Label>
                       <Input 
@@ -394,41 +394,42 @@ export default function ClienteProfilePage() {
                         value={formData.birth_date || ''}
                         onChange={(e) => handleChange('birth_date', e.target.value)}
                         max={new Date().toISOString().split('T')[0]}
+                        className="bg-[hsl(220,20%,12%)] border-[hsl(220,18%,20%)] text-white focus:border-primary focus:ring-primary/20 [color-scheme:dark]"
                       />
-                      {errors.birth_date && <p className="text-xs text-destructive">{errors.birth_date}</p>}
                     </div>
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="marital_status" className="flex items-center gap-2">
-                      <Heart className="h-3.5 w-3.5" />
+                    <Label htmlFor="marital_status" className="text-gray-300 text-sm flex items-center gap-2">
+                      <Heart className="h-3.5 w-3.5 text-primary" />
                       Estado Civil
                     </Label>
                     <Select 
                       value={formData.marital_status || ''} 
                       onValueChange={(v) => handleChange('marital_status', v || null)}
                     >
-                      <SelectTrigger>
+                      <SelectTrigger className="bg-[hsl(220,20%,12%)] border-[hsl(220,18%,20%)] text-white focus:border-primary focus:ring-primary/20">
                         <SelectValue placeholder="Selecione" />
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent className="bg-[hsl(220,20%,12%)] border-[hsl(220,18%,20%)]">
                         {maritalStatusOptions.map(option => (
-                          <SelectItem key={option.value} value={option.value}>
+                          <SelectItem key={option.value} value={option.value} className="text-white hover:bg-primary/20 focus:bg-primary/20">
                             {option.label}
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   </div>
-                </CardContent>
-              </Card>
+                </div>
+              </div>
 
               {/* Save Button */}
-              <div className="flex flex-col sm:flex-row gap-3 sm:justify-end">
+              <div className="flex flex-col sm:flex-row gap-3 sm:justify-end pt-4">
                 <Button 
                   type="button" 
                   variant="outline"
                   onClick={() => navigate('/cliente')}
+                  className="border-[hsl(220,18%,20%)] text-gray-300 hover:bg-[hsl(220,20%,14%)] hover:text-white"
                 >
                   <ArrowLeft className="h-4 w-4 mr-2" />
                   Voltar
@@ -436,7 +437,7 @@ export default function ClienteProfilePage() {
                 <Button 
                   type="submit" 
                   disabled={updateProfile.isPending || !hasChanges}
-                  className="bg-primary text-primary-foreground hover:bg-primary/90"
+                  className="bg-primary hover:bg-primary/90 text-black font-semibold disabled:opacity-50"
                 >
                   {updateProfile.isPending ? (
                     <>
