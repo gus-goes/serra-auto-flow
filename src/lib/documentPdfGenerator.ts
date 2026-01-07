@@ -3,7 +3,7 @@ import { formatCurrency, formatCPF, formatPhone, formatRG, maritalStatusLabels, 
 import { formatDateDisplay, formatDateFullPtBr } from './dateUtils';
 import { getPDFColors } from './bankConfig';
 import { getCompanyConfig, formatCompanyAddress } from './companyConfig';
-import type { Contract, Warranty, TransferAuthorization, WithdrawalDeclaration, Reservation, Client, Vehicle } from '@/types';
+import type { Contract, Warranty, TransferAuthorization, WithdrawalDeclaration, Reservation, Client, Vehicle, User } from '@/types';
 import { clientStorage, vehicleStorage, userStorage } from './storage';
 import companyLogo from '@/assets/logo.png';
 

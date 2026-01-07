@@ -3,7 +3,7 @@ import { formatCurrency, formatCPF, numberToWords, formatPhone, formatRG, marita
 import { formatDateDisplay, formatDateFullPtBr } from './dateUtils';
 import { getPDFColors, getBankConfigByName, BANK_CONFIGS } from './bankConfig';
 import { getCompanyConfig, formatCompanyAddress, formatCompanyShortAddress } from './companyConfig';
-import type { Receipt, Proposal, Client } from '@/types';
+import type { Receipt, Proposal, Client, Vehicle, User, Bank } from '@/types';
 import { clientStorage, vehicleStorage, userStorage, bankStorage } from './storage';
 import companyLogo from '@/assets/logo.png';
 
@@ -15,6 +15,7 @@ import companyLogo from '@/assets/logo.png';
 interface PDFOptions {
   bankName?: string;
   privacyMode?: boolean;
+  banks?: Bank[];
 }
 
 // Payment reference labels
@@ -41,8 +42,8 @@ function drawHeader(doc: jsPDF, options: PDFOptions = {}): number {
   const bankConfig = options.bankName ? getBankConfigByName(options.bankName) : undefined;
   const company = getCompanyConfig();
   
-  // Get bank logo from storage if available
-  const storedBank = options.bankName ? bankStorage.getAll().find(b => 
+  // Get bank logo from provided banks array or from bank config
+  const storedBank = options.bankName && options.banks ? options.banks.find(b => 
     b.name.toLowerCase().includes(options.bankName!.toLowerCase()) ||
     options.bankName!.toLowerCase().includes(b.name.toLowerCase())
   ) : undefined;
@@ -262,13 +263,18 @@ function drawSignatureSection(
   return y + sigBoxHeight + 15;
 }
 
+interface ReceiptPDFData {
+  receipt: Receipt;
+  client?: Client | null;
+  vehicle?: Vehicle | null;
+  vendor?: User | null;
+}
+
 /**
  * Generate professional Receipt PDF
  */
-export function generateReceiptPDF(receipt: Receipt, options: PDFOptions = {}): void {
-  const client = clientStorage.getById(receipt.clientId);
-  const vehicle = receipt.vehicleId ? vehicleStorage.getById(receipt.vehicleId) : null;
-  const vendor = userStorage.getById(receipt.vendorId);
+export function generateReceiptPDF(data: ReceiptPDFData, options: PDFOptions = {}): void {
+  const { receipt, client, vehicle, vendor } = data;
   
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.getWidth();
@@ -403,15 +409,18 @@ export function generateReceiptPDF(receipt: Receipt, options: PDFOptions = {}): 
   doc.save(`recibo-${receipt.number}.pdf`);
 }
 
+interface ProposalPDFData {
+  proposal: Proposal;
+  client: Client;
+  vehicle: Vehicle;
+  vendor?: User | null;
+}
+
 /**
  * Generate professional Proposal PDF - Simplified with signature and 5-day validity
  */
-export function generateProposalPDF(proposal: Proposal, options: PDFOptions = {}): void {
-  const client = clientStorage.getById(proposal.clientId);
-  const vehicle = vehicleStorage.getById(proposal.vehicleId);
-  const vendor = userStorage.getById(proposal.vendorId);
-  
-  if (!client || !vehicle) return;
+export function generateProposalPDF(data: ProposalPDFData, options: PDFOptions = {}): void {
+  const { proposal, client, vehicle, vendor } = data;
   
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.getWidth();
@@ -607,11 +616,16 @@ export function generateProposalPDF(proposal: Proposal, options: PDFOptions = {}
   doc.save(`proposta-${proposal.number}.pdf`);
 }
 
+interface ClientPDFData {
+  client: Client;
+  vendor?: User | null;
+}
+
 /**
  * Generate Client Registration PDF - Professional Layout
  */
-export function generateClientPDF(client: Client): void {
-  const vendor = userStorage.getById(client.vendorId);
+export function generateClientPDF(data: ClientPDFData): void {
+  const { client, vendor } = data;
   const company = getCompanyConfig();
   const colors = getPDFColors();
   
