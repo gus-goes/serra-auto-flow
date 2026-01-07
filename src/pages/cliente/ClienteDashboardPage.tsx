@@ -40,6 +40,7 @@ import {
   useClientWithdrawals
 } from '@/hooks/useClientDocuments';
 import { formatCurrency } from '@/lib/formatters';
+import { formatDateDisplay } from '@/lib/dateUtils';
 import { generateContractPDF, generateWarrantyPDF, generateTransferAuthPDF, generateReservationPDF, generateWithdrawalPDF } from '@/lib/documentPdfGenerator';
 import { generateReceiptPDF } from '@/lib/pdfGenerator';
 import { mapClientFromDB, mapVehicleFromDB, mapContractFromDB, mapReceiptFromDB, mapWarrantyFromDB, mapTransferFromDB, mapReservationFromDB, mapWithdrawalFromDB } from '@/lib/pdfDataMappers';
@@ -541,6 +542,13 @@ export default function ClienteDashboardPage() {
                   <CalendarCheck className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
                   Reservas
                 </TabsTrigger>
+                <TabsTrigger 
+                  value="withdrawals" 
+                  className="data-[state=active]:bg-primary data-[state=active]:text-black rounded-lg px-2 sm:px-4 text-xs sm:text-sm text-gray-400 hover:text-white transition-colors whitespace-nowrap"
+                >
+                  <Ban className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                  Desistências
+                </TabsTrigger>
               </TabsList>
               <ScrollBar orientation="horizontal" className="invisible" />
             </ScrollArea>
@@ -583,7 +591,7 @@ export default function ClienteDashboardPage() {
                                 <div className="flex items-center gap-3 mt-1.5">
                                   <span className="flex items-center gap-1 text-[10px] sm:text-xs text-gray-500">
                                     <Calendar className="h-3 w-3" />
-                                    {format(new Date(contract.contract_date), "dd/MM/yy")}
+                                    {formatDateDisplay(contract.contract_date)}
                                   </span>
                                   <span className="text-xs sm:text-sm font-bold text-primary">
                                     {formatCurrency(contract.vehicle_price || 0)}
@@ -641,7 +649,7 @@ export default function ClienteDashboardPage() {
                                 <p className="text-xs sm:text-sm text-gray-500">{warranty.warranty_period} • {warranty.warranty_km?.toLocaleString()} km</p>
                                 <span className="flex items-center gap-1 text-[10px] sm:text-xs text-gray-500 mt-1.5">
                                   <Calendar className="h-3 w-3" />
-                                  {format(new Date(warranty.created_at), "dd/MM/yyyy")}
+                                  {formatDateDisplay(warranty.created_at)}
                                 </span>
                               </div>
                             </div>
@@ -695,7 +703,7 @@ export default function ClienteDashboardPage() {
                                 <p className="text-xs sm:text-sm text-gray-500 truncate">{receipt.description || 'Pagamento'}</p>
                                 <span className="flex items-center gap-1 text-[10px] sm:text-xs text-gray-500 mt-1.5">
                                   <Calendar className="h-3 w-3" />
-                                  {format(new Date(receipt.payment_date), "dd/MM/yyyy")}
+                                  {formatDateDisplay(receipt.payment_date)}
                                 </span>
                               </div>
                             </div>
@@ -760,7 +768,7 @@ export default function ClienteDashboardPage() {
                                 <p className="text-xs sm:text-sm text-gray-500">{proposalTypeMap[proposal.type]}</p>
                                 <span className="flex items-center gap-1 text-[10px] sm:text-xs text-gray-500 mt-1.5">
                                   <Calendar className="h-3 w-3" />
-                                  {format(new Date(proposal.created_at), "dd/MM/yyyy")}
+                                  {formatDateDisplay(proposal.created_at)}
                                 </span>
                               </div>
                             </div>
@@ -811,7 +819,7 @@ export default function ClienteDashboardPage() {
                                 <p className="text-xs sm:text-sm text-gray-500">{transfer.location}</p>
                                 <span className="flex items-center gap-1 text-[10px] sm:text-xs text-gray-500 mt-1.5">
                                   <Calendar className="h-3 w-3" />
-                                  {format(new Date(transfer.transfer_date), "dd/MM/yyyy")}
+                                  {formatDateDisplay(transfer.transfer_date)}
                                 </span>
                               </div>
                             </div>
@@ -873,7 +881,7 @@ export default function ClienteDashboardPage() {
                                 )}
                                 <span className="flex items-center gap-1 text-[10px] sm:text-xs text-gray-500 mt-1.5">
                                   <Calendar className="h-3 w-3" />
-                                  {format(new Date(reservation.reservation_date), "dd/MM/yyyy")}
+                                  {formatDateDisplay(reservation.reservation_date)}
                                 </span>
                               </div>
                             </div>
@@ -881,6 +889,62 @@ export default function ClienteDashboardPage() {
                               size="sm"
                               className="w-full sm:w-auto bg-cyan-500 hover:bg-cyan-600 text-white font-medium text-xs sm:text-sm"
                               onClick={() => handleDownloadReservation(reservation)}
+                              disabled={isDownloading}
+                            >
+                              {isDownloading ? <Clock className="h-4 w-4 mr-1.5 animate-spin" /> : <Download className="h-4 w-4 mr-1.5" />}
+                              PDF
+                            </Button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </TabsContent>
+
+            {/* Withdrawals Tab */}
+            <TabsContent value="withdrawals" className="mt-4 sm:mt-6">
+              <div className="rounded-xl sm:rounded-2xl bg-[hsl(220,20%,10%)] border border-[hsl(220,18%,18%)] overflow-hidden">
+                <div className="p-3 sm:p-6 border-b border-[hsl(220,18%,18%)]">
+                  <div className="flex items-center gap-2 sm:gap-3">
+                    <div className="p-2 sm:p-2.5 rounded-lg sm:rounded-xl bg-red-500/10">
+                      <Ban className="h-4 w-4 sm:h-5 sm:w-5 text-red-400" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-white text-sm sm:text-base">Minhas Desistências</h3>
+                      <p className="text-xs sm:text-sm text-gray-500 hidden sm:block">Declarações de desistência</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="p-3 sm:p-4">
+                  {isLoadingWithdrawals ? <DocumentSkeleton /> : withdrawals.length === 0 ? (
+                    <EmptyState icon={Ban} title="Nenhuma desistência encontrada" description="Suas declarações aparecerão aqui" />
+                  ) : (
+                    <div className="space-y-2 sm:space-y-3">
+                      {withdrawals.map((withdrawal) => {
+                        const isDownloading = downloadingId === withdrawal.id;
+                        return (
+                          <div key={withdrawal.id} className="group flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 sm:p-4 rounded-xl bg-[hsl(220,20%,12%)] hover:bg-[hsl(220,20%,14%)] border border-transparent hover:border-red-500/30 transition-all">
+                            <div className="flex items-start gap-3 min-w-0">
+                              <div className="p-2 sm:p-3 rounded-lg sm:rounded-xl bg-red-500/10 text-red-400 group-hover:bg-red-500 group-hover:text-white transition-colors shrink-0">
+                                <Ban className="h-5 w-5 sm:h-6 sm:w-6" />
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <p className="font-semibold text-white text-sm sm:text-base">Desistência #{withdrawal.declaration_number}</p>
+                                {withdrawal.reason && (
+                                  <p className="text-xs sm:text-sm text-gray-500 truncate">{withdrawal.reason}</p>
+                                )}
+                                <span className="flex items-center gap-1 text-[10px] sm:text-xs text-gray-500 mt-1.5">
+                                  <Calendar className="h-3 w-3" />
+                                  {formatDateDisplay(withdrawal.declaration_date)}
+                                </span>
+                              </div>
+                            </div>
+                            <Button 
+                              size="sm"
+                              className="w-full sm:w-auto bg-red-500 hover:bg-red-600 text-white font-medium text-xs sm:text-sm"
+                              onClick={() => handleDownloadWithdrawal(withdrawal)}
                               disabled={isDownloading}
                             >
                               {isDownloading ? <Clock className="h-4 w-4 mr-1.5 animate-spin" /> : <Download className="h-4 w-4 mr-1.5" />}
