@@ -7,7 +7,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
   FileText, 
   LogOut, 
-  User, 
   Receipt, 
   FileCheck, 
   Download, 
@@ -19,8 +18,8 @@ import {
   CheckCircle2,
   XCircle,
   HourglassIcon,
-  Sparkles,
-  Settings
+  Settings,
+  ChevronRight
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -35,11 +34,11 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useState } from 'react';
 
-const proposalStatusConfig: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline'; icon: typeof CheckCircle2 }> = {
-  pendente: { label: 'Em Análise', variant: 'secondary', icon: HourglassIcon },
-  aprovada: { label: 'Aprovada', variant: 'default', icon: CheckCircle2 },
-  recusada: { label: 'Recusada', variant: 'destructive', icon: XCircle },
-  cancelada: { label: 'Cancelada', variant: 'outline', icon: XCircle },
+const proposalStatusConfig: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline'; icon: typeof CheckCircle2; color: string }> = {
+  pendente: { label: 'Em Análise', variant: 'secondary', icon: HourglassIcon, color: 'text-yellow-500' },
+  aprovada: { label: 'Aprovada', variant: 'default', icon: CheckCircle2, color: 'text-green-500' },
+  recusada: { label: 'Recusada', variant: 'destructive', icon: XCircle, color: 'text-red-500' },
+  cancelada: { label: 'Cancelada', variant: 'outline', icon: XCircle, color: 'text-gray-500' },
 };
 
 const proposalTypeMap: Record<string, string> = {
@@ -161,58 +160,67 @@ export default function ClienteDashboardPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/30">
+    <div className="min-h-screen bg-[hsl(220,20%,8%)]">
       {/* Hero Header */}
-      <header className="relative overflow-hidden bg-gradient-to-r from-sidebar-background via-sidebar-background to-sidebar-accent border-b border-sidebar-border">
-        <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGRlZnM+PHBhdHRlcm4gaWQ9ImdyaWQiIHdpZHRoPSI2MCIgaGVpZ2h0PSI2MCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHBhdGggZD0iTSA2MCAwIEwgMCAwIDAgNjAiIGZpbGw9Im5vbmUiIHN0cm9rZT0icmdiYSgyNTUsMjU1LDI1NSwwLjAzKSIgc3Ryb2tlLXdpZHRoPSIxIi8+PC9wYXR0ZXJuPjwvZGVmcz48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSJ1cmwoI2dyaWQpIi8+PC9zdmc+')] opacity-50" />
+      <header className="relative overflow-hidden bg-[hsl(220,20%,6%)] border-b-2 border-primary">
+        {/* Background pattern */}
+        <div className="absolute inset-0 opacity-10">
+          <div className="absolute inset-0" style={{
+            backgroundImage: `repeating-linear-gradient(
+              45deg,
+              transparent,
+              transparent 10px,
+              hsl(48, 100%, 50%) 10px,
+              hsl(48, 100%, 50%) 11px
+            )`
+          }} />
+        </div>
         
-        <div className="container mx-auto px-4 py-6 relative">
+        <div className="container mx-auto px-4 py-5 relative">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <div className="relative">
-                <div className="absolute -inset-1 bg-primary/20 rounded-xl blur-sm" />
-                <img src={logo} alt="Logo" className="relative h-12 w-12 object-contain rounded-lg" />
+              <div className="relative group">
+                <div className="absolute -inset-1.5 bg-primary rounded-xl opacity-60 blur-md group-hover:opacity-100 transition-opacity" />
+                <div className="relative bg-[hsl(220,20%,10%)] p-2 rounded-xl border border-primary/50">
+                  <img src={logo} alt="Logo" className="h-10 w-10 object-contain" />
+                </div>
               </div>
               <div>
-                <h1 className="text-xl font-bold text-white flex items-center gap-2">
-                  Portal do Cliente
-                  <Sparkles className="h-4 w-4 text-primary" />
+                <h1 className="text-xl font-bold text-white tracking-tight">
+                  Área do <span className="text-primary">Cliente</span>
                 </h1>
-                <p className="text-sm text-sidebar-foreground/70">
+                <p className="text-xs text-gray-400">
                   Seus documentos em um só lugar
                 </p>
               </div>
             </div>
             
-            <div className="flex items-center gap-2 sm:gap-3">
-              <div className="hidden sm:block text-right">
+            <div className="flex items-center gap-2">
+              <div className="hidden md:flex flex-col items-end mr-2">
                 <p className="text-sm font-medium text-white">{profile?.name}</p>
-                <p className="text-xs text-sidebar-foreground/60">{profile?.email}</p>
+                <p className="text-xs text-gray-500">{profile?.email}</p>
               </div>
               <Button 
                 variant="ghost" 
                 size="icon"
                 onClick={() => navigate('/cliente/perfil')}
-                className="text-sidebar-foreground/80 hover:text-white hover:bg-white/10"
+                className="text-gray-400 hover:text-primary hover:bg-primary/10 transition-colors"
                 title="Meu Perfil"
               >
-                <Settings className="h-4 w-4" />
+                <Settings className="h-5 w-5" />
               </Button>
               <Button 
                 variant="ghost" 
-                size="sm" 
+                size="icon"
                 onClick={logout}
-                className="text-sidebar-foreground/80 hover:text-white hover:bg-white/10"
+                className="text-gray-400 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                title="Sair"
               >
-                <LogOut className="h-4 w-4" />
-                <span className="hidden sm:inline ml-2">Sair</span>
+                <LogOut className="h-5 w-5" />
               </Button>
             </div>
           </div>
         </div>
-        
-        {/* Decorative gradient line */}
-        <div className="h-1 bg-gradient-to-r from-primary via-primary/80 to-transparent" />
       </header>
 
       {/* Main Content */}
@@ -220,120 +228,130 @@ export default function ClienteDashboardPage() {
         <div className="space-y-8 animate-fade-in">
           
           {/* Welcome Section */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4">
             <div>
-              <h2 className="text-2xl sm:text-3xl font-bold text-foreground">
-                Olá, {firstName}! 👋
+              <p className="text-primary font-medium text-sm mb-1">Bem-vindo de volta</p>
+              <h2 className="text-3xl md:text-4xl font-bold text-white">
+                Olá, {firstName}! 
               </h2>
-              <p className="text-muted-foreground mt-1">
+              <p className="text-gray-400 mt-2">
                 Acompanhe seus contratos, propostas e recibos
               </p>
             </div>
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Calendar className="h-4 w-4" />
-              {format(new Date(), "EEEE, dd 'de' MMMM", { locale: ptBR })}
+            <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[hsl(220,20%,12%)] border border-[hsl(220,18%,18%)]">
+              <Calendar className="h-4 w-4 text-primary" />
+              <span className="text-sm text-gray-300">
+                {format(new Date(), "EEEE, dd 'de' MMMM", { locale: ptBR })}
+              </span>
             </div>
           </div>
 
           {/* No Client Record Warning */}
           {!isLoadingClient && !hasClientRecord && (
-            <Card className="border-warning/50 bg-warning/5">
-              <CardContent className="flex items-start gap-4 pt-6">
-                <div className="p-2 rounded-lg bg-warning/10">
-                  <AlertCircle className="h-5 w-5 text-warning" />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-warning">Cadastro pendente</h3>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Seu e-mail ({profile?.email}) ainda não está vinculado a um cadastro de cliente. 
-                    Entre em contato com a loja para concluir seu cadastro.
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
+            <div className="p-4 rounded-xl bg-yellow-500/10 border border-yellow-500/30 flex items-start gap-4">
+              <div className="p-2 rounded-lg bg-yellow-500/20">
+                <AlertCircle className="h-5 w-5 text-yellow-500" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-yellow-500">Cadastro pendente</h3>
+                <p className="text-sm text-gray-400 mt-1">
+                  Seu e-mail ({profile?.email}) ainda não está vinculado a um cadastro de cliente. 
+                  Entre em contato com a loja para concluir seu cadastro.
+                </p>
+              </div>
+            </div>
           )}
 
           {/* Stats Cards */}
           {hasClientRecord && (
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-              <Card className="group hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
-                <CardContent className="pt-6">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground">Contratos</p>
-                      <p className="text-3xl font-bold text-foreground mt-1">{totalContracts}</p>
-                    </div>
-                    <div className="p-2.5 rounded-xl bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
-                      <FileCheck className="h-5 w-5" />
+              {/* Contracts Card */}
+              <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-[hsl(220,20%,12%)] to-[hsl(220,20%,8%)] border border-[hsl(220,18%,18%)] p-5 hover:border-primary/50 transition-all duration-300">
+                <div className="absolute top-0 right-0 w-20 h-20 bg-primary/10 rounded-full blur-2xl group-hover:bg-primary/20 transition-colors" />
+                <div className="relative">
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">Contratos</span>
+                    <div className="p-2 rounded-lg bg-primary/10 text-primary">
+                      <FileCheck className="h-4 w-4" />
                     </div>
                   </div>
-                </CardContent>
-              </Card>
+                  <p className="text-3xl font-bold text-white">{totalContracts}</p>
+                </div>
+              </div>
 
-              <Card className="group hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
-                <CardContent className="pt-6">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground">Propostas</p>
-                      <p className="text-3xl font-bold text-foreground mt-1">{totalProposals}</p>
-                    </div>
-                    <div className="p-2.5 rounded-xl bg-info/10 text-info group-hover:bg-info group-hover:text-info-foreground transition-colors">
-                      <FileText className="h-5 w-5" />
+              {/* Proposals Card */}
+              <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-[hsl(220,20%,12%)] to-[hsl(220,20%,8%)] border border-[hsl(220,18%,18%)] p-5 hover:border-primary/50 transition-all duration-300">
+                <div className="absolute top-0 right-0 w-20 h-20 bg-blue-500/10 rounded-full blur-2xl group-hover:bg-blue-500/20 transition-colors" />
+                <div className="relative">
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">Propostas</span>
+                    <div className="p-2 rounded-lg bg-blue-500/10 text-blue-400">
+                      <FileText className="h-4 w-4" />
                     </div>
                   </div>
+                  <p className="text-3xl font-bold text-white">{totalProposals}</p>
                   {approvedProposals > 0 && (
-                    <p className="text-xs text-success mt-2 flex items-center gap-1">
+                    <p className="text-xs text-green-400 mt-1 flex items-center gap-1">
                       <CheckCircle2 className="h-3 w-3" />
                       {approvedProposals} aprovada{approvedProposals > 1 ? 's' : ''}
                     </p>
                   )}
-                </CardContent>
-              </Card>
+                </div>
+              </div>
 
-              <Card className="group hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
-                <CardContent className="pt-6">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground">Recibos</p>
-                      <p className="text-3xl font-bold text-foreground mt-1">{totalReceipts}</p>
-                    </div>
-                    <div className="p-2.5 rounded-xl bg-success/10 text-success group-hover:bg-success group-hover:text-success-foreground transition-colors">
-                      <Receipt className="h-5 w-5" />
+              {/* Receipts Card */}
+              <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-[hsl(220,20%,12%)] to-[hsl(220,20%,8%)] border border-[hsl(220,18%,18%)] p-5 hover:border-primary/50 transition-all duration-300">
+                <div className="absolute top-0 right-0 w-20 h-20 bg-green-500/10 rounded-full blur-2xl group-hover:bg-green-500/20 transition-colors" />
+                <div className="relative">
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">Recibos</span>
+                    <div className="p-2 rounded-lg bg-green-500/10 text-green-400">
+                      <Receipt className="h-4 w-4" />
                     </div>
                   </div>
-                </CardContent>
-              </Card>
+                  <p className="text-3xl font-bold text-white">{totalReceipts}</p>
+                </div>
+              </div>
 
-              <Card className="group hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
-                <CardContent className="pt-6">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground">Total Pago</p>
-                      <p className="text-2xl font-bold text-foreground mt-1">
-                        {formatCurrency(receipts.reduce((acc, r) => acc + r.amount, 0))}
-                      </p>
-                    </div>
-                    <div className="p-2.5 rounded-xl bg-accent/20 text-accent-foreground group-hover:bg-accent transition-colors">
-                      <CreditCard className="h-5 w-5" />
+              {/* Total Paid Card */}
+              <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/20 to-[hsl(220,20%,8%)] border border-primary/30 p-5 hover:border-primary transition-all duration-300">
+                <div className="absolute top-0 right-0 w-20 h-20 bg-primary/20 rounded-full blur-2xl" />
+                <div className="relative">
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-xs font-medium text-primary uppercase tracking-wider">Total Pago</span>
+                    <div className="p-2 rounded-lg bg-primary/20 text-primary">
+                      <CreditCard className="h-4 w-4" />
                     </div>
                   </div>
-                </CardContent>
-              </Card>
+                  <p className="text-2xl font-bold text-white">
+                    {formatCurrency(receipts.reduce((acc, r) => acc + r.amount, 0))}
+                  </p>
+                </div>
+              </div>
             </div>
           )}
 
           {/* Documents Tabs */}
           <Tabs defaultValue="contracts" className="w-full">
-            <TabsList className="grid w-full grid-cols-3 lg:w-[400px] bg-muted/50">
-              <TabsTrigger value="contracts" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <TabsList className="w-full lg:w-auto inline-flex h-12 bg-[hsl(220,20%,10%)] border border-[hsl(220,18%,18%)] p-1 rounded-xl">
+              <TabsTrigger 
+                value="contracts" 
+                className="flex-1 lg:flex-none data-[state=active]:bg-primary data-[state=active]:text-black rounded-lg px-6 text-gray-400 hover:text-white transition-colors"
+              >
                 <FileCheck className="h-4 w-4 mr-2" />
                 Contratos
               </TabsTrigger>
-              <TabsTrigger value="proposals" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <TabsTrigger 
+                value="proposals" 
+                className="flex-1 lg:flex-none data-[state=active]:bg-primary data-[state=active]:text-black rounded-lg px-6 text-gray-400 hover:text-white transition-colors"
+              >
                 <FileText className="h-4 w-4 mr-2" />
                 Propostas
               </TabsTrigger>
-              <TabsTrigger value="receipts" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <TabsTrigger 
+                value="receipts" 
+                className="flex-1 lg:flex-none data-[state=active]:bg-primary data-[state=active]:text-black rounded-lg px-6 text-gray-400 hover:text-white transition-colors"
+              >
                 <Receipt className="h-4 w-4 mr-2" />
                 Recibos
               </TabsTrigger>
@@ -341,37 +359,38 @@ export default function ClienteDashboardPage() {
 
             {/* Contracts Tab */}
             <TabsContent value="contracts" className="mt-6">
-              <Card>
-                <CardHeader className="pb-4">
-                  <CardTitle className="flex items-center gap-2 text-lg">
-                    <FileCheck className="h-5 w-5 text-primary" />
-                    Meus Contratos
-                  </CardTitle>
-                  <CardDescription>
-                    Contratos de compra e venda de veículos
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
+              <div className="rounded-2xl bg-[hsl(220,20%,10%)] border border-[hsl(220,18%,18%)] overflow-hidden">
+                <div className="p-6 border-b border-[hsl(220,18%,18%)]">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2.5 rounded-xl bg-primary/10">
+                      <FileCheck className="h-5 w-5 text-primary" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-white">Meus Contratos</h3>
+                      <p className="text-sm text-gray-500">Contratos de compra e venda de veículos</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="p-4">
                   {isLoadingContracts ? (
                     <div className="space-y-3">
                       {[1, 2].map((i) => (
-                        <div key={i} className="flex items-center gap-4 p-4 rounded-xl border">
-                          <Skeleton className="h-12 w-12 rounded-lg" />
+                        <div key={i} className="flex items-center gap-4 p-4 rounded-xl bg-[hsl(220,20%,12%)]">
+                          <Skeleton className="h-14 w-14 rounded-xl bg-[hsl(220,20%,16%)]" />
                           <div className="flex-1 space-y-2">
-                            <Skeleton className="h-4 w-48" />
-                            <Skeleton className="h-3 w-32" />
+                            <Skeleton className="h-4 w-48 bg-[hsl(220,20%,16%)]" />
+                            <Skeleton className="h-3 w-32 bg-[hsl(220,20%,16%)]" />
                           </div>
-                          <Skeleton className="h-9 w-24" />
                         </div>
                       ))}
                     </div>
                   ) : contracts.length === 0 ? (
-                    <div className="text-center py-12">
-                      <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-muted flex items-center justify-center">
-                        <FileCheck className="h-8 w-8 text-muted-foreground" />
+                    <div className="text-center py-16">
+                      <div className="w-20 h-20 mx-auto mb-4 rounded-2xl bg-[hsl(220,20%,12%)] flex items-center justify-center">
+                        <FileCheck className="h-10 w-10 text-gray-600" />
                       </div>
-                      <h3 className="font-medium text-foreground">Nenhum contrato encontrado</h3>
-                      <p className="text-sm text-muted-foreground mt-1">
+                      <h3 className="font-medium text-white">Nenhum contrato encontrado</h3>
+                      <p className="text-sm text-gray-500 mt-1">
                         Seus contratos aparecerão aqui quando disponíveis
                       </p>
                     </div>
@@ -383,42 +402,41 @@ export default function ClienteDashboardPage() {
                         return (
                           <div
                             key={contract.id}
-                            className="group flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl border bg-card hover:bg-accent/5 hover:border-primary/30 transition-all duration-200"
+                            className="group flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl bg-[hsl(220,20%,12%)] hover:bg-[hsl(220,20%,14%)] border border-transparent hover:border-primary/30 transition-all duration-200"
                           >
                             <div className="flex items-start gap-4">
-                              <div className="p-3 rounded-xl bg-primary/10 text-primary">
-                                <Car className="h-5 w-5" />
+                              <div className="p-3 rounded-xl bg-primary/10 text-primary group-hover:bg-primary group-hover:text-black transition-colors">
+                                <Car className="h-6 w-6" />
                               </div>
                               <div>
                                 <div className="flex items-center gap-2 flex-wrap">
-                                  <p className="font-semibold text-foreground">
+                                  <p className="font-semibold text-white">
                                     {vehicleData?.brand} {vehicleData?.model}
                                   </p>
                                   {vehicleData?.year && (
-                                    <Badge variant="outline" className="text-xs">
+                                    <span className="text-xs px-2 py-0.5 rounded-full bg-primary/20 text-primary font-medium">
                                       {vehicleData.year}
-                                    </Badge>
+                                    </span>
                                   )}
                                 </div>
-                                <p className="text-sm text-muted-foreground mt-0.5">
+                                <p className="text-sm text-gray-500 mt-0.5">
                                   Contrato #{contract.contract_number}
                                   {vehicleData?.plate && ` • ${vehicleData.plate}`}
                                 </p>
-                                <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
-                                  <span className="flex items-center gap-1">
+                                <div className="flex items-center gap-4 mt-2">
+                                  <span className="flex items-center gap-1 text-xs text-gray-500">
                                     <Calendar className="h-3 w-3" />
                                     {format(new Date(contract.contract_date), "dd/MM/yyyy")}
                                   </span>
-                                  <span className="font-medium text-foreground">
+                                  <span className="text-sm font-bold text-primary">
                                     {formatCurrency(contract.vehicle_price || 0)}
                                   </span>
                                 </div>
                               </div>
                             </div>
                             <Button 
-                              variant="outline" 
                               size="sm"
-                              className="mt-3 sm:mt-0 group-hover:bg-primary group-hover:text-primary-foreground group-hover:border-primary transition-colors"
+                              className="mt-4 sm:mt-0 bg-primary hover:bg-primary/90 text-black font-medium"
                               onClick={() => handleDownloadContract(contract)}
                               disabled={isDownloading}
                             >
@@ -434,43 +452,44 @@ export default function ClienteDashboardPage() {
                       })}
                     </div>
                   )}
-                </CardContent>
-              </Card>
+                </div>
+              </div>
             </TabsContent>
 
             {/* Proposals Tab */}
             <TabsContent value="proposals" className="mt-6">
-              <Card>
-                <CardHeader className="pb-4">
-                  <CardTitle className="flex items-center gap-2 text-lg">
-                    <FileText className="h-5 w-5 text-info" />
-                    Minhas Propostas
-                  </CardTitle>
-                  <CardDescription>
-                    Propostas de financiamento e compra
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
+              <div className="rounded-2xl bg-[hsl(220,20%,10%)] border border-[hsl(220,18%,18%)] overflow-hidden">
+                <div className="p-6 border-b border-[hsl(220,18%,18%)]">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2.5 rounded-xl bg-blue-500/10">
+                      <FileText className="h-5 w-5 text-blue-400" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-white">Minhas Propostas</h3>
+                      <p className="text-sm text-gray-500">Propostas de financiamento e compra</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="p-4">
                   {isLoadingProposals ? (
                     <div className="space-y-3">
                       {[1, 2].map((i) => (
-                        <div key={i} className="flex items-center gap-4 p-4 rounded-xl border">
-                          <Skeleton className="h-12 w-12 rounded-lg" />
+                        <div key={i} className="flex items-center gap-4 p-4 rounded-xl bg-[hsl(220,20%,12%)]">
+                          <Skeleton className="h-14 w-14 rounded-xl bg-[hsl(220,20%,16%)]" />
                           <div className="flex-1 space-y-2">
-                            <Skeleton className="h-4 w-48" />
-                            <Skeleton className="h-3 w-32" />
+                            <Skeleton className="h-4 w-48 bg-[hsl(220,20%,16%)]" />
+                            <Skeleton className="h-3 w-32 bg-[hsl(220,20%,16%)]" />
                           </div>
-                          <Skeleton className="h-6 w-20" />
                         </div>
                       ))}
                     </div>
                   ) : proposals.length === 0 ? (
-                    <div className="text-center py-12">
-                      <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-muted flex items-center justify-center">
-                        <FileText className="h-8 w-8 text-muted-foreground" />
+                    <div className="text-center py-16">
+                      <div className="w-20 h-20 mx-auto mb-4 rounded-2xl bg-[hsl(220,20%,12%)] flex items-center justify-center">
+                        <FileText className="h-10 w-10 text-gray-600" />
                       </div>
-                      <h3 className="font-medium text-foreground">Nenhuma proposta encontrada</h3>
-                      <p className="text-sm text-muted-foreground mt-1">
+                      <h3 className="font-medium text-white">Nenhuma proposta encontrada</h3>
+                      <p className="text-sm text-gray-500 mt-1">
                         Suas propostas aparecerão aqui quando disponíveis
                       </p>
                     </div>
@@ -482,39 +501,37 @@ export default function ClienteDashboardPage() {
                         return (
                           <div
                             key={proposal.id}
-                            className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl border bg-card hover:bg-accent/5 transition-colors"
+                            className="group flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl bg-[hsl(220,20%,12%)] hover:bg-[hsl(220,20%,14%)] border border-transparent hover:border-blue-500/30 transition-all duration-200"
                           >
                             <div className="flex items-start gap-4">
-                              <div className="p-3 rounded-xl bg-info/10 text-info">
-                                <FileText className="h-5 w-5" />
+                              <div className="p-3 rounded-xl bg-blue-500/10 text-blue-400">
+                                <FileText className="h-6 w-6" />
                               </div>
                               <div>
                                 <div className="flex items-center gap-2 flex-wrap">
-                                  <p className="font-semibold text-foreground">
+                                  <p className="font-semibold text-white">
                                     Proposta #{proposal.proposal_number}
                                   </p>
-                                  <Badge variant={statusConfig.variant} className="gap-1">
+                                  <span className={`flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-[hsl(220,20%,16%)] ${statusConfig.color}`}>
                                     <StatusIcon className="h-3 w-3" />
                                     {statusConfig.label}
-                                  </Badge>
-                                </div>
-                                <p className="text-sm text-muted-foreground mt-0.5">
-                                  {proposalTypeMap[proposal.type] || proposal.type}
-                                </p>
-                                <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
-                                  <span className="flex items-center gap-1">
-                                    <Calendar className="h-3 w-3" />
-                                    {format(new Date(proposal.created_at), "dd/MM/yyyy")}
                                   </span>
                                 </div>
+                                <p className="text-sm text-gray-500 mt-0.5">
+                                  {proposalTypeMap[proposal.type] || proposal.type}
+                                </p>
+                                <span className="flex items-center gap-1 text-xs text-gray-500 mt-2">
+                                  <Calendar className="h-3 w-3" />
+                                  {format(new Date(proposal.created_at), "dd/MM/yyyy")}
+                                </span>
                               </div>
                             </div>
-                            <div className="mt-3 sm:mt-0 text-right">
-                              <p className="text-lg font-bold text-foreground">
+                            <div className="mt-4 sm:mt-0 text-right">
+                              <p className="text-xl font-bold text-white">
                                 {formatCurrency(proposal.total_amount)}
                               </p>
                               {proposal.installments && proposal.installments > 1 && (
-                                <p className="text-xs text-muted-foreground">
+                                <p className="text-xs text-gray-500">
                                   {proposal.installments}x de {formatCurrency(proposal.installment_value || 0)}
                                 </p>
                               )}
@@ -524,43 +541,44 @@ export default function ClienteDashboardPage() {
                       })}
                     </div>
                   )}
-                </CardContent>
-              </Card>
+                </div>
+              </div>
             </TabsContent>
 
             {/* Receipts Tab */}
             <TabsContent value="receipts" className="mt-6">
-              <Card>
-                <CardHeader className="pb-4">
-                  <CardTitle className="flex items-center gap-2 text-lg">
-                    <Receipt className="h-5 w-5 text-success" />
-                    Meus Recibos
-                  </CardTitle>
-                  <CardDescription>
-                    Comprovantes de pagamentos realizados
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
+              <div className="rounded-2xl bg-[hsl(220,20%,10%)] border border-[hsl(220,18%,18%)] overflow-hidden">
+                <div className="p-6 border-b border-[hsl(220,18%,18%)]">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2.5 rounded-xl bg-green-500/10">
+                      <Receipt className="h-5 w-5 text-green-400" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-white">Meus Recibos</h3>
+                      <p className="text-sm text-gray-500">Comprovantes de pagamentos realizados</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="p-4">
                   {isLoadingReceipts ? (
                     <div className="space-y-3">
                       {[1, 2].map((i) => (
-                        <div key={i} className="flex items-center gap-4 p-4 rounded-xl border">
-                          <Skeleton className="h-12 w-12 rounded-lg" />
+                        <div key={i} className="flex items-center gap-4 p-4 rounded-xl bg-[hsl(220,20%,12%)]">
+                          <Skeleton className="h-14 w-14 rounded-xl bg-[hsl(220,20%,16%)]" />
                           <div className="flex-1 space-y-2">
-                            <Skeleton className="h-4 w-48" />
-                            <Skeleton className="h-3 w-32" />
+                            <Skeleton className="h-4 w-48 bg-[hsl(220,20%,16%)]" />
+                            <Skeleton className="h-3 w-32 bg-[hsl(220,20%,16%)]" />
                           </div>
-                          <Skeleton className="h-9 w-24" />
                         </div>
                       ))}
                     </div>
                   ) : receipts.length === 0 ? (
-                    <div className="text-center py-12">
-                      <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-muted flex items-center justify-center">
-                        <Receipt className="h-8 w-8 text-muted-foreground" />
+                    <div className="text-center py-16">
+                      <div className="w-20 h-20 mx-auto mb-4 rounded-2xl bg-[hsl(220,20%,12%)] flex items-center justify-center">
+                        <Receipt className="h-10 w-10 text-gray-600" />
                       </div>
-                      <h3 className="font-medium text-foreground">Nenhum recibo encontrado</h3>
-                      <p className="text-sm text-muted-foreground mt-1">
+                      <h3 className="font-medium text-white">Nenhum recibo encontrado</h3>
+                      <p className="text-sm text-gray-500 mt-1">
                         Seus recibos aparecerão aqui quando disponíveis
                       </p>
                     </div>
@@ -571,35 +589,32 @@ export default function ClienteDashboardPage() {
                         return (
                           <div
                             key={receipt.id}
-                            className="group flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl border bg-card hover:bg-accent/5 hover:border-success/30 transition-all duration-200"
+                            className="group flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl bg-[hsl(220,20%,12%)] hover:bg-[hsl(220,20%,14%)] border border-transparent hover:border-green-500/30 transition-all duration-200"
                           >
                             <div className="flex items-start gap-4">
-                              <div className="p-3 rounded-xl bg-success/10 text-success">
-                                <Receipt className="h-5 w-5" />
+                              <div className="p-3 rounded-xl bg-green-500/10 text-green-400 group-hover:bg-green-500 group-hover:text-black transition-colors">
+                                <Receipt className="h-6 w-6" />
                               </div>
                               <div>
-                                <p className="font-semibold text-foreground">
+                                <p className="font-semibold text-white">
                                   Recibo #{receipt.receipt_number}
                                 </p>
-                                <p className="text-sm text-muted-foreground mt-0.5">
+                                <p className="text-sm text-gray-500 mt-0.5">
                                   {receipt.description || 'Pagamento'}
                                 </p>
-                                <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
-                                  <span className="flex items-center gap-1">
-                                    <Calendar className="h-3 w-3" />
-                                    {format(new Date(receipt.payment_date), "dd/MM/yyyy")}
-                                  </span>
-                                </div>
+                                <span className="flex items-center gap-1 text-xs text-gray-500 mt-2">
+                                  <Calendar className="h-3 w-3" />
+                                  {format(new Date(receipt.payment_date), "dd/MM/yyyy")}
+                                </span>
                               </div>
                             </div>
-                            <div className="flex items-center gap-3 mt-3 sm:mt-0">
-                              <span className="text-lg font-bold text-success">
+                            <div className="flex items-center gap-4 mt-4 sm:mt-0">
+                              <span className="text-xl font-bold text-green-400">
                                 {formatCurrency(receipt.amount)}
                               </span>
                               <Button 
-                                variant="outline" 
                                 size="sm"
-                                className="group-hover:bg-success group-hover:text-success-foreground group-hover:border-success transition-colors"
+                                className="bg-green-500 hover:bg-green-600 text-black font-medium"
                                 onClick={() => handleDownloadReceipt(receipt)}
                                 disabled={isDownloading}
                               >
@@ -616,22 +631,62 @@ export default function ClienteDashboardPage() {
                       })}
                     </div>
                   )}
-                </CardContent>
-              </Card>
+                </div>
+              </div>
             </TabsContent>
           </Tabs>
+
+          {/* Quick Actions */}
+          {hasClientRecord && (
+            <div className="grid sm:grid-cols-2 gap-4">
+              <button 
+                onClick={() => navigate('/cliente/perfil')}
+                className="group flex items-center justify-between p-5 rounded-2xl bg-[hsl(220,20%,10%)] border border-[hsl(220,18%,18%)] hover:border-primary/50 transition-all duration-200"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="p-3 rounded-xl bg-primary/10 text-primary group-hover:bg-primary group-hover:text-black transition-colors">
+                    <Settings className="h-5 w-5" />
+                  </div>
+                  <div className="text-left">
+                    <p className="font-semibold text-white">Meu Perfil</p>
+                    <p className="text-sm text-gray-500">Atualize seus dados pessoais</p>
+                  </div>
+                </div>
+                <ChevronRight className="h-5 w-5 text-gray-600 group-hover:text-primary transition-colors" />
+              </button>
+
+              <a 
+                href="tel:+5549999999999"
+                className="group flex items-center justify-between p-5 rounded-2xl bg-[hsl(220,20%,10%)] border border-[hsl(220,18%,18%)] hover:border-primary/50 transition-all duration-200"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="p-3 rounded-xl bg-blue-500/10 text-blue-400 group-hover:bg-blue-500 group-hover:text-white transition-colors">
+                    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                    </svg>
+                  </div>
+                  <div className="text-left">
+                    <p className="font-semibold text-white">Fale Conosco</p>
+                    <p className="text-sm text-gray-500">Entre em contato com a loja</p>
+                  </div>
+                </div>
+                <ChevronRight className="h-5 w-5 text-gray-600 group-hover:text-blue-400 transition-colors" />
+              </a>
+            </div>
+          )}
         </div>
       </main>
 
       {/* Footer */}
-      <footer className="mt-auto border-t bg-card/50">
+      <footer className="mt-16 border-t border-[hsl(220,18%,14%)] bg-[hsl(220,20%,6%)]">
         <div className="container mx-auto px-4 py-6">
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-muted-foreground">
-            <div className="flex items-center gap-2">
-              <img src={logo} alt="Logo" className="h-6 w-6 object-contain" />
-              <span>Portal do Cliente</span>
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <img src={logo} alt="Logo" className="h-8 w-8 object-contain" />
+              <div className="h-6 w-px bg-[hsl(220,18%,18%)]" />
+              <span className="text-sm text-gray-500">Portal do Cliente</span>
             </div>
-            <p>© {new Date().getFullYear()} Todos os direitos reservados</p>
+            <p className="text-xs text-gray-600">© {new Date().getFullYear()} Todos os direitos reservados</p>
           </div>
         </div>
       </footer>
