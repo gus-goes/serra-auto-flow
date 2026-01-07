@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { proposalStorage, vehicleStorage, clientStorage, bankStorage, generateId, generateNumber } from '@/lib/storage';
-import type { Proposal, ProposalStatus } from '@/types';
+import type { Proposal, ProposalStatus, ProposalType } from '@/types';
 import { formatCurrency, formatCPF } from '@/lib/formatters';
 import { formatDateDisplay, getCurrentTimestamp } from '@/lib/dateUtils';
 import { generateProposalPDF } from '@/lib/pdfGenerator';
@@ -26,7 +26,7 @@ import {
   Pen,
   Building2,
   Home,
-  DollarSign
+  Banknote
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -46,6 +46,18 @@ const statusColors: Record<ProposalStatus, string> = {
   vendida: 'bg-primary/10 text-primary border border-primary/20',
 };
 
+const typeLabels: Record<ProposalType, string> = {
+  bancario: 'Financiamento Bancário',
+  direto: 'Financiamento Direto',
+  avista: 'À Vista',
+};
+
+const typeColors: Record<ProposalType, string> = {
+  bancario: '#3B82F6', // blue
+  direto: '#FFD700', // yellow (Autos da Serra)
+  avista: '#22C55E', // green
+};
+
 export default function ProposalsPage() {
   const { user, isAdmin } = useAuth();
   const { toast } = useToast();
@@ -60,13 +72,13 @@ export default function ProposalsPage() {
   const [isSignatureOpen, setIsSignatureOpen] = useState(false);
   const [signingProposal, setSigningProposal] = useState<Proposal | null>(null);
   const [signatureType, setSignatureType] = useState<'client' | 'vendor'>('client');
-  const [financingType, setFinancingType] = useState<'bancario' | 'proprio'>('bancario');
+  const [proposalType, setProposalType] = useState<ProposalType>('bancario');
 
   const vehicles = vehicleStorage.getAll();
   const clients = clientStorage.getAll().filter(c => isAdmin || c.vendorId === user?.id);
   const banks = bankStorage.getActive();
   
-  // Separate banks
+  // Separate external banks
   const externalBanks = banks.filter(b => !b.slug?.includes('proprio') && !b.name.toLowerCase().includes('próprio'));
 
   const [form, setForm] = useState({
@@ -90,8 +102,8 @@ export default function ProposalsPage() {
     return matchesSearch && matchesStatus;
   });
 
-  // Calculate installment for own financing (no interest)
-  const calculateOwnInstallment = () => {
+  // Calculate installment for direct financing (no interest)
+  const calculateDirectInstallment = () => {
     const financedAmount = form.vehiclePrice - form.downPayment;
     if (financedAmount <= 0 || form.installments <= 0) return 0;
     return financedAmount / form.installments;
@@ -100,16 +112,26 @@ export default function ProposalsPage() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    const isOwnFinancing = financingType === 'proprio';
-    const selectedBank = isOwnFinancing ? null : externalBanks.find(b => b.id === form.bankId);
-    const financedAmount = form.vehiclePrice - form.downPayment;
+    const selectedBank = proposalType === 'bancario' ? externalBanks.find(b => b.id === form.bankId) : null;
+    const financedAmount = proposalType === 'avista' ? 0 : form.vehiclePrice - form.downPayment;
     
-    // For own financing, calculate installment without interest
-    const installmentValue = isOwnFinancing 
-      ? calculateOwnInstallment() 
-      : form.installmentValue;
+    // Calculate based on type
+    let installmentValue = 0;
+    let totalValue = 0;
+    let installments = form.installments;
     
-    const totalValue = installmentValue * form.installments;
+    if (proposalType === 'avista') {
+      installmentValue = 0;
+      totalValue = form.cashPrice || form.vehiclePrice;
+      installments = 1;
+    } else if (proposalType === 'direto') {
+      installmentValue = calculateDirectInstallment();
+      totalValue = installmentValue * form.installments;
+    } else {
+      installmentValue = form.installmentValue;
+      totalValue = installmentValue * form.installments;
+    }
+    
     const now = getCurrentTimestamp();
 
     const proposal: Proposal = {
@@ -119,15 +141,16 @@ export default function ProposalsPage() {
       vehicleId: form.vehicleId,
       vendorId: user!.id,
       status: 'negociacao',
-      bank: isOwnFinancing ? 'Financiamento Próprio' : selectedBank?.name,
+      type: proposalType,
+      bank: proposalType === 'bancario' ? selectedBank?.name : undefined,
       vehiclePrice: form.vehiclePrice,
-      cashPrice: form.cashPrice > 0 ? form.cashPrice : undefined,
-      downPayment: form.downPayment,
+      cashPrice: proposalType === 'avista' ? (form.cashPrice || form.vehiclePrice) : undefined,
+      downPayment: proposalType === 'avista' ? 0 : form.downPayment,
       financedAmount,
-      installments: form.installments,
+      installments,
       installmentValue,
       totalValue,
-      isOwnFinancing,
+      isOwnFinancing: proposalType === 'direto',
       notes: form.notes || undefined,
       createdAt: now,
       updatedAt: now,
@@ -213,17 +236,21 @@ export default function ProposalsPage() {
       installmentValue: 0,
       notes: '',
     });
-    setFinancingType('bancario');
+    setProposalType('bancario');
   };
 
-  // Helper to get bank color indicator
-  const getBankColorStyle = (proposal: Proposal) => {
-    if (proposal.isOwnFinancing) {
-      return { borderLeft: '4px solid #FFD700' };
-    }
-    const config = getBankConfigByName(proposal.bank || '');
-    if (!config) return {};
-    return { borderLeft: `4px solid ${config.colorHex}` };
+  // Get type color for table row
+  const getTypeColorStyle = (proposal: Proposal) => {
+    const type = proposal.type || (proposal.isOwnFinancing ? 'direto' : 'bancario');
+    return { borderLeft: `4px solid ${typeColors[type]}` };
+  };
+
+  // Get proposal type from legacy data
+  const getProposalType = (proposal: Proposal): ProposalType => {
+    if (proposal.type) return proposal.type;
+    if (proposal.isOwnFinancing) return 'direto';
+    if (proposal.cashPrice && !proposal.bank) return 'avista';
+    return 'bancario';
   };
 
   return (
@@ -287,19 +314,24 @@ export default function ProposalsPage() {
                 </div>
               </div>
 
-              {/* Financing Type Tabs */}
-              <Tabs value={financingType} onValueChange={(v) => setFinancingType(v as 'bancario' | 'proprio')}>
-                <TabsList className="grid w-full grid-cols-2">
+              {/* Proposal Type Tabs - 3 options */}
+              <Tabs value={proposalType} onValueChange={(v) => setProposalType(v as ProposalType)}>
+                <TabsList className="grid w-full grid-cols-3">
                   <TabsTrigger value="bancario" className="flex items-center gap-2">
                     <Building2 className="h-4 w-4" />
-                    Financiamento Bancário
+                    <span className="hidden sm:inline">Fin.</span> Bancário
                   </TabsTrigger>
-                  <TabsTrigger value="proprio" className="flex items-center gap-2">
+                  <TabsTrigger value="direto" className="flex items-center gap-2">
                     <Home className="h-4 w-4" />
-                    Financiamento Próprio
+                    <span className="hidden sm:inline">Fin.</span> Direto
+                  </TabsTrigger>
+                  <TabsTrigger value="avista" className="flex items-center gap-2">
+                    <Banknote className="h-4 w-4" />
+                    À Vista
                   </TabsTrigger>
                 </TabsList>
                 
+                {/* Financiamento Bancário */}
                 <TabsContent value="bancario" className="space-y-4 pt-4">
                   <div className="space-y-2">
                     <Label className="flex items-center gap-2">
@@ -333,6 +365,25 @@ export default function ProposalsPage() {
                   
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
+                      <Label>Valor do Veículo</Label>
+                      <Input
+                        type="number"
+                        value={form.vehiclePrice}
+                        onChange={(e) => setForm({ ...form, vehiclePrice: parseFloat(e.target.value) || 0 })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Entrada</Label>
+                      <Input
+                        type="number"
+                        value={form.downPayment}
+                        onChange={(e) => setForm({ ...form, downPayment: parseFloat(e.target.value) || 0 })}
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
                       <Label>Parcelas</Label>
                       <Input
                         type="number"
@@ -351,15 +402,35 @@ export default function ProposalsPage() {
                   </div>
                 </TabsContent>
                 
-                <TabsContent value="proprio" className="space-y-4 pt-4">
+                {/* Financiamento Direto */}
+                <TabsContent value="direto" className="space-y-4 pt-4">
                   <div className="bg-primary/5 border border-primary/20 rounded-lg p-4">
                     <div className="flex items-center gap-2 text-primary mb-2">
                       <Home className="h-5 w-5" />
-                      <span className="font-semibold">Financiamento Próprio - Sem Juros</span>
+                      <span className="font-semibold">Financiamento Direto - Sem Juros</span>
                     </div>
                     <p className="text-sm text-muted-foreground">
                       O valor financiado será dividido igualmente pelo número de parcelas, sem acréscimo de juros.
                     </p>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Valor do Veículo</Label>
+                      <Input
+                        type="number"
+                        value={form.vehiclePrice}
+                        onChange={(e) => setForm({ ...form, vehiclePrice: parseFloat(e.target.value) || 0 })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Entrada</Label>
+                      <Input
+                        type="number"
+                        value={form.downPayment}
+                        onChange={(e) => setForm({ ...form, downPayment: parseFloat(e.target.value) || 0 })}
+                      />
+                    </div>
                   </div>
                   
                   <div className="space-y-2">
@@ -383,45 +454,43 @@ export default function ProposalsPage() {
                     <div className="bg-muted/50 rounded-lg p-3">
                       <p className="text-sm text-muted-foreground">Valor da parcela:</p>
                       <p className="text-xl font-bold text-primary">
-                        {formatCurrency(calculateOwnInstallment())}
+                        {formatCurrency(calculateDirectInstallment())}
+                      </p>
+                    </div>
+                  )}
+                </TabsContent>
+                
+                {/* À Vista */}
+                <TabsContent value="avista" className="space-y-4 pt-4">
+                  <div className="bg-success/5 border border-success/20 rounded-lg p-4">
+                    <div className="flex items-center gap-2 text-success mb-2">
+                      <Banknote className="h-5 w-5" />
+                      <span className="font-semibold">Pagamento à Vista</span>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      Venda com pagamento integral no ato da compra, sem financiamento.
+                    </p>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label>Valor à Vista</Label>
+                    <Input
+                      type="number"
+                      value={form.cashPrice || form.vehiclePrice}
+                      onChange={(e) => setForm({ ...form, cashPrice: parseFloat(e.target.value) || 0 })}
+                    />
+                  </div>
+                  
+                  {form.cashPrice > 0 && (
+                    <div className="bg-success/10 rounded-lg p-4 text-center">
+                      <p className="text-sm text-muted-foreground mb-1">Valor Total</p>
+                      <p className="text-2xl font-bold text-success">
+                        {formatCurrency(form.cashPrice)}
                       </p>
                     </div>
                   )}
                 </TabsContent>
               </Tabs>
-
-              {/* Common Fields */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Valor do Veículo</Label>
-                  <Input
-                    type="number"
-                    value={form.vehiclePrice}
-                    onChange={(e) => setForm({ ...form, vehiclePrice: parseFloat(e.target.value) || 0 })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label className="flex items-center gap-2">
-                    <DollarSign className="h-4 w-4 text-success" />
-                    Valor à Vista
-                  </Label>
-                  <Input
-                    type="number"
-                    value={form.cashPrice}
-                    onChange={(e) => setForm({ ...form, cashPrice: parseFloat(e.target.value) || 0 })}
-                    placeholder="Deixe 0 se não aplicável"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Entrada</Label>
-                <Input
-                  type="number"
-                  value={form.downPayment}
-                  onChange={(e) => setForm({ ...form, downPayment: parseFloat(e.target.value) || 0 })}
-                />
-              </div>
 
               <div className="space-y-2">
                 <Label>Observações</Label>
@@ -494,7 +563,7 @@ export default function ProposalsPage() {
                   <TableHead>Número</TableHead>
                   <TableHead>Cliente</TableHead>
                   <TableHead>Veículo</TableHead>
-                  <TableHead>Financiamento</TableHead>
+                  <TableHead>Tipo</TableHead>
                   <TableHead>Valor</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Assinaturas</TableHead>
@@ -505,12 +574,13 @@ export default function ProposalsPage() {
                 {filteredProposals.map((proposal) => {
                   const client = clientStorage.getById(proposal.clientId);
                   const vehicle = vehicleStorage.getById(proposal.vehicleId);
+                  const type = getProposalType(proposal);
                   
                   return (
                     <TableRow 
                       key={proposal.id} 
                       className="table-row-hover"
-                      style={getBankColorStyle(proposal)}
+                      style={getTypeColorStyle(proposal)}
                     >
                       <TableCell className="font-mono text-sm">{proposal.number}</TableCell>
                       <TableCell>
@@ -528,26 +598,30 @@ export default function ProposalsPage() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        {proposal.isOwnFinancing ? (
-                          <div className="flex items-center gap-2">
-                            <Home className="h-4 w-4 text-primary" />
-                            <span className="text-sm">Próprio</span>
+                        <div className="flex items-center gap-2">
+                          {type === 'bancario' && <Building2 className="h-4 w-4 text-blue-500" />}
+                          {type === 'direto' && <Home className="h-4 w-4 text-primary" />}
+                          {type === 'avista' && <Banknote className="h-4 w-4 text-success" />}
+                          <div>
+                            <p className="text-sm font-medium">{typeLabels[type]}</p>
+                            {type === 'bancario' && proposal.bank && (
+                              <p className="text-xs text-muted-foreground">{proposal.bank}</p>
+                            )}
                           </div>
-                        ) : proposal.bank ? (
-                          <div className="flex items-center gap-2">
-                            <Building2 className="h-4 w-4 text-muted-foreground" />
-                            <span className="text-sm">{proposal.bank}</span>
-                          </div>
-                        ) : (
-                          <span className="text-muted-foreground text-sm">-</span>
-                        )}
+                        </div>
                       </TableCell>
                       <TableCell>
                         <div>
-                          <p className="font-semibold">{formatCurrency(proposal.vehiclePrice)}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {proposal.installments}x {formatCurrency(proposal.installmentValue)}
-                          </p>
+                          {type === 'avista' ? (
+                            <p className="font-semibold text-success">{formatCurrency(proposal.cashPrice || proposal.vehiclePrice)}</p>
+                          ) : (
+                            <>
+                              <p className="font-semibold">{formatCurrency(proposal.vehiclePrice)}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {proposal.installments}x {formatCurrency(proposal.installmentValue)}
+                              </p>
+                            </>
+                          )}
                         </div>
                       </TableCell>
                       <TableCell>
