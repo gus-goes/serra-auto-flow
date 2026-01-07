@@ -9,6 +9,7 @@ import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { MainLayout } from "@/components/layout/MainLayout";
 import LoginPage from "./pages/LoginPage";
 import ClienteDashboardPage from "./pages/cliente/ClienteDashboardPage";
+import ClienteProfilePage from "./pages/cliente/ClienteProfilePage";
 import DashboardPage from "./pages/DashboardPage";
 import VehiclesPage from "./pages/VehiclesPage";
 import ClientsPage from "./pages/ClientsPage";
@@ -46,6 +47,14 @@ const App = () => (
                 element={
                   <ProtectedRoute allowedRoles={['cliente']}>
                     <ClienteDashboardPage />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/cliente/perfil" 
+                element={
+                  <ProtectedRoute allowedRoles={['cliente']}>
+                    <ClienteProfilePage />
                   </ProtectedRoute>
                 } 
               />
