@@ -19,10 +19,12 @@ import {
   CheckCircle2,
   XCircle,
   HourglassIcon,
-  Sparkles
+  Sparkles,
+  Settings
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { useNavigate } from 'react-router-dom';
 import logo from '@/assets/logo.png';
 import { useClientRecord, useClientContracts, useClientProposals, useClientReceipts } from '@/hooks/useClientDocuments';
 import { formatCurrency } from '@/lib/formatters';
@@ -49,6 +51,7 @@ const proposalTypeMap: Record<string, string> = {
 export default function ClienteDashboardPage() {
   const { profile, logout } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
   const { data: clientRecord, isLoading: isLoadingClient } = useClientRecord();
   const { data: contracts = [], isLoading: isLoadingContracts } = useClientContracts();
   const { data: proposals = [], isLoading: isLoadingProposals } = useClientProposals();
@@ -181,11 +184,20 @@ export default function ClienteDashboardPage() {
               </div>
             </div>
             
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 sm:gap-3">
               <div className="hidden sm:block text-right">
                 <p className="text-sm font-medium text-white">{profile?.name}</p>
                 <p className="text-xs text-sidebar-foreground/60">{profile?.email}</p>
               </div>
+              <Button 
+                variant="ghost" 
+                size="icon"
+                onClick={() => navigate('/cliente/perfil')}
+                className="text-sidebar-foreground/80 hover:text-white hover:bg-white/10"
+                title="Meu Perfil"
+              >
+                <Settings className="h-4 w-4" />
+              </Button>
               <Button 
                 variant="ghost" 
                 size="sm" 
