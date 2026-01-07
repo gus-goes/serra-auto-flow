@@ -1,5 +1,5 @@
 import { jsPDF } from 'jspdf';
-import { formatCurrency, formatCPF, formatPhone, formatRG, maritalStatusLabels } from './formatters';
+import { formatCurrency, formatCPF, formatPhone, formatRG, maritalStatusLabels, numberToWords } from './formatters';
 import { formatDateDisplay, formatDateFullPtBr } from './dateUtils';
 import { getPDFColors } from './bankConfig';
 import { getCompanyConfig, formatCompanyAddress } from './companyConfig';
@@ -84,7 +84,7 @@ function drawInfoRow(doc: jsPDF, label: string, value: string, x: number, y: num
   doc.text(value || '-', x + labelWidth, y);
 }
 
-// ===== CONTRACT PDF =====
+// ===== CONTRACT PDF (ELABORADO) =====
 
 export function generateContractPDF(contract: Contract): void {
   const client = clientStorage.getById(contract.clientId);
@@ -97,181 +97,296 @@ export function generateContractPDF(contract: Contract): void {
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
+  const marginLeft = 20;
+  const marginRight = 20;
+  const contentWidth = pageWidth - marginLeft - marginRight;
   
-  let y = drawDocumentHeader(doc, 'CONTRATO DE COMPRA E VENDA DE VEÍCULO');
+  // Helper: Check and add new page if needed
+  const checkPageBreak = (neededSpace: number): number => {
+    if (y + neededSpace > pageHeight - 30) {
+      doc.addPage();
+      return 25;
+    }
+    return y;
+  };
   
-  // Contract number and date
+  // Helper: Draw paragraph with justified alignment
+  const drawParagraph = (text: string, indent: number = 0): number => {
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(30, 30, 30);
+    const lines = doc.splitTextToSize(text, contentWidth - indent);
+    lines.forEach((line: string) => {
+      y = checkPageBreak(6);
+      doc.text(line, marginLeft + indent, y);
+      y += 5;
+    });
+    return y;
+  };
+  
+  // Helper: Draw clause title
+  const drawClauseTitle = (title: string): number => {
+    y = checkPageBreak(15);
+    y += 4;
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(30, 30, 30);
+    doc.text(title, marginLeft, y);
+    y += 7;
+    return y;
+  };
+  
+  // Helper: Draw sub-clause
+  const drawSubClause = (number: string, text: string): number => {
+    y = checkPageBreak(12);
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(50, 50, 50);
+    doc.text(number, marginLeft + 5, y);
+    doc.setFont('helvetica', 'normal');
+    const lines = doc.splitTextToSize(text, contentWidth - 20);
+    doc.text(lines, marginLeft + 15, y);
+    y += lines.length * 5 + 2;
+    return y;
+  };
+  
+  let y = drawDocumentHeader(doc, 'CONTRATO PARTICULAR DE COMPRA E VENDA DE VEÍCULO AUTOMOTOR');
+  
+  // Contract number and date - right aligned
   doc.setFontSize(9);
-  doc.setFont('helvetica', 'normal');
+  doc.setFont('helvetica', 'bold');
   doc.setTextColor(80, 80, 80);
-  doc.text(`Contrato Nº ${contract.number}`, 20, y);
-  doc.text(`Data: ${formatDateDisplay(contract.createdAt)}`, pageWidth - 20, y, { align: 'right' });
+  doc.text(`Contrato Nº ${contract.number}`, pageWidth - marginRight, y, { align: 'right' });
   y += 10;
   
-  // VENDEDOR section
-  y = drawSectionTitle(doc, y, 'VENDEDOR');
-  doc.setFillColor(250, 250, 250);
-  doc.rect(15, y, pageWidth - 30, 24, 'F');
+  // ===== PREÂMBULO =====
+  const clientAddress = client.address ? 
+    `${client.address.street}, nº ${client.address.number}${client.address.complement ? ', ' + client.address.complement : ''}, ${client.address.neighborhood}, ${client.address.city}/${client.address.state}, CEP ${client.address.zipCode}` : 
+    'endereço não informado';
   
-  drawInfoRow(doc, 'Razão Social:', company.fantasyName, 20, y + 7, 45);
-  drawInfoRow(doc, 'CNPJ:', company.cnpj, 20, y + 14, 45);
-  drawInfoRow(doc, 'Endereço:', formatCompanyAddress(), 20, y + 21, 45);
-  y += 30;
+  const preambulo = `Pelo presente instrumento particular de compra e venda de veículo automotor, que entre si fazem, de um lado, como VENDEDOR(A), ${company.fantasyName}, pessoa jurídica de direito privado, inscrita no CNPJ sob nº ${company.cnpj}, com sede em ${formatCompanyAddress()}, neste ato representada por seu(sua) responsável legal, e de outro lado, como COMPRADOR(A), ${client.name.toUpperCase()}, ${maritalStatusLabels[client.maritalStatus] || 'estado civil não informado'}, portador(a) da Cédula de Identidade RG nº ${formatRG(client.rg)}, inscrito(a) no CPF sob nº ${formatCPF(client.cpf)}, residente e domiciliado(a) em ${clientAddress}, têm entre si justo e contratado o seguinte:`;
   
-  // COMPRADOR section
-  y = drawSectionTitle(doc, y, 'COMPRADOR');
-  doc.setFillColor(250, 250, 250);
-  doc.rect(15, y, pageWidth - 30, 32, 'F');
+  y = drawParagraph(preambulo);
+  y += 5;
   
-  drawInfoRow(doc, 'Nome:', client.name, 20, y + 7, 35);
-  drawInfoRow(doc, 'CPF:', formatCPF(client.cpf), 110, y + 7, 25);
-  drawInfoRow(doc, 'RG:', formatRG(client.rg), 20, y + 14, 35);
-  drawInfoRow(doc, 'Estado Civil:', maritalStatusLabels[client.maritalStatus] || '', 110, y + 14, 40);
+  // ===== CLÁUSULA PRIMEIRA - DO OBJETO =====
+  y = drawClauseTitle('CLÁUSULA PRIMEIRA – DO OBJETO');
   
-  const addressStr = client.address ? 
-    `${client.address.street}, ${client.address.number} - ${client.address.neighborhood}, ${client.address.city}/${client.address.state}` : '';
-  const addrLines = doc.splitTextToSize(addressStr, pageWidth - 80);
-  drawInfoRow(doc, 'Endereço:', '', 20, y + 21, 35);
-  doc.setFontSize(8);
-  doc.text(addrLines, 55, y + 21);
+  const vehicleDesc = `${vehicle.brand} ${vehicle.model}, ano de fabricação/modelo ${vehicle.year}, cor ${vehicle.color}, placa ${vehicle.plate || 'a ser emplacado'}, chassi nº ${vehicle.chassis || '___________________'}, RENAVAM nº ${vehicle.renavam || '___________________'}, combustível ${vehicle.fuel}, câmbio ${vehicle.transmission}, com ${vehicle.mileage.toLocaleString('pt-BR')} km rodados`;
   
-  if (client.email) {
-    drawInfoRow(doc, 'E-mail:', client.email, 20, y + 28, 35);
-  }
-  y += 38;
+  const clausulaObjeto = `1.1. O(A) VENDEDOR(A) é legítimo(a) proprietário(a) e possuidor(a) do veículo: ${vehicleDesc}.`;
+  y = drawSubClause('1.1.', `O(A) VENDEDOR(A) é legítimo(a) proprietário(a) e possuidor(a) do veículo: ${vehicleDesc}.`);
   
-  // VEÍCULO section
-  y = drawSectionTitle(doc, y, 'VEÍCULO');
-  doc.setFillColor(250, 250, 250);
-  doc.rect(15, y, pageWidth - 30, 28, 'F');
+  y = drawSubClause('1.2.', 'O(A) VENDEDOR(A), pelo presente instrumento, vende, transfere e outorga ao(à) COMPRADOR(A) o veículo acima descrito, livre e desembaraçado de quaisquer ônus, dívidas, multas, impostos, taxas ou encargos de qualquer natureza, até a data da assinatura deste contrato.');
   
-  drawInfoRow(doc, 'Marca/Modelo:', `${vehicle.brand} ${vehicle.model}`, 20, y + 7, 45);
-  drawInfoRow(doc, 'Ano:', String(vehicle.year), 120, y + 7, 20);
-  drawInfoRow(doc, 'Cor:', vehicle.color, 20, y + 14, 45);
-  drawInfoRow(doc, 'Placa:', vehicle.plate || '-', 120, y + 14, 20);
-  drawInfoRow(doc, 'Chassi:', vehicle.chassis || '-', 20, y + 21, 45);
-  drawInfoRow(doc, 'CRV:', vehicle.crv || '-', 120, y + 21, 20);
-  y += 34;
+  y = drawSubClause('1.3.', 'O(A) COMPRADOR(A) declara ter examinado o veículo, conhecendo suas condições de uso, estado de conservação, características e funcionamento, aceitando-o no estado em que se encontra.');
   
-  // PAGAMENTO section
-  y = drawSectionTitle(doc, y, 'PREÇO E FORMA DE PAGAMENTO');
-  doc.setFillColor(250, 250, 250);
-  doc.rect(15, y, pageWidth - 30, 24, 'F');
+  // ===== CLÁUSULA SEGUNDA - DO PREÇO E FORMA DE PAGAMENTO =====
+  y = drawClauseTitle('CLÁUSULA SEGUNDA – DO PREÇO E FORMA DE PAGAMENTO');
   
-  drawInfoRow(doc, 'Valor Total:', formatCurrency(contract.vehiclePrice), 20, y + 7, 40);
+  const valorExtenso = numberToWords(contract.vehiclePrice);
+  y = drawSubClause('2.1.', `O preço total da venda é de ${formatCurrency(contract.vehiclePrice)} (${valorExtenso}), que será pago pelo(a) COMPRADOR(A) da seguinte forma:`);
   
   if (contract.paymentType === 'avista') {
-    drawInfoRow(doc, 'Forma:', 'À Vista', 110, y + 7, 30);
+    y = drawSubClause('2.2.', `Pagamento à vista, no ato da assinatura deste contrato ou conforme combinado entre as partes.`);
   } else {
-    drawInfoRow(doc, 'Entrada:', formatCurrency(contract.downPayment || 0), 20, y + 14, 40);
-    drawInfoRow(doc, 'Parcelas:', `${contract.installments}x de ${formatCurrency(contract.installmentValue || 0)}`, 110, y + 14, 35);
+    const entradaExtenso = numberToWords(contract.downPayment || 0);
+    const parcelaExtenso = numberToWords(contract.installmentValue || 0);
+    
+    if (contract.downPayment && contract.downPayment > 0) {
+      y = drawSubClause('2.2.', `Entrada no valor de ${formatCurrency(contract.downPayment)} (${entradaExtenso}), paga no ato da assinatura deste contrato.`);
+    }
+    
+    y = drawSubClause('2.3.', `O saldo remanescente será pago em ${contract.installments || 0} (${numberToWords(contract.installments || 0).replace(' reais', '').replace(' real', '')}) parcelas mensais e consecutivas no valor de ${formatCurrency(contract.installmentValue || 0)} (${parcelaExtenso}) cada, vencendo-se a primeira em _____/_____/_______ e as demais no mesmo dia dos meses subsequentes.`);
   }
-  y += 30;
   
-  // CLÁUSULAS
+  y = drawSubClause('2.4.', 'O(A) VENDEDOR(A) declara ter recebido o sinal/entrada ou pagamento conforme descrito acima, dando plena e irrevogável quitação do valor correspondente.');
+  
+  // ===== CLÁUSULA TERCEIRA - DA TRANSFERÊNCIA =====
+  y = drawClauseTitle('CLÁUSULA TERCEIRA – DA TRANSFERÊNCIA DE PROPRIEDADE');
+  
+  y = drawSubClause('3.1.', 'A transferência da propriedade do veículo junto ao órgão de trânsito competente (DETRAN) será realizada após a quitação integral do valor acordado.');
+  
+  y = drawSubClause('3.2.', 'As despesas com a transferência de propriedade, incluindo taxas, emolumentos e despachante, serão de responsabilidade do(a) COMPRADOR(A), salvo disposição em contrário acordada entre as partes.');
+  
+  y = drawSubClause('3.3.', 'O(A) VENDEDOR(A) compromete-se a entregar toda a documentação necessária para a transferência, incluindo CRV (Certificado de Registro de Veículo) devidamente preenchido e assinado.');
+  
+  // ===== CLÁUSULA QUARTA - DA ENTREGA =====
+  y = drawClauseTitle('CLÁUSULA QUARTA – DA ENTREGA DO VEÍCULO');
+  
+  const dataEntrega = contract.deliveryDate ? formatDateDisplay(contract.deliveryDate) : 'na data de assinatura deste contrato';
+  y = drawSubClause('4.1.', `O veículo será entregue ao(à) COMPRADOR(A) em ${dataEntrega}, no estabelecimento do(a) VENDEDOR(A) ou em local previamente acordado.`);
+  
+  y = drawSubClause('4.2.', 'A partir da entrega do veículo, o(a) COMPRADOR(A) assume integral responsabilidade por multas de trânsito, infrações, acidentes, sinistros e quaisquer outros eventos relacionados ao uso do veículo.');
+  
+  y = drawSubClause('4.3.', 'O veículo será entregue com tanque de combustível conforme acordado entre as partes, juntamente com todos os acessórios e equipamentos obrigatórios.');
+  
+  // ===== CLÁUSULA QUINTA - DAS OBRIGAÇÕES =====
+  y = drawClauseTitle('CLÁUSULA QUINTA – DAS OBRIGAÇÕES DAS PARTES');
+  
+  y = drawSubClause('5.1.', 'São obrigações do(a) VENDEDOR(A): a) entregar o veículo nas condições acordadas; b) fornecer toda documentação necessária para transferência; c) responder pela evicção e vícios ocultos, nos termos da lei; d) comunicar ao DETRAN a venda do veículo no prazo legal.');
+  
+  y = drawSubClause('5.2.', 'São obrigações do(a) COMPRADOR(A): a) efetuar o pagamento nas condições pactuadas; b) providenciar a transferência do veículo em seu nome no prazo legal de 30 (trinta) dias; c) arcar com todos os tributos e encargos incidentes sobre o veículo a partir da data da venda.');
+  
+  // ===== CLÁUSULA SEXTA - DO INADIMPLEMENTO =====
+  y = drawClauseTitle('CLÁUSULA SEXTA – DO INADIMPLEMENTO E PENALIDADES');
+  
+  y = drawSubClause('6.1.', 'Em caso de atraso no pagamento de qualquer parcela, incidirá multa moratória de 2% (dois por cento) sobre o valor da parcela em atraso, acrescida de juros de 1% (um por cento) ao mês, calculados pro rata die.');
+  
+  y = drawSubClause('6.2.', 'O atraso superior a 30 (trinta) dias em qualquer parcela dará ao(à) VENDEDOR(A) o direito de considerar vencidas antecipadamente todas as parcelas restantes e exigir o pagamento integral do saldo devedor.');
+  
+  y = drawSubClause('6.3.', 'A rescisão contratual por culpa do(a) COMPRADOR(A) implicará na perda de 20% (vinte por cento) do valor total pago, a título de cláusula penal compensatória, sendo o restante devolvido em até 30 (trinta) dias.');
+  
+  y = drawSubClause('6.4.', 'A rescisão por culpa do(a) VENDEDOR(A) obriga à devolução integral dos valores pagos, acrescidos de correção monetária e multa de 10% (dez por cento).');
+  
+  // ===== CLÁUSULA SÉTIMA - GARANTIA LEGAL =====
+  y = drawClauseTitle('CLÁUSULA SÉTIMA – DA GARANTIA');
+  
+  y = drawSubClause('7.1.', 'Por tratar-se de veículo usado, aplica-se a garantia legal de 90 (noventa) dias, conforme previsto no Código de Defesa do Consumidor, para vícios ocultos que impossibilitem o uso adequado do bem.');
+  
+  y = drawSubClause('7.2.', 'Eventuais garantias adicionais oferecidas pelo(a) VENDEDOR(A) serão formalizadas em Termo de Garantia específico, que integrará o presente contrato.');
+  
+  y = drawSubClause('7.3.', 'A garantia não cobre peças de desgaste natural, tais como: pneus, freios, embreagem, bateria, lâmpadas, correias, filtros e fluidos.');
+  
+  // ===== CLÁUSULA OITAVA - DECLARAÇÕES =====
+  y = drawClauseTitle('CLÁUSULA OITAVA – DAS DECLARAÇÕES');
+  
+  y = drawSubClause('8.1.', 'O(A) VENDEDOR(A) declara que o veículo encontra-se em perfeitas condições de funcionamento, livre de quaisquer restrições judiciais, administrativas ou criminais.');
+  
+  y = drawSubClause('8.2.', 'O(A) COMPRADOR(A) declara estar ciente e de acordo com todas as condições do veículo, tendo realizado teste de rodagem e verificação dos itens de segurança.');
+  
+  y = drawSubClause('8.3.', 'Ambas as partes declaram que as informações prestadas neste contrato são verdadeiras, assumindo integral responsabilidade civil e criminal por sua veracidade.');
+  
+  // ===== CLÁUSULA NONA - DISPOSIÇÕES GERAIS =====
+  y = drawClauseTitle('CLÁUSULA NONA – DAS DISPOSIÇÕES GERAIS');
+  
+  y = drawSubClause('9.1.', 'Este contrato obriga as partes e seus sucessores a qualquer título.');
+  
+  y = drawSubClause('9.2.', 'Qualquer tolerância ou concessão entre as partes não implica novação ou renúncia de direitos.');
+  
+  y = drawSubClause('9.3.', 'Eventuais alterações neste contrato somente terão validade se formalizadas por escrito e assinadas por ambas as partes.');
+  
+  // ===== CLÁUSULA DÉCIMA - DO FORO =====
+  y = drawClauseTitle('CLÁUSULA DÉCIMA – DO FORO');
+  
+  y = drawSubClause('10.1.', `Fica eleito o foro da comarca de ${company.address.city}/${company.address.state} para dirimir quaisquer dúvidas ou litígios oriundos do presente contrato, com renúncia expressa a qualquer outro, por mais privilegiado que seja.`);
+  
+  y += 5;
+  
+  // ===== ENCERRAMENTO =====
+  y = checkPageBreak(20);
   doc.setFontSize(10);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(30, 30, 30);
+  const encerramento = `E por estarem assim justos e contratados, firmam o presente instrumento em 02 (duas) vias de igual teor e forma, na presença de 02 (duas) testemunhas, para que produza seus jurídicos e legais efeitos.`;
+  const encerramentoLines = doc.splitTextToSize(encerramento, contentWidth);
+  encerramentoLines.forEach((line: string) => {
+    y = checkPageBreak(6);
+    doc.text(line, marginLeft, y);
+    y += 5;
+  });
+  
+  y += 10;
+  
+  // Local e data
+  y = checkPageBreak(15);
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(30, 30, 30);
+  doc.text(`${company.address.city}/${company.address.state}, ${formatDateFullPtBr(contract.createdAt)}.`, pageWidth / 2, y, { align: 'center' });
+  y += 25;
+  
+  // ===== ASSINATURAS =====
+  y = checkPageBreak(80);
+  
+  const sigWidth = 80;
+  const leftX = marginLeft + 5;
+  const rightX = pageWidth - marginRight - sigWidth - 5;
+  
+  // VENDEDOR
+  doc.setFontSize(8);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(80, 80, 80);
+  doc.text('VENDEDOR(A)', leftX + sigWidth / 2, y, { align: 'center' });
+  y += 5;
+  
+  // Signature box for vendor
+  doc.setDrawColor(180, 180, 180);
+  doc.setLineWidth(0.3);
+  doc.rect(leftX, y, sigWidth, 25);
+  
+  if (contract.vendorSignature) {
+    try {
+      doc.addImage(contract.vendorSignature, 'PNG', leftX + 5, y + 2, sigWidth - 10, 21);
+    } catch (e) {}
+  }
+  
+  // COMPRADOR  
+  doc.text('COMPRADOR(A)', rightX + sigWidth / 2, y - 5, { align: 'center' });
+  doc.rect(rightX, y, sigWidth, 25);
+  
+  if (contract.clientSignature) {
+    try {
+      doc.addImage(contract.clientSignature, 'PNG', rightX + 5, y + 2, sigWidth - 10, 21);
+    } catch (e) {}
+  }
+  
+  y += 28;
+  
+  // Vendor info
+  doc.setFontSize(8);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(50, 50, 50);
+  doc.text(company.fantasyName, leftX + sigWidth / 2, y, { align: 'center' });
+  doc.text(`CNPJ: ${company.cnpj}`, leftX + sigWidth / 2, y + 4, { align: 'center' });
+  
+  // Client info
+  doc.text(client.name.toUpperCase(), rightX + sigWidth / 2, y, { align: 'center' });
+  doc.text(`CPF: ${formatCPF(client.cpf)}`, rightX + sigWidth / 2, y + 4, { align: 'center' });
+  
+  y += 20;
+  
+  // ===== TESTEMUNHAS =====
+  y = checkPageBreak(50);
+  doc.setFontSize(9);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(30, 30, 30);
-  doc.text('CLÁUSULAS CONTRATUAIS', 20, y);
-  y += 8;
+  doc.text('TESTEMUNHAS:', marginLeft, y);
+  y += 10;
   
-  const clauses = [
-    '1. O VENDEDOR se compromete a entregar o veículo em perfeitas condições de uso.',
-    '2. O COMPRADOR declara ter examinado o veículo e aceita-o no estado em que se encontra.',
-    '3. A transferência de propriedade será realizada após a quitação total do valor acordado.',
-    '4. Em caso de atraso no pagamento, será cobrada multa de 5% sobre o valor da parcela.',
-    '5. Incidirão juros de 1% ao mês sobre parcelas em atraso.',
-    '6. A multa por rescisão unilateral do contrato é de 15% do valor total.',
-    '7. O veículo será entregue com documentação em dia e livre de débitos até a data da venda.',
-    '8. O COMPRADOR assume a responsabilidade por multas e infrações a partir da entrega.',
-    '9. Fica eleito o foro da comarca de Lages/SC para dirimir quaisquer dúvidas.',
-  ];
+  const witnessWidth = 75;
+  
+  // Testemunha 1
+  doc.setDrawColor(180, 180, 180);
+  doc.rect(leftX, y, witnessWidth, 20);
+  y += 23;
   
   doc.setFontSize(8);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(50, 50, 50);
   
-  clauses.forEach((clause) => {
-    const lines = doc.splitTextToSize(clause, pageWidth - 45);
-    if (y + lines.length * 4 > pageHeight - 60) {
-      doc.addPage();
-      y = 20;
-    }
-    doc.text(lines, 20, y);
-    y += lines.length * 4 + 2;
-  });
-  
-  y += 10;
-  
-  // Check if we need a new page for signatures
-  if (y > pageHeight - 80) {
-    doc.addPage();
-    y = 30;
-  }
-  
-  // ASSINATURAS
-  doc.setFontSize(9);
-  doc.setFont('helvetica', 'normal');
-  doc.setTextColor(80, 80, 80);
-  doc.text(`Lages/SC, ${formatDateFullPtBr(contract.createdAt)}`, pageWidth / 2, y, { align: 'center' });
-  y += 15;
-  
-  // Signature boxes
-  const sigWidth = 75;
-  const leftX = 25;
-  const rightX = pageWidth - 25 - sigWidth;
-  
-  // Client signature
-  if (contract.clientSignature) {
-    try {
-      doc.addImage(contract.clientSignature, 'PNG', leftX + 5, y, sigWidth - 10, 20);
-    } catch (e) {}
-  }
-  doc.setDrawColor(80, 80, 80);
-  doc.line(leftX, y + 25, leftX + sigWidth, y + 25);
-  doc.setFontSize(8);
-  doc.text('COMPRADOR', leftX + sigWidth / 2, y + 30, { align: 'center' });
-  doc.text(client.name, leftX + sigWidth / 2, y + 35, { align: 'center' });
-  
-  // Vendor signature
-  if (contract.vendorSignature) {
-    try {
-      doc.addImage(contract.vendorSignature, 'PNG', rightX + 5, y, sigWidth - 10, 20);
-    } catch (e) {}
-  }
-  doc.line(rightX, y + 25, rightX + sigWidth, y + 25);
-  doc.text('VENDEDOR', rightX + sigWidth / 2, y + 30, { align: 'center' });
-  doc.text(vendor?.name || company.fantasyName, rightX + sigWidth / 2, y + 35, { align: 'center' });
-  
-  y += 50;
-  
-  // Witnesses
-  doc.setFontSize(9);
-  doc.setFont('helvetica', 'bold');
-  doc.text('TESTEMUNHAS:', 20, y);
-  y += 10;
-  
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(8);
-  
-  // Witness 1
-  doc.line(leftX, y + 15, leftX + sigWidth, y + 15);
   if (contract.witness1) {
-    doc.text(`Nome: ${contract.witness1.name}`, leftX, y + 20);
-    doc.text(`RG: ${contract.witness1.rg} | CPF: ${formatCPF(contract.witness1.cpf)}`, leftX, y + 25);
+    doc.text(`Nome: ${contract.witness1.name}`, leftX, y);
+    doc.text(`RG: ${contract.witness1.rg}`, leftX, y + 5);
+    doc.text(`CPF: ${formatCPF(contract.witness1.cpf)}`, leftX, y + 10);
   } else {
-    doc.text('Nome:', leftX, y + 20);
-    doc.text('RG:                    CPF:', leftX, y + 25);
+    doc.text('Nome: _________________________________', leftX, y);
+    doc.text('RG: ________________', leftX, y + 5);
+    doc.text('CPF: ________________', leftX, y + 10);
   }
   
-  // Witness 2
-  doc.line(rightX, y + 15, rightX + sigWidth, y + 15);
+  // Testemunha 2
+  const witness2Y = y - 23;
+  doc.rect(rightX, witness2Y, witnessWidth, 20);
+  
   if (contract.witness2) {
-    doc.text(`Nome: ${contract.witness2.name}`, rightX, y + 20);
-    doc.text(`RG: ${contract.witness2.rg} | CPF: ${formatCPF(contract.witness2.cpf)}`, rightX, y + 25);
+    doc.text(`Nome: ${contract.witness2.name}`, rightX, y);
+    doc.text(`RG: ${contract.witness2.rg}`, rightX, y + 5);
+    doc.text(`CPF: ${formatCPF(contract.witness2.cpf)}`, rightX, y + 10);
   } else {
-    doc.text('Nome:', rightX, y + 20);
-    doc.text('RG:                    CPF:', rightX, y + 25);
+    doc.text('Nome: _________________________________', rightX, y);
+    doc.text('RG: ________________', rightX, y + 5);
+    doc.text('CPF: ________________', rightX, y + 10);
   }
   
   doc.save(`contrato-${contract.number}.pdf`);
