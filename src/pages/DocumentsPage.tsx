@@ -76,8 +76,8 @@ export default function DocumentsPage() {
   });
 
   const [warrantyForm, setWarrantyForm] = useState({
-    clientId: '', vehicleId: '', warrantyPeriod: '3 meses', warrantyCoverage: 'Motor e Câmbio',
-    warrantyKm: 5000, conditions: ''
+    clientId: '', vehicleId: '', warrantyPeriod: '6 meses', warrantyCoverage: 'Motor e Câmbio',
+    warrantyKm: 200000, conditions: ''
   });
 
   const [transferForm, setTransferForm] = useState({
@@ -94,7 +94,7 @@ export default function DocumentsPage() {
 
   // Reset form functions
   const resetContractForm = () => setContractForm({ clientId: '', vehicleId: '', vehiclePrice: 0, paymentType: 'avista', downPayment: 0, installments: 12, installmentValue: 0 });
-  const resetWarrantyForm = () => setWarrantyForm({ clientId: '', vehicleId: '', warrantyPeriod: '3 meses', warrantyCoverage: 'Motor e Câmbio', warrantyKm: 5000, conditions: '' });
+  const resetWarrantyForm = () => setWarrantyForm({ clientId: '', vehicleId: '', warrantyPeriod: '6 meses', warrantyCoverage: 'Motor e Câmbio', warrantyKm: 200000, conditions: '' });
   const resetTransferForm = () => setTransferForm({ clientId: '', vehicleId: '', vehicleValue: 0, location: 'Lages/SC' });
   const resetWithdrawalForm = () => setWithdrawalForm({ clientId: '', vehicleId: '', reason: 'motivos pessoais' });
   const resetReservationForm = () => setReservationForm({ clientId: '', vehicleId: '', depositAmount: 0 });
@@ -495,11 +495,11 @@ export default function DocumentsPage() {
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label>Período</Label>
-                      <Input value={warrantyForm.warrantyPeriod} onChange={(e) => setWarrantyForm({...warrantyForm, warrantyPeriod: e.target.value})} placeholder="3 meses" />
+                      <Input value="6 meses" disabled className="bg-muted" />
                     </div>
                     <div className="space-y-2">
                       <Label>KM Limite</Label>
-                      <Input type="number" value={warrantyForm.warrantyKm} onChange={(e) => setWarrantyForm({...warrantyForm, warrantyKm: parseInt(e.target.value) || 0})} />
+                      <Input value="200.000 km" disabled className="bg-muted" />
                     </div>
                   </div>
                   <div className="space-y-2">
