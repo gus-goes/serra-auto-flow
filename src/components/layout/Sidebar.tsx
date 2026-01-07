@@ -17,6 +17,7 @@ import {
   ChevronRight,
   UserCog,
   X,
+  History,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useState } from 'react';
@@ -35,6 +36,7 @@ const menuItems = [
   { icon: Receipt, label: 'Recibos', path: '/recibos', adminOnly: false },
   { icon: FileText, label: 'Documentos', path: '/documentos', adminOnly: false },
   { icon: TrendingUp, label: 'Funil de Vendas', path: '/funil', adminOnly: false },
+  { icon: History, label: 'Histórico', path: '/historico', adminOnly: true },
   { icon: UserCog, label: 'Vendedores', path: '/vendedores', adminOnly: true },
   { icon: Settings, label: 'Configurações', path: '/configuracoes', adminOnly: true },
 ];
