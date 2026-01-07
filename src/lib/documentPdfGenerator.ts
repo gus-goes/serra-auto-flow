@@ -229,7 +229,10 @@ export function generateContractPDF(contract: Contract): void {
   // ===== CLÁUSULA PRIMEIRA - DO OBJETO =====
   y = drawClauseTitle('CLÁUSULA PRIMEIRA – DO OBJETO');
   
-  const vehicleDesc = `${vehicleData.brand} ${vehicleData.model}, ano de fabricação/modelo ${vehicleData.year}, cor ${vehicleData.color}, placa ${vehicleData.plate || 'a ser emplacado'}, chassi nº ${vehicleData.chassis || '___________________'}, RENAVAM nº ${vehicleData.renavam || '___________________'}, combustível ${vehicleData.fuel}, câmbio ${vehicleData.transmission}, com ${vehicleData.mileage.toLocaleString('pt-BR')} km rodados`;
+  // Usa dados do veículo original para chassi/renavam se não estiverem no contrato
+  const chassi = vehicleData.chassis || vehicle.chassis || 'não informado';
+  const renavam = vehicleData.renavam || vehicle.renavam || 'não informado';
+  const vehicleDesc = `${vehicleData.brand} ${vehicleData.model}, ano de fabricação/modelo ${vehicleData.year}, cor ${vehicleData.color}, placa ${vehicleData.plate || 'a ser emplacado'}, chassi nº ${chassi}, RENAVAM nº ${renavam}, combustível ${vehicleData.fuel}, câmbio ${vehicleData.transmission}, com ${vehicleData.mileage.toLocaleString('pt-BR')} km rodados`;
   
   y = drawSubClause('1.1.', `O(A) VENDEDOR(A) é legítimo(a) proprietário(a) e possuidor(a) do veículo: ${vehicleDesc}.`);
   

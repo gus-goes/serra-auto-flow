@@ -26,6 +26,17 @@ import {
   FileText, Plus, Search, Download, Trash2, 
   FileSignature, Shield, Car, XCircle, CalendarClock, Eye
 } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 
 const statusColors = {
   ativa: 'bg-success/10 text-success border border-success/20',
@@ -409,20 +420,34 @@ export default function DocumentsPage() {
                   <TableCell>
                     <div className="flex gap-1">
                       <Button size="icon" variant="ghost" onClick={() => generateContractPDF(c)}><Download className="h-4 w-4" /></Button>
-                      <Button 
-                        size="icon" 
-                        variant="ghost" 
-                        className="text-destructive hover:text-destructive"
-                        onClick={() => {
-                          if (confirm('Excluir este contrato?')) {
-                            contractStorage.delete(c.id);
-                            refreshData();
-                            toast({ title: 'Contrato excluído' });
-                          }
-                        }}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button size="icon" variant="ghost" className="text-destructive hover:text-destructive">
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Excluir contrato?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Esta ação não pode ser desfeita. O contrato será permanentemente removido.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                            <AlertDialogAction
+                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                              onClick={() => {
+                                contractStorage.delete(c.id);
+                                refreshData();
+                                toast({ title: 'Contrato excluído' });
+                              }}
+                            >
+                              Excluir
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
                     </div>
                   </TableCell>
                 </TableRow>
@@ -493,20 +518,34 @@ export default function DocumentsPage() {
                   <TableCell>
                     <div className="flex gap-1">
                       <Button size="icon" variant="ghost" onClick={() => generateWarrantyPDF(w)}><Download className="h-4 w-4" /></Button>
-                      <Button 
-                        size="icon" 
-                        variant="ghost" 
-                        className="text-destructive hover:text-destructive"
-                        onClick={() => {
-                          if (confirm('Excluir esta garantia?')) {
-                            warrantyStorage.delete(w.id);
-                            refreshData();
-                            toast({ title: 'Garantia excluída' });
-                          }
-                        }}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button size="icon" variant="ghost" className="text-destructive hover:text-destructive">
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Excluir garantia?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Esta ação não pode ser desfeita. A garantia será permanentemente removida.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                            <AlertDialogAction
+                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                              onClick={() => {
+                                warrantyStorage.delete(w.id);
+                                refreshData();
+                                toast({ title: 'Garantia excluída' });
+                              }}
+                            >
+                              Excluir
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
                     </div>
                   </TableCell>
                 </TableRow>
@@ -566,20 +605,34 @@ export default function DocumentsPage() {
                   <TableCell>
                     <div className="flex gap-1">
                       <Button size="icon" variant="ghost" onClick={() => generateTransferAuthPDF(t)}><Download className="h-4 w-4" /></Button>
-                      <Button 
-                        size="icon" 
-                        variant="ghost" 
-                        className="text-destructive hover:text-destructive"
-                        onClick={() => {
-                          if (confirm('Excluir esta ATPV?')) {
-                            transferAuthStorage.delete(t.id);
-                            refreshData();
-                            toast({ title: 'ATPV excluída' });
-                          }
-                        }}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button size="icon" variant="ghost" className="text-destructive hover:text-destructive">
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Excluir ATPV?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Esta ação não pode ser desfeita. A autorização será permanentemente removida.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                            <AlertDialogAction
+                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                              onClick={() => {
+                                transferAuthStorage.delete(t.id);
+                                refreshData();
+                                toast({ title: 'ATPV excluída' });
+                              }}
+                            >
+                              Excluir
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
                     </div>
                   </TableCell>
                 </TableRow>
@@ -635,20 +688,34 @@ export default function DocumentsPage() {
                   <TableCell>
                     <div className="flex gap-1">
                       <Button size="icon" variant="ghost" onClick={() => generateWithdrawalPDF(w)}><Download className="h-4 w-4" /></Button>
-                      <Button 
-                        size="icon" 
-                        variant="ghost" 
-                        className="text-destructive hover:text-destructive"
-                        onClick={() => {
-                          if (confirm('Excluir esta desistência?')) {
-                            withdrawalStorage.delete(w.id);
-                            refreshData();
-                            toast({ title: 'Desistência excluída' });
-                          }
-                        }}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button size="icon" variant="ghost" className="text-destructive hover:text-destructive">
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Excluir desistência?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Esta ação não pode ser desfeita. A declaração será permanentemente removida.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                            <AlertDialogAction
+                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                              onClick={() => {
+                                withdrawalStorage.delete(w.id);
+                                refreshData();
+                                toast({ title: 'Desistência excluída' });
+                              }}
+                            >
+                              Excluir
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
                     </div>
                   </TableCell>
                 </TableRow>
@@ -706,20 +773,34 @@ export default function DocumentsPage() {
                   <TableCell>
                     <div className="flex gap-1">
                       <Button size="icon" variant="ghost" onClick={() => generateReservationPDF(r)}><Download className="h-4 w-4" /></Button>
-                      <Button 
-                        size="icon" 
-                        variant="ghost" 
-                        className="text-destructive hover:text-destructive"
-                        onClick={() => {
-                          if (confirm('Excluir esta reserva?')) {
-                            reservationStorage.delete(r.id);
-                            refreshData();
-                            toast({ title: 'Reserva excluída' });
-                          }
-                        }}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button size="icon" variant="ghost" className="text-destructive hover:text-destructive">
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Excluir reserva?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Esta ação não pode ser desfeita. A reserva será permanentemente removida.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                            <AlertDialogAction
+                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                              onClick={() => {
+                                reservationStorage.delete(r.id);
+                                refreshData();
+                                toast({ title: 'Reserva excluída' });
+                              }}
+                            >
+                              Excluir
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
                     </div>
                   </TableCell>
                 </TableRow>
