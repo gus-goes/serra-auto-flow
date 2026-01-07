@@ -1,61 +1,107 @@
 import { useState } from 'react';
 import { useProfiles, useUpdateProfile } from '@/hooks/useProfiles';
+import { useAuth } from '@/contexts/AuthContext';
 import { formatPhone } from '@/lib/formatters';
 import { formatDateDisplay } from '@/lib/dateUtils';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useQueryClient } from '@tanstack/react-query';
 import { 
   UserCog, 
   Edit2, 
   Shield,
   User as UserIcon,
-  CheckCircle,
-  XCircle,
-  Phone
+  Phone,
+  Plus
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
+type DialogMode = 'create' | 'edit' | null;
+
 export default function VendorsPage() {
   const { data: profiles = [], isLoading } = useProfiles();
+  const { isAdmin } = useAuth();
   const updateProfile = useUpdateProfile();
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const queryClient = useQueryClient();
+  const [dialogMode, setDialogMode] = useState<DialogMode>(null);
   const [editingProfile, setEditingProfile] = useState<typeof profiles[0] | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
 
   const [form, setForm] = useState({
     name: '',
     email: '',
     phone: '',
+    password: '',
+    role: 'vendedor' as 'admin' | 'vendedor',
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!editingProfile) return;
-
-    updateProfile.mutate({
-      id: editingProfile.id,
-      name: form.name,
-      email: form.email,
-      phone: form.phone || null,
-    }, {
-      onSuccess: () => {
-        setIsDialogOpen(false);
-        resetForm();
-        toast({
-          title: 'Usuário atualizado',
-          description: `${form.name} foi salvo com sucesso.`,
+    if (dialogMode === 'edit' && editingProfile) {
+      updateProfile.mutate({
+        id: editingProfile.id,
+        name: form.name,
+        email: form.email,
+        phone: form.phone || null,
+      }, {
+        onSuccess: () => {
+          closeDialog();
+          toast({
+            title: 'Usuário atualizado',
+            description: `${form.name} foi salvo com sucesso.`,
+          });
+        },
+      });
+    } else if (dialogMode === 'create') {
+      setIsSubmitting(true);
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        const response = await supabase.functions.invoke('create-user', {
+          body: {
+            email: form.email,
+            password: form.password,
+            name: form.name,
+            phone: form.phone || null,
+            role: form.role,
+          },
         });
-      },
-    });
+
+        if (response.error) {
+          throw new Error(response.error.message || 'Erro ao criar usuário');
+        }
+
+        if (response.data?.error) {
+          throw new Error(response.data.error);
+        }
+
+        queryClient.invalidateQueries({ queryKey: ['profiles'] });
+        closeDialog();
+        toast({
+          title: 'Usuário criado',
+          description: `${form.name} foi cadastrado com sucesso.`,
+        });
+      } catch (error) {
+        console.error('Error creating user:', error);
+        toast({
+          variant: 'destructive',
+          title: 'Erro ao criar usuário',
+          description: error instanceof Error ? error.message : 'Erro desconhecido',
+        });
+      } finally {
+        setIsSubmitting(false);
+      }
+    }
   };
 
   const handleEdit = (profile: typeof profiles[0]) => {
@@ -64,8 +110,20 @@ export default function VendorsPage() {
       name: profile.name,
       email: profile.email,
       phone: profile.phone || '',
+      password: '',
+      role: getRole(profile) as 'admin' | 'vendedor',
     });
-    setIsDialogOpen(true);
+    setDialogMode('edit');
+  };
+
+  const handleCreate = () => {
+    resetForm();
+    setDialogMode('create');
+  };
+
+  const closeDialog = () => {
+    setDialogMode(null);
+    resetForm();
   };
 
   const resetForm = () => {
@@ -74,6 +132,8 @@ export default function VendorsPage() {
       name: '',
       email: '',
       phone: '',
+      password: '',
+      role: 'vendedor',
     });
   };
 
@@ -112,63 +172,123 @@ export default function VendorsPage() {
           <h1 className="text-2xl font-bold">Usuários</h1>
           <p className="text-muted-foreground">Gerencie os usuários do sistema</p>
         </div>
-        <Dialog open={isDialogOpen} onOpenChange={(open) => { setIsDialogOpen(open); if (!open) resetForm(); }}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Editar Usuário</DialogTitle>
-            </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="name">Nome Completo</Label>
-                <Input
-                  id="name"
-                  value={form.name}
-                  onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  placeholder="João da Silva"
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="email">E-mail</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={form.email}
-                  onChange={(e) => setForm({ ...form, email: e.target.value })}
-                  placeholder="usuario@autosdoserra.com.br"
-                  required
-                  disabled
-                />
+        {isAdmin && (
+          <Button onClick={handleCreate} className="btn-primary">
+            <Plus className="h-4 w-4 mr-2" />
+            Novo Usuário
+          </Button>
+        )}
+      </div>
+
+      {/* Dialog for Create/Edit */}
+      <Dialog open={dialogMode !== null} onOpenChange={(open) => { if (!open) closeDialog(); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {dialogMode === 'create' ? 'Novo Usuário' : 'Editar Usuário'}
+            </DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="name">Nome Completo</Label>
+              <Input
+                id="name"
+                value={form.name}
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
+                placeholder="João da Silva"
+                required
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="email">E-mail</Label>
+              <Input
+                id="email"
+                type="email"
+                value={form.email}
+                onChange={(e) => setForm({ ...form, email: e.target.value })}
+                placeholder="usuario@autosdoserra.com.br"
+                required
+                disabled={dialogMode === 'edit'}
+              />
+              {dialogMode === 'edit' && (
                 <p className="text-xs text-muted-foreground">
                   O e-mail não pode ser alterado pois é usado para autenticação.
                 </p>
-              </div>
+              )}
+            </div>
 
+            {dialogMode === 'create' && (
               <div className="space-y-2">
-                <Label htmlFor="phone" className="flex items-center gap-2">
-                  <Phone className="h-4 w-4" />
-                  Telefone (aparece nos PDFs)
-                </Label>
+                <Label htmlFor="password">Senha</Label>
                 <Input
-                  id="phone"
-                  value={form.phone}
-                  onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                  placeholder="(49) 99999-9999"
+                  id="password"
+                  type="password"
+                  value={form.password}
+                  onChange={(e) => setForm({ ...form, password: e.target.value })}
+                  placeholder="Mínimo 6 caracteres"
+                  required
+                  minLength={6}
                 />
               </div>
+            )}
 
-              <div className="flex gap-3 justify-end pt-4">
-                <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
-                  Cancelar
-                </Button>
-                <Button type="submit" className="btn-primary" disabled={updateProfile.isPending}>
-                  {updateProfile.isPending ? 'Salvando...' : 'Salvar Alterações'}
-                </Button>
+            <div className="space-y-2">
+              <Label htmlFor="phone" className="flex items-center gap-2">
+                <Phone className="h-4 w-4" />
+                Telefone (aparece nos PDFs)
+              </Label>
+              <Input
+                id="phone"
+                value={form.phone}
+                onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                placeholder="(49) 99999-9999"
+              />
+            </div>
+
+            {dialogMode === 'create' && (
+              <div className="space-y-2">
+                <Label htmlFor="role">Perfil</Label>
+                <Select
+                  value={form.role}
+                  onValueChange={(value) => setForm({ ...form, role: value as 'admin' | 'vendedor' })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="vendedor">
+                      <div className="flex items-center gap-2">
+                        <UserIcon className="h-4 w-4" />
+                        Vendedor
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="admin">
+                      <div className="flex items-center gap-2">
+                        <Shield className="h-4 w-4" />
+                        Administrador
+                      </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
-            </form>
-          </DialogContent>
-        </Dialog>
-      </div>
+            )}
+
+            <div className="flex gap-3 justify-end pt-4">
+              <Button type="button" variant="outline" onClick={closeDialog}>
+                Cancelar
+              </Button>
+              <Button 
+                type="submit" 
+                className="btn-primary" 
+                disabled={updateProfile.isPending || isSubmitting}
+              >
+                {updateProfile.isPending || isSubmitting ? 'Salvando...' : dialogMode === 'create' ? 'Criar Usuário' : 'Salvar Alterações'}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       {/* Users Table */}
       {profiles.length > 0 ? (
