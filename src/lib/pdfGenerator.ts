@@ -217,12 +217,12 @@ function drawSignatureSection(
   const leftSigX = 30;
   const rightSigX = pageWidth - 30 - sigBoxWidth;
   
-  // Signature label
+  // Signature label - positioned lower
   doc.setFontSize(10);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(60, 60, 60);
-  doc.text('ASSINATURAS', pageWidth / 2, y, { align: 'center' });
-  y += 8;
+  doc.text('ASSINATURAS', pageWidth / 2, y + 10, { align: 'center' });
+  y += 18;
   
   // Client signature box
   if (clientSignature && !privacyMode) {
@@ -760,8 +760,6 @@ export function generateClientPDF(client: Client): void {
     y += notesHeight + 8;
   }
   
-  // Footer
-  drawFooter(doc, 'Ficha de Cadastro');
   
   doc.save(`ficha-cadastro-${client.name.toLowerCase().replace(/\s+/g, '-')}.pdf`);
 }
