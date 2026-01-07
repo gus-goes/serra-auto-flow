@@ -1,8 +1,7 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { bankStorage, backup, generateId } from '@/lib/storage';
+import { useBanks, useCreateBank, useUpdateBank, useDeleteBank, useUploadBankLogo } from '@/hooks/useBanks';
 import { getCompanyConfig, saveCompanyConfig, type CompanyConfig, type LegalRepresentative } from '@/lib/companyConfig';
-import type { Bank } from '@/types';
 import { formatPercent } from '@/lib/formatters';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
@@ -15,33 +14,39 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { SignaturePad } from '@/components/ui/signature-pad';
+import { Skeleton } from '@/components/ui/skeleton';
 import { 
   Settings, 
   Building2, 
   Plus, 
   Edit2, 
   Trash2,
-  Download,
-  Upload,
-  Database,
-  AlertTriangle,
   Palette,
   Image,
   Home,
   User,
-  Save
+  Save,
+  Upload,
+  Loader2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export default function SettingsPage() {
   const { user, isAdmin } = useAuth();
-  const [banks, setBanks] = useState<Bank[]>(bankStorage.getAll());
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [editingBank, setEditingBank] = useState<Bank | null>(null);
-  const [activeTab, setActiveTab] = useState('bancarios');
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const logoInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+  
+  const { data: banks = [], isLoading } = useBanks();
+  const createBank = useCreateBank();
+  const updateBank = useUpdateBank();
+  const deleteBank = useDeleteBank();
+  const uploadLogo = useUploadBankLogo();
+
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editingBank, setEditingBank] = useState<typeof banks[0] | null>(null);
+  const [activeTab, setActiveTab] = useState('bancarios');
+  const [pendingLogo, setPendingLogo] = useState<File | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const logoInputRef = useRef<HTMLInputElement>(null);
 
   // Company config state
   const [companyConfig, setCompanyConfig] = useState<CompanyConfig>(getCompanyConfig());
@@ -64,154 +69,142 @@ export default function SettingsPage() {
     rate60: 2.29,
     commission: 2.5,
     colorHex: '#003A70',
-    logo: '',
     isOwn: false,
   });
 
   // Separate banks by type
-  const externalBanks = banks.filter(b => !b.slug?.includes('proprio') && !b.name.toLowerCase().includes('próprio'));
-  const ownFinancing = banks.filter(b => b.slug?.includes('proprio') || b.name.toLowerCase().includes('próprio'));
+  const externalBanks = banks.filter(b => !b.slug?.includes('proprio'));
+  const ownFinancing = banks.filter(b => b.slug?.includes('proprio'));
 
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 100 * 1024) {
+    if (file.size > 500 * 1024) {
       toast({
         title: 'Arquivo muito grande',
-        description: 'O logo deve ter no máximo 100KB.',
+        description: 'O logo deve ter no máximo 500KB.',
         variant: 'destructive',
       });
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const base64 = event.target?.result as string;
-      setForm({ ...form, logo: base64 });
-    };
-    reader.readAsDataURL(file);
+    setPendingLogo(file);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsSubmitting(true);
     
-    const isOwnFinancing = activeTab === 'proprio' || form.isOwn;
-    
-    const bank: Bank = {
-      id: editingBank?.id || generateId(),
-      name: form.name,
-      slug: isOwnFinancing ? 'proprio' : form.name.toLowerCase().replace(/\s+/g, '-'),
-      colorHex: form.colorHex,
-      logo: form.logo || undefined,
-      rates: {
+    try {
+      const isOwnFinancing = activeTab === 'proprio' || form.isOwn;
+      const rates = {
         12: form.rate12,
         24: form.rate24,
         36: form.rate36,
         48: form.rate48,
         60: form.rate60,
-      },
-      commission: form.commission,
-      active: editingBank?.active ?? true,
-    };
+      };
 
-    bankStorage.save(bank);
-    setBanks(bankStorage.getAll());
-    setIsDialogOpen(false);
-    resetForm();
+      const bankData = {
+        name: form.name,
+        slug: isOwnFinancing ? 'proprio' : form.name.toLowerCase().replace(/\s+/g, '-'),
+        primary_color: form.colorHex,
+        color_hex: form.colorHex,
+        rates,
+        commission_rate: form.commission,
+        is_active: editingBank?.is_active ?? true,
+      };
 
-    toast({
-      title: editingBank ? 'Banco atualizado' : 'Banco cadastrado',
-      description: `${bank.name} foi salvo com sucesso.`,
-    });
+      let bankId: string;
+
+      if (editingBank) {
+        await updateBank.mutateAsync({ id: editingBank.id, ...bankData });
+        bankId = editingBank.id;
+      } else {
+        const result = await createBank.mutateAsync(bankData);
+        bankId = result.id;
+      }
+
+      // Upload logo if pending
+      if (pendingLogo) {
+        const logoUrl = await uploadLogo.mutateAsync({ bankId, file: pendingLogo });
+        await updateBank.mutateAsync({ id: bankId, logo_url: logoUrl });
+      }
+
+      setIsDialogOpen(false);
+      resetForm();
+
+      toast({
+        title: editingBank ? 'Banco atualizado' : 'Banco cadastrado',
+        description: `${form.name} foi salvo com sucesso.`,
+      });
+    } catch (error) {
+      toast({
+        title: 'Erro ao salvar',
+        description: 'Ocorreu um erro ao salvar o banco.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const handleEdit = (bank: Bank) => {
+  const handleEdit = (bank: typeof banks[0]) => {
     setEditingBank(bank);
+    const rates = (bank.rates || {}) as Record<string, number>;
     setForm({
       name: bank.name,
-      rate12: bank.rates[12],
-      rate24: bank.rates[24],
-      rate36: bank.rates[36],
-      rate48: bank.rates[48],
-      rate60: bank.rates[60],
-      commission: bank.commission,
-      colorHex: bank.colorHex || '#003A70',
-      logo: bank.logo || '',
+      rate12: rates['12'] || 1.89,
+      rate24: rates['24'] || 1.99,
+      rate36: rates['36'] || 2.09,
+      rate48: rates['48'] || 2.19,
+      rate60: rates['60'] || 2.29,
+      commission: Number(bank.commission_rate) || 2.5,
+      colorHex: bank.color_hex || bank.primary_color || '#003A70',
       isOwn: bank.slug?.includes('proprio') || false,
     });
+    setPendingLogo(null);
     setIsDialogOpen(true);
   };
 
-  const handleToggleActive = (bank: Bank) => {
-    const updatedBank = { ...bank, active: !bank.active };
-    bankStorage.save(updatedBank);
-    setBanks(bankStorage.getAll());
-    toast({
-      title: updatedBank.active ? 'Banco ativado' : 'Banco desativado',
-      description: `${bank.name} foi ${updatedBank.active ? 'ativado' : 'desativado'}.`,
-    });
-  };
-
-  const handleDelete = (id: string) => {
-    if (confirm('Tem certeza que deseja excluir este banco?')) {
-      bankStorage.delete(id);
-      setBanks(bankStorage.getAll());
+  const handleToggleActive = async (bank: typeof banks[0]) => {
+    try {
+      await updateBank.mutateAsync({ id: bank.id, is_active: !bank.is_active });
       toast({
-        title: 'Banco excluído',
-        description: 'O banco foi removido do sistema.',
+        title: bank.is_active ? 'Banco desativado' : 'Banco ativado',
+        description: `${bank.name} foi ${bank.is_active ? 'desativado' : 'ativado'}.`,
+      });
+    } catch (error) {
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível alterar o status.',
+        variant: 'destructive',
       });
     }
   };
 
-  const handleExport = () => {
-    const data = backup.export();
-    const blob = new Blob([data], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `autos-da-serra-backup-${new Date().toISOString().split('T')[0]}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    
-    toast({
-      title: 'Backup exportado',
-      description: 'O arquivo de backup foi baixado com sucesso.',
-    });
-  };
-
-  const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const content = event.target?.result as string;
-      if (backup.import(content)) {
-        setBanks(bankStorage.getAll());
+  const handleDelete = async (id: string) => {
+    if (confirm('Tem certeza que deseja excluir este banco?')) {
+      try {
+        await deleteBank.mutateAsync(id);
         toast({
-          title: 'Backup importado',
-          description: 'Os dados foram restaurados com sucesso.',
+          title: 'Banco excluído',
+          description: 'O banco foi removido do sistema.',
         });
-      } else {
+      } catch (error) {
         toast({
-          title: 'Erro na importação',
-          description: 'O arquivo de backup é inválido.',
+          title: 'Erro ao excluir',
+          description: 'Não foi possível excluir o banco.',
           variant: 'destructive',
         });
       }
-    };
-    reader.readAsText(file);
-    
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
     }
   };
 
   const resetForm = () => {
     setEditingBank(null);
+    setPendingLogo(null);
     setForm({
       name: '',
       rate12: 1.89,
@@ -221,13 +214,11 @@ export default function SettingsPage() {
       rate60: 2.29,
       commission: 2.5,
       colorHex: activeTab === 'proprio' ? '#FFD700' : '#003A70',
-      logo: '',
       isOwn: activeTab === 'proprio',
     });
   };
 
-
-  const renderBankTable = (bankList: Bank[], isOwn: boolean) => (
+  const renderBankTable = (bankList: typeof banks, isOwn: boolean) => (
     <Table>
       <TableHeader>
         <TableRow>
@@ -243,55 +234,58 @@ export default function SettingsPage() {
         </TableRow>
       </TableHeader>
       <TableBody>
-        {bankList.length > 0 ? bankList.map((bank) => (
-          <TableRow key={bank.id} className={cn('table-row-hover', !bank.active && 'opacity-50')}>
-            <TableCell>
-              <div className="flex items-center gap-3">
-                {bank.logo ? (
-                  <img src={bank.logo} alt={bank.name} className="h-6 w-auto max-w-[60px] rounded" />
-                ) : bank.colorHex ? (
-                  <div 
-                    className="h-6 w-6 rounded-full border border-border"
-                    style={{ backgroundColor: bank.colorHex }}
-                  />
-                ) : null}
-                <span className="font-medium">{bank.name}</span>
-              </div>
-            </TableCell>
-            <TableCell>{formatPercent(bank.rates[12])}</TableCell>
-            <TableCell>{formatPercent(bank.rates[24])}</TableCell>
-            <TableCell>{formatPercent(bank.rates[36])}</TableCell>
-            <TableCell>{formatPercent(bank.rates[48])}</TableCell>
-            <TableCell>{formatPercent(bank.rates[60])}</TableCell>
-            <TableCell className="text-success">{formatPercent(bank.commission)}</TableCell>
-            <TableCell>
-              <Switch
-                checked={bank.active}
-                onCheckedChange={() => handleToggleActive(bank)}
-              />
-            </TableCell>
-            <TableCell>
-              <div className="flex gap-1">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8"
-                  onClick={() => handleEdit(bank)}
-                >
-                  <Edit2 className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8 text-destructive hover:text-destructive"
-                  onClick={() => handleDelete(bank.id)}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
-            </TableCell>
-          </TableRow>
-        )) : (
+        {bankList.length > 0 ? bankList.map((bank) => {
+          const rates = (bank.rates || {}) as Record<string, number>;
+          return (
+            <TableRow key={bank.id} className={cn('table-row-hover', !bank.is_active && 'opacity-50')}>
+              <TableCell>
+                <div className="flex items-center gap-3">
+                  {bank.logo_url ? (
+                    <img src={bank.logo_url} alt={bank.name} className="h-6 w-auto max-w-[60px] rounded" />
+                  ) : bank.color_hex ? (
+                    <div 
+                      className="h-6 w-6 rounded-full border border-border"
+                      style={{ backgroundColor: bank.color_hex }}
+                    />
+                  ) : null}
+                  <span className="font-medium">{bank.name}</span>
+                </div>
+              </TableCell>
+              <TableCell>{formatPercent(rates['12'] || 0)}</TableCell>
+              <TableCell>{formatPercent(rates['24'] || 0)}</TableCell>
+              <TableCell>{formatPercent(rates['36'] || 0)}</TableCell>
+              <TableCell>{formatPercent(rates['48'] || 0)}</TableCell>
+              <TableCell>{formatPercent(rates['60'] || 0)}</TableCell>
+              <TableCell className="text-success">{formatPercent(Number(bank.commission_rate) || 0)}</TableCell>
+              <TableCell>
+                <Switch
+                  checked={bank.is_active ?? true}
+                  onCheckedChange={() => handleToggleActive(bank)}
+                />
+              </TableCell>
+              <TableCell>
+                <div className="flex gap-1">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => handleEdit(bank)}
+                  >
+                    <Edit2 className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-destructive hover:text-destructive"
+                    onClick={() => handleDelete(bank.id)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              </TableCell>
+            </TableRow>
+          );
+        }) : (
           <TableRow>
             <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
               {isOwn ? 'Nenhum financiamento próprio cadastrado' : 'Nenhum banco cadastrado'}
@@ -301,6 +295,25 @@ export default function SettingsPage() {
       </TableBody>
     </Table>
   );
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6 animate-fade-in">
+        <div>
+          <Skeleton className="h-8 w-48" />
+          <Skeleton className="h-4 w-64 mt-2" />
+        </div>
+        <Card>
+          <CardHeader>
+            <Skeleton className="h-6 w-48" />
+          </CardHeader>
+          <CardContent>
+            <Skeleton className="h-64 w-full" />
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -387,8 +400,12 @@ export default function SettingsPage() {
                           <Upload className="h-4 w-4 mr-2" />
                           Upload
                         </Button>
-                        {form.logo && (
-                          <img src={form.logo} alt="Preview" className="h-10 w-auto max-w-[60px] rounded border" />
+                        {(pendingLogo || editingBank?.logo_url) && (
+                          <img 
+                            src={pendingLogo ? URL.createObjectURL(pendingLogo) : editingBank?.logo_url || ''} 
+                            alt="Preview" 
+                            className="h-10 w-auto max-w-[60px] rounded border" 
+                          />
                         )}
                       </div>
                     </div>
@@ -463,7 +480,8 @@ export default function SettingsPage() {
                     <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
                       Cancelar
                     </Button>
-                    <Button type="submit" className="btn-primary">
+                    <Button type="submit" className="btn-primary" disabled={isSubmitting}>
+                      {isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                       {editingBank ? 'Salvar Alterações' : 'Cadastrar'}
                     </Button>
                   </div>
@@ -477,7 +495,7 @@ export default function SettingsPage() {
                 <TabsList className="grid w-full grid-cols-2">
                   <TabsTrigger value="bancarios" className="flex items-center gap-2">
                     <Building2 className="h-4 w-4" />
-                    Bancos Externos
+                    Bancos Parceiros
                   </TabsTrigger>
                   <TabsTrigger value="proprio" className="flex items-center gap-2">
                     <Home className="h-4 w-4" />
@@ -485,191 +503,88 @@ export default function SettingsPage() {
                   </TabsTrigger>
                 </TabsList>
               </div>
-              <TabsContent value="bancarios" className="mt-0">
+
+              <TabsContent value="bancarios" className="p-0 mt-4">
                 {renderBankTable(externalBanks, false)}
               </TabsContent>
-              <TabsContent value="proprio" className="mt-0">
+
+              <TabsContent value="proprio" className="p-0 mt-4">
                 {renderBankTable(ownFinancing, true)}
               </TabsContent>
             </Tabs>
           </CardContent>
         </Card>
 
-
-        {/* Legal Representative */}
-        <Card className="lg:col-span-2">
+        {/* Legal Representative - keeping local storage for now */}
+        <Card>
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
               <User className="h-5 w-5 text-primary" />
-              Representante Legal da Empresa
+              Representante Legal
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground mb-4">
-              Dados do representante legal para inclusão em contratos e documentos oficiais.
-            </p>
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              <div className="space-y-2">
-                <Label htmlFor="rep-name">Nome Completo</Label>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2 col-span-2">
+                <Label>Nome Completo</Label>
                 <Input
-                  id="rep-name"
                   value={legalRep.name}
                   onChange={(e) => setLegalRep({ ...legalRep, name: e.target.value })}
-                  placeholder="NOME COMPLETO"
+                  placeholder="Nome do representante"
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="rep-nationality">Nacionalidade</Label>
+                <Label>Nacionalidade</Label>
                 <Input
-                  id="rep-nationality"
                   value={legalRep.nationality}
                   onChange={(e) => setLegalRep({ ...legalRep, nationality: e.target.value })}
-                  placeholder="Brasileiro"
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="rep-marital">Estado Civil</Label>
-                <Select
-                  value={legalRep.maritalStatus}
-                  onValueChange={(value) => setLegalRep({ ...legalRep, maritalStatus: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione" />
-                  </SelectTrigger>
+                <Label>Estado Civil</Label>
+                <Select value={legalRep.maritalStatus} onValueChange={(v) => setLegalRep({ ...legalRep, maritalStatus: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="solteiro(a)">Solteiro(a)</SelectItem>
                     <SelectItem value="casado(a)">Casado(a)</SelectItem>
                     <SelectItem value="divorciado(a)">Divorciado(a)</SelectItem>
                     <SelectItem value="viúvo(a)">Viúvo(a)</SelectItem>
-                    <SelectItem value="união estável">União Estável</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="rep-occupation">Profissão</Label>
+                <Label>Profissão</Label>
                 <Input
-                  id="rep-occupation"
                   value={legalRep.occupation}
                   onChange={(e) => setLegalRep({ ...legalRep, occupation: e.target.value })}
-                  placeholder="Empresário"
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="rep-rg">RG</Label>
+                <Label>RG</Label>
                 <Input
-                  id="rep-rg"
                   value={legalRep.rg}
                   onChange={(e) => setLegalRep({ ...legalRep, rg: e.target.value })}
-                  placeholder="0000000"
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="rep-cpf">CPF</Label>
+              <div className="space-y-2 col-span-2">
+                <Label>CPF</Label>
                 <Input
-                  id="rep-cpf"
                   value={legalRep.cpf}
                   onChange={(e) => setLegalRep({ ...legalRep, cpf: e.target.value })}
-                  placeholder="000.000.000-00"
                 />
               </div>
-              <div className="space-y-2 md:col-span-2">
-                <Label>Rubrica/Assinatura</Label>
-                {legalRep.signature ? (
-                  <div className="flex items-center gap-4">
-                    <img src={legalRep.signature} alt="Rubrica" className="h-16 border rounded bg-white" />
-                    <Button variant="outline" size="sm" onClick={() => setLegalRep({ ...legalRep, signature: '' })}>
-                      <Trash2 className="h-4 w-4 mr-2" />
-                      Remover
-                    </Button>
-                  </div>
-                ) : (
-                  <SignaturePad
-                    onSave={(sig) => setLegalRep({ ...legalRep, signature: sig })}
-                    label="Desenhe a rubrica abaixo"
-                  />
-                )}
-                <p className="text-xs text-muted-foreground">Esta rubrica será usada nos Contratos e ATPVs</p>
-              </div>
             </div>
-            <div className="mt-4 flex justify-end">
-              <Button
-                onClick={() => {
-                  saveCompanyConfig({ legalRepresentative: legalRep });
-                  setCompanyConfig(getCompanyConfig());
-                  toast({
-                    title: 'Representante salvo',
-                    description: 'Dados do representante legal atualizados com sucesso.',
-                  });
-                }}
-                className="btn-primary"
-              >
-                <Save className="h-4 w-4 mr-2" />
-                Salvar Representante
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
 
-        {/* Backup */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Database className="h-5 w-5 text-primary" />
-              Backup de Dados
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Exporte ou importe todos os dados do sistema para um arquivo JSON.
-            </p>
-            <div className="flex gap-3">
-              <Button variant="outline" onClick={handleExport} className="flex-1">
-                <Download className="h-4 w-4 mr-2" />
-                Exportar
-              </Button>
-              <Button 
-                variant="outline" 
-                onClick={() => fileInputRef.current?.click()}
-                className="flex-1"
-              >
-                <Upload className="h-4 w-4 mr-2" />
-                Importar
-              </Button>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".json"
-                onChange={handleImport}
-                className="hidden"
-              />
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Danger Zone */}
-        <Card className="border-destructive/50">
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2 text-destructive">
-              <AlertTriangle className="h-5 w-5" />
-              Zona de Perigo
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Ações irreversíveis que afetam todos os dados do sistema.
-            </p>
             <Button 
-              variant="destructive" 
-              className="w-full"
+              className="w-full btn-primary"
               onClick={() => {
-                if (confirm('ATENÇÃO: Esta ação irá apagar TODOS os dados do sistema. Esta ação não pode ser desfeita. Deseja continuar?')) {
-                  localStorage.clear();
-                  window.location.reload();
-                }
+                saveCompanyConfig({ ...companyConfig, legalRepresentative: legalRep });
+                setCompanyConfig({ ...companyConfig, legalRepresentative: legalRep });
+                toast({ title: 'Salvo', description: 'Dados do representante atualizados.' });
               }}
             >
-              <Trash2 className="h-4 w-4 mr-2" />
-              Limpar Todos os Dados
+              <Save className="h-4 w-4 mr-2" />
+              Salvar Representante
             </Button>
           </CardContent>
         </Card>

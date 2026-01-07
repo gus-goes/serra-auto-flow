@@ -1,9 +1,12 @@
 import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { proposalStorage, vehicleStorage, clientStorage, bankStorage, generateId, generateNumber } from '@/lib/storage';
-import type { Proposal, ProposalStatus, ProposalType } from '@/types';
-import { formatCurrency, formatCPF } from '@/lib/formatters';
-import { formatDateDisplay, getCurrentTimestamp } from '@/lib/dateUtils';
+import { useProposals, useCreateProposal, useUpdateProposal, useDeleteProposal } from '@/hooks/useProposals';
+import { useVehicles } from '@/hooks/useVehicles';
+import { useClients } from '@/hooks/useClients';
+import { useBanks } from '@/hooks/useBanks';
+import type { Database } from '@/integrations/supabase/types';
+import { formatCurrency } from '@/lib/formatters';
+import { formatDateDisplay } from '@/lib/dateUtils';
 import { generateProposalPDF } from '@/lib/pdfGenerator';
 import { getBankConfigByName } from '@/lib/bankConfig';
 import { useToast } from '@/hooks/use-toast';
@@ -17,6 +20,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { SignaturePad } from '@/components/ui/signature-pad';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Skeleton } from '@/components/ui/skeleton';
 import { 
   FileText, 
   Plus, 
@@ -26,60 +30,63 @@ import {
   Pen,
   Building2,
   Home,
-  Banknote
+  Banknote,
+  Loader2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
+type ProposalStatus = Database['public']['Enums']['proposal_status'];
+type ProposalType = Database['public']['Enums']['proposal_type'];
+
 const statusLabels: Record<ProposalStatus, string> = {
-  negociacao: 'Em Negociação',
-  enviada: 'Enviada',
+  pendente: 'Pendente',
   aprovada: 'Aprovada',
-  reprovada: 'Reprovada',
-  vendida: 'Vendida',
+  recusada: 'Recusada',
+  cancelada: 'Cancelada',
 };
 
 const statusColors: Record<ProposalStatus, string> = {
-  negociacao: 'bg-warning/10 text-warning border border-warning/20',
-  enviada: 'bg-info/10 text-info border border-info/20',
+  pendente: 'bg-warning/10 text-warning border border-warning/20',
   aprovada: 'bg-success/10 text-success border border-success/20',
-  reprovada: 'bg-destructive/10 text-destructive border border-destructive/20',
-  vendida: 'bg-primary/10 text-primary border border-primary/20',
+  recusada: 'bg-destructive/10 text-destructive border border-destructive/20',
+  cancelada: 'bg-muted text-muted-foreground',
 };
 
 const typeLabels: Record<ProposalType, string> = {
-  bancario: 'Financiamento Bancário',
-  direto: 'Financiamento Direto',
-  avista: 'À Vista',
+  financiamento_bancario: 'Financiamento Bancário',
+  financiamento_direto: 'Financiamento Direto',
+  a_vista: 'À Vista',
 };
 
 const typeColors: Record<ProposalType, string> = {
-  bancario: '#3B82F6', // blue
-  direto: '#FFD700', // yellow (Autos da Serra)
-  avista: '#22C55E', // green
+  financiamento_bancario: '#3B82F6',
+  financiamento_direto: '#FFD700',
+  a_vista: '#22C55E',
 };
 
 export default function ProposalsPage() {
   const { user, isAdmin } = useAuth();
   const { toast } = useToast();
   
-  const [proposals, setProposals] = useState<Proposal[]>(() => {
-    const all = proposalStorage.getAll();
-    return isAdmin ? all : all.filter(p => p.vendorId === user?.id);
-  });
+  const { data: proposals = [], isLoading: loadingProposals } = useProposals();
+  const { data: vehicles = [], isLoading: loadingVehicles } = useVehicles();
+  const { data: clients = [], isLoading: loadingClients } = useClients();
+  const { data: banks = [], isLoading: loadingBanks } = useBanks();
+  
+  const createProposal = useCreateProposal();
+  const updateProposal = useUpdateProposal();
+  const deleteProposal = useDeleteProposal();
+
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isSignatureOpen, setIsSignatureOpen] = useState(false);
-  const [signingProposal, setSigningProposal] = useState<Proposal | null>(null);
+  const [signingProposal, setSigningProposal] = useState<typeof proposals[0] | null>(null);
   const [signatureType, setSignatureType] = useState<'client' | 'vendor'>('client');
-  const [proposalType, setProposalType] = useState<ProposalType>('bancario');
+  const [proposalType, setProposalType] = useState<ProposalType>('financiamento_bancario');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const vehicles = vehicleStorage.getAll();
-  const clients = clientStorage.getAll().filter(c => isAdmin || c.vendorId === user?.id);
-  const banks = bankStorage.getActive();
-  
-  // Separate external banks
-  const externalBanks = banks.filter(b => !b.slug?.includes('proprio') && !b.name.toLowerCase().includes('próprio'));
+  const activeBanks = banks.filter(b => b.is_active && !b.slug?.includes('proprio'));
 
   const [form, setForm] = useState({
     clientId: '',
@@ -93,131 +100,168 @@ export default function ProposalsPage() {
     notes: '',
   });
 
+  const isLoading = loadingProposals || loadingVehicles || loadingClients || loadingBanks;
+
   const filteredProposals = proposals.filter(p => {
-    const client = clientStorage.getById(p.clientId);
-    const vehicle = vehicleStorage.getById(p.vehicleId);
-    const searchStr = `${client?.name} ${vehicle?.brand} ${vehicle?.model} ${p.number}`.toLowerCase();
+    const client = clients.find(c => c.id === p.client_id);
+    const vehicle = vehicles.find(v => v.id === p.vehicle_id);
+    const searchStr = `${client?.name || ''} ${vehicle?.brand || ''} ${vehicle?.model || ''} ${p.proposal_number}`.toLowerCase();
     const matchesSearch = searchStr.includes(search.toLowerCase());
     const matchesStatus = statusFilter === 'all' || p.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
 
-  // Calculate installment for direct financing (no interest)
   const calculateDirectInstallment = () => {
     const financedAmount = form.vehiclePrice - form.downPayment;
     if (financedAmount <= 0 || form.installments <= 0) return 0;
     return financedAmount / form.installments;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsSubmitting(true);
     
-    const selectedBank = proposalType === 'bancario' ? externalBanks.find(b => b.id === form.bankId) : null;
-    const financedAmount = proposalType === 'avista' ? 0 : form.vehiclePrice - form.downPayment;
-    
-    // Calculate based on type
-    let installmentValue = 0;
-    let totalValue = 0;
-    let installments = form.installments;
-    
-    if (proposalType === 'avista') {
-      installmentValue = 0;
-      totalValue = form.cashPrice || form.vehiclePrice;
-      installments = 1;
-    } else if (proposalType === 'direto') {
-      installmentValue = calculateDirectInstallment();
-      totalValue = installmentValue * form.installments;
-    } else {
-      installmentValue = form.installmentValue;
-      totalValue = installmentValue * form.installments;
+    try {
+      const financedAmount = proposalType === 'a_vista' ? 0 : form.vehiclePrice - form.downPayment;
+      
+      let installmentValue = 0;
+      let totalValue = 0;
+      let installments = form.installments;
+      
+      if (proposalType === 'a_vista') {
+        installmentValue = 0;
+        totalValue = form.cashPrice || form.vehiclePrice;
+        installments = 1;
+      } else if (proposalType === 'financiamento_direto') {
+        installmentValue = calculateDirectInstallment();
+        totalValue = installmentValue * form.installments;
+      } else {
+        installmentValue = form.installmentValue;
+        totalValue = installmentValue * form.installments;
+      }
+
+      await createProposal.mutateAsync({
+        client_id: form.clientId,
+        vehicle_id: form.vehicleId,
+        bank_id: proposalType === 'financiamento_bancario' ? form.bankId : null,
+        type: proposalType,
+        vehicle_price: form.vehiclePrice,
+        cash_price: proposalType === 'a_vista' ? (form.cashPrice || form.vehiclePrice) : null,
+        down_payment: proposalType === 'a_vista' ? 0 : form.downPayment,
+        financed_amount: financedAmount,
+        installments,
+        installment_value: installmentValue,
+        total_amount: totalValue,
+        is_own_financing: proposalType === 'financiamento_direto',
+        notes: form.notes || null,
+      });
+
+      setIsDialogOpen(false);
+      resetForm();
+
+      toast({
+        title: 'Proposta criada',
+        description: 'Proposta foi criada com sucesso.',
+      });
+    } catch (error) {
+      toast({
+        title: 'Erro ao criar',
+        description: 'Ocorreu um erro ao criar a proposta.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSubmitting(false);
     }
-    
-    const now = getCurrentTimestamp();
-
-    const proposal: Proposal = {
-      id: generateId(),
-      number: generateNumber('PROP'),
-      clientId: form.clientId,
-      vehicleId: form.vehicleId,
-      vendorId: user!.id,
-      status: 'negociacao',
-      type: proposalType,
-      bank: proposalType === 'bancario' ? selectedBank?.name : undefined,
-      vehiclePrice: form.vehiclePrice,
-      cashPrice: proposalType === 'avista' ? (form.cashPrice || form.vehiclePrice) : undefined,
-      downPayment: proposalType === 'avista' ? 0 : form.downPayment,
-      financedAmount,
-      installments,
-      installmentValue,
-      totalValue,
-      isOwnFinancing: proposalType === 'direto',
-      notes: form.notes || undefined,
-      createdAt: now,
-      updatedAt: now,
-    };
-
-    proposalStorage.save(proposal);
-    const all = proposalStorage.getAll();
-    setProposals(isAdmin ? all : all.filter(p => p.vendorId === user?.id));
-    setIsDialogOpen(false);
-    resetForm();
-
-    toast({
-      title: 'Proposta criada',
-      description: `Proposta ${proposal.number} foi criada com sucesso.`,
-    });
   };
 
-  const handleStatusChange = (proposalId: string, newStatus: ProposalStatus) => {
-    const proposal = proposalStorage.getById(proposalId);
-    if (proposal) {
-      proposal.status = newStatus;
-      proposal.updatedAt = getCurrentTimestamp();
-      proposalStorage.save(proposal);
-      const all = proposalStorage.getAll();
-      setProposals(isAdmin ? all : all.filter(p => p.vendorId === user?.id));
+  const handleStatusChange = async (proposalId: string, newStatus: ProposalStatus) => {
+    try {
+      await updateProposal.mutateAsync({ id: proposalId, status: newStatus });
       toast({
         title: 'Status atualizado',
         description: `Proposta atualizada para ${statusLabels[newStatus]}.`,
       });
+    } catch (error) {
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível atualizar o status.',
+        variant: 'destructive',
+      });
     }
   };
 
-  const handleSignature = (signature: string) => {
+  const handleSignature = async (signature: string) => {
     if (signingProposal) {
-      const proposal = { ...signingProposal };
-      if (signatureType === 'client') {
-        proposal.clientSignature = signature;
-      } else {
-        proposal.vendorSignature = signature;
+      try {
+        const updateData = signatureType === 'client' 
+          ? { client_signature: signature }
+          : { vendor_signature: signature };
+        
+        await updateProposal.mutateAsync({ id: signingProposal.id, ...updateData });
+        setIsSignatureOpen(false);
+        setSigningProposal(null);
+        toast({
+          title: 'Assinatura salva',
+          description: `Assinatura do ${signatureType === 'client' ? 'cliente' : 'vendedor'} foi registrada.`,
+        });
+      } catch (error) {
+        toast({
+          title: 'Erro',
+          description: 'Não foi possível salvar a assinatura.',
+          variant: 'destructive',
+        });
       }
-      proposal.updatedAt = getCurrentTimestamp();
-      proposalStorage.save(proposal);
-      const all = proposalStorage.getAll();
-      setProposals(isAdmin ? all : all.filter(p => p.vendorId === user?.id));
-      setIsSignatureOpen(false);
-      setSigningProposal(null);
-      toast({
-        title: 'Assinatura salva',
-        description: `Assinatura do ${signatureType === 'client' ? 'cliente' : 'vendedor'} foi registrada.`,
-      });
     }
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (confirm('Tem certeza que deseja excluir esta proposta?')) {
-      proposalStorage.delete(id);
-      const all = proposalStorage.getAll();
-      setProposals(isAdmin ? all : all.filter(p => p.vendorId === user?.id));
-      toast({
-        title: 'Proposta excluída',
-        description: 'A proposta foi removida do sistema.',
-      });
+      try {
+        await deleteProposal.mutateAsync(id);
+        toast({
+          title: 'Proposta excluída',
+          description: 'A proposta foi removida do sistema.',
+        });
+      } catch (error) {
+        toast({
+          title: 'Erro ao excluir',
+          description: 'Não foi possível excluir a proposta.',
+          variant: 'destructive',
+        });
+      }
     }
   };
 
-  const handleGeneratePDF = (proposal: Proposal) => {
-    generateProposalPDF(proposal);
+  const handleGeneratePDF = (proposal: typeof proposals[0]) => {
+    const client = clients.find(c => c.id === proposal.client_id);
+    const vehicle = vehicles.find(v => v.id === proposal.vehicle_id);
+    
+    // Convert to legacy format for PDF generator
+    const legacyProposal = {
+      id: proposal.id,
+      number: proposal.proposal_number,
+      clientId: proposal.client_id || '',
+      vehicleId: proposal.vehicle_id || '',
+      vendorId: proposal.seller_id || '',
+      status: proposal.status as any,
+      type: proposal.type as any,
+      bank: banks.find(b => b.id === proposal.bank_id)?.name,
+      vehiclePrice: Number(proposal.vehicle_price),
+      cashPrice: proposal.cash_price ? Number(proposal.cash_price) : undefined,
+      downPayment: Number(proposal.down_payment) || 0,
+      financedAmount: Number(proposal.financed_amount) || 0,
+      installments: proposal.installments || 1,
+      installmentValue: Number(proposal.installment_value) || 0,
+      totalValue: Number(proposal.total_amount),
+      isOwnFinancing: proposal.is_own_financing || false,
+      notes: proposal.notes || undefined,
+      clientSignature: proposal.client_signature || undefined,
+      vendorSignature: proposal.vendor_signature || undefined,
+      createdAt: proposal.created_at,
+      updatedAt: proposal.updated_at,
+    };
+    
+    generateProposalPDF(legacyProposal as any);
     toast({
       title: 'PDF gerado',
       description: 'A proposta foi baixada com sucesso.',
@@ -236,22 +280,36 @@ export default function ProposalsPage() {
       installmentValue: 0,
       notes: '',
     });
-    setProposalType('bancario');
+    setProposalType('financiamento_bancario');
   };
 
-  // Get type color for table row
-  const getTypeColorStyle = (proposal: Proposal) => {
-    const type = proposal.type || (proposal.isOwnFinancing ? 'direto' : 'bancario');
-    return { borderLeft: `4px solid ${typeColors[type]}` };
+  const getTypeColorStyle = (proposal: typeof proposals[0]) => {
+    return { borderLeft: `4px solid ${typeColors[proposal.type]}` };
   };
 
-  // Get proposal type from legacy data
-  const getProposalType = (proposal: Proposal): ProposalType => {
-    if (proposal.type) return proposal.type;
-    if (proposal.isOwnFinancing) return 'direto';
-    if (proposal.cashPrice && !proposal.bank) return 'avista';
-    return 'bancario';
-  };
+  if (isLoading) {
+    return (
+      <div className="space-y-6 animate-fade-in">
+        <div className="flex items-center justify-between">
+          <div>
+            <Skeleton className="h-8 w-32" />
+            <Skeleton className="h-4 w-48 mt-2" />
+          </div>
+          <Skeleton className="h-10 w-32" />
+        </div>
+        <Skeleton className="h-10 w-full max-w-md" />
+        <Card>
+          <CardContent className="p-0">
+            <div className="space-y-4 p-4">
+              {[1, 2, 3, 4, 5].map(i => (
+                <Skeleton key={i} className="h-16 w-full" />
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -295,8 +353,8 @@ export default function ProposalsPage() {
                       setForm({ 
                         ...form, 
                         vehicleId: v,
-                        vehiclePrice: vehicle?.price || 0,
-                        cashPrice: vehicle?.price || 0
+                        vehiclePrice: Number(vehicle?.price) || 0,
+                        cashPrice: Number(vehicle?.price) || 0
                       });
                     }}
                   >
@@ -306,7 +364,7 @@ export default function ProposalsPage() {
                     <SelectContent>
                       {vehicles.map(v => (
                         <SelectItem key={v.id} value={v.id}>
-                          {v.brand} {v.model} - {formatCurrency(v.price)}
+                          {v.brand} {v.model} - {formatCurrency(Number(v.price))}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -314,51 +372,45 @@ export default function ProposalsPage() {
                 </div>
               </div>
 
-              {/* Proposal Type Tabs - 3 options */}
+              {/* Proposal Type Tabs */}
               <Tabs value={proposalType} onValueChange={(v) => setProposalType(v as ProposalType)}>
                 <TabsList className="grid w-full grid-cols-3">
-                  <TabsTrigger value="bancario" className="flex items-center gap-2">
+                  <TabsTrigger value="financiamento_bancario" className="flex items-center gap-2">
                     <Building2 className="h-4 w-4" />
                     <span className="hidden sm:inline">Fin.</span> Bancário
                   </TabsTrigger>
-                  <TabsTrigger value="direto" className="flex items-center gap-2">
+                  <TabsTrigger value="financiamento_direto" className="flex items-center gap-2">
                     <Home className="h-4 w-4" />
                     <span className="hidden sm:inline">Fin.</span> Direto
                   </TabsTrigger>
-                  <TabsTrigger value="avista" className="flex items-center gap-2">
+                  <TabsTrigger value="a_vista" className="flex items-center gap-2">
                     <Banknote className="h-4 w-4" />
                     À Vista
                   </TabsTrigger>
                 </TabsList>
                 
                 {/* Financiamento Bancário */}
-                <TabsContent value="bancario" className="space-y-4 pt-4">
+                <TabsContent value="financiamento_bancario" className="space-y-4 pt-4">
                   <div className="space-y-2">
-                    <Label className="flex items-center gap-2">
-                      <Building2 className="h-4 w-4" />
-                      Banco
-                    </Label>
+                    <Label>Banco</Label>
                     <Select value={form.bankId} onValueChange={(v) => setForm({ ...form, bankId: v })}>
                       <SelectTrigger>
                         <SelectValue placeholder="Selecione o banco" />
                       </SelectTrigger>
                       <SelectContent>
-                        {externalBanks.map(b => {
-                          const config = getBankConfigByName(b.name);
-                          return (
-                            <SelectItem key={b.id} value={b.id}>
-                              <div className="flex items-center gap-2">
-                                {config && (
-                                  <div 
-                                    className="w-3 h-3 rounded-full" 
-                                    style={{ backgroundColor: config.colorHex }}
-                                  />
-                                )}
-                                {b.name}
-                              </div>
-                            </SelectItem>
-                          );
-                        })}
+                        {activeBanks.map(b => (
+                          <SelectItem key={b.id} value={b.id}>
+                            <div className="flex items-center gap-2">
+                              {b.color_hex && (
+                                <div 
+                                  className="w-3 h-3 rounded-full" 
+                                  style={{ backgroundColor: b.color_hex }}
+                                />
+                              )}
+                              {b.name}
+                            </div>
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
@@ -391,7 +443,6 @@ export default function ProposalsPage() {
                         onChange={(e) => setForm({ ...form, installments: Math.max(1, parseInt(e.target.value) || 1) })}
                         min={1}
                         max={120}
-                        placeholder="Número de parcelas"
                       />
                     </div>
                     <div className="space-y-2">
@@ -406,7 +457,7 @@ export default function ProposalsPage() {
                 </TabsContent>
                 
                 {/* Financiamento Direto */}
-                <TabsContent value="direto" className="space-y-4 pt-4">
+                <TabsContent value="financiamento_direto" className="space-y-4 pt-4">
                   <div className="bg-primary/5 border border-primary/20 rounded-lg p-4">
                     <div className="flex items-center gap-2 text-primary mb-2">
                       <Home className="h-5 w-5" />
@@ -444,14 +495,13 @@ export default function ProposalsPage() {
                       onChange={(e) => setForm({ ...form, installments: Math.max(1, parseInt(e.target.value) || 1) })}
                       min={1}
                       max={120}
-                      placeholder="Digite o número de parcelas"
                     />
                   </div>
                   
-                  {form.vehiclePrice > 0 && form.downPayment >= 0 && (
-                    <div className="bg-muted/50 rounded-lg p-3">
-                      <p className="text-sm text-muted-foreground">Valor da parcela:</p>
-                      <p className="text-xl font-bold text-primary">
+                  {form.vehiclePrice > 0 && form.downPayment < form.vehiclePrice && (
+                    <div className="bg-success/10 border border-success/20 rounded-lg p-4">
+                      <p className="text-sm text-muted-foreground">Valor da Parcela:</p>
+                      <p className="text-2xl font-bold text-success">
                         {formatCurrency(calculateDirectInstallment())}
                       </p>
                     </div>
@@ -459,34 +509,25 @@ export default function ProposalsPage() {
                 </TabsContent>
                 
                 {/* À Vista */}
-                <TabsContent value="avista" className="space-y-4 pt-4">
+                <TabsContent value="a_vista" className="space-y-4 pt-4">
                   <div className="bg-success/5 border border-success/20 rounded-lg p-4">
                     <div className="flex items-center gap-2 text-success mb-2">
                       <Banknote className="h-5 w-5" />
-                      <span className="font-semibold">Pagamento à Vista</span>
+                      <span className="font-semibold">Pagamento À Vista</span>
                     </div>
                     <p className="text-sm text-muted-foreground">
-                      Venda com pagamento integral no ato da compra, sem financiamento.
+                      Valor total pago no ato da compra.
                     </p>
                   </div>
                   
                   <div className="space-y-2">
-                    <Label>Valor à Vista</Label>
+                    <Label>Valor À Vista</Label>
                     <Input
                       type="number"
                       value={form.cashPrice || form.vehiclePrice}
                       onChange={(e) => setForm({ ...form, cashPrice: parseFloat(e.target.value) || 0 })}
                     />
                   </div>
-                  
-                  {form.cashPrice > 0 && (
-                    <div className="bg-success/10 rounded-lg p-4 text-center">
-                      <p className="text-sm text-muted-foreground mb-1">Valor Total</p>
-                      <p className="text-2xl font-bold text-success">
-                        {formatCurrency(form.cashPrice)}
-                      </p>
-                    </div>
-                  )}
                 </TabsContent>
               </Tabs>
 
@@ -495,6 +536,7 @@ export default function ProposalsPage() {
                 <Textarea
                   value={form.notes}
                   onChange={(e) => setForm({ ...form, notes: e.target.value })}
+                  placeholder="Observações adicionais..."
                   rows={3}
                 />
               </div>
@@ -503,7 +545,8 @@ export default function ProposalsPage() {
                 <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
                   Cancelar
                 </Button>
-                <Button type="submit" className="btn-primary">
+                <Button type="submit" className="btn-primary" disabled={isSubmitting}>
+                  {isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                   Criar Proposta
                 </Button>
               </div>
@@ -528,8 +571,8 @@ export default function ProposalsPage() {
       </Dialog>
 
       {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-4">
-        <div className="relative flex-1">
+      <div className="flex gap-4 flex-wrap">
+        <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Buscar por cliente, veículo ou número..."
@@ -539,12 +582,12 @@ export default function ProposalsPage() {
           />
         </div>
         <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-full sm:w-48">
-            <SelectValue placeholder="Filtrar por status" />
+          <SelectTrigger className="w-40">
+            <SelectValue placeholder="Status" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Todos os status</SelectItem>
-            {(Object.keys(statusLabels) as ProposalStatus[]).map((s) => (
+            <SelectItem value="all">Todos</SelectItem>
+            {(Object.keys(statusLabels) as ProposalStatus[]).map(s => (
               <SelectItem key={s} value={s}>{statusLabels[s]}</SelectItem>
             ))}
           </SelectContent>
@@ -561,7 +604,6 @@ export default function ProposalsPage() {
                   <TableHead>Número</TableHead>
                   <TableHead>Cliente</TableHead>
                   <TableHead>Veículo</TableHead>
-                  <TableHead>Tipo</TableHead>
                   <TableHead>Valor</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Assinaturas</TableHead>
@@ -570,68 +612,28 @@ export default function ProposalsPage() {
               </TableHeader>
               <TableBody>
                 {filteredProposals.map((proposal) => {
-                  const client = clientStorage.getById(proposal.clientId);
-                  const vehicle = vehicleStorage.getById(proposal.vehicleId);
-                  const type = getProposalType(proposal);
+                  const client = clients.find(c => c.id === proposal.client_id);
+                  const vehicle = vehicles.find(v => v.id === proposal.vehicle_id);
                   
                   return (
-                    <TableRow 
-                      key={proposal.id} 
-                      className="table-row-hover"
-                      style={getTypeColorStyle(proposal)}
-                    >
-                      <TableCell className="font-mono text-sm">{proposal.number}</TableCell>
+                    <TableRow key={proposal.id} className="table-row-hover" style={getTypeColorStyle(proposal)}>
+                      <TableCell className="font-mono text-sm">{proposal.proposal_number}</TableCell>
                       <TableCell>
-                        <div>
-                          <p className="font-medium">{client?.name || 'N/A'}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {client && formatCPF(client.cpf)}
-                          </p>
-                        </div>
+                        <p className="font-medium">{client?.name || '-'}</p>
                       </TableCell>
                       <TableCell>
-                        <div>
-                          <p className="font-medium">{vehicle?.brand} {vehicle?.model}</p>
-                          <p className="text-xs text-muted-foreground">{vehicle?.year}</p>
-                        </div>
+                        {vehicle ? `${vehicle.brand} ${vehicle.model}` : '-'}
+                      </TableCell>
+                      <TableCell className="font-semibold">
+                        {formatCurrency(Number(proposal.total_amount))}
                       </TableCell>
                       <TableCell>
-                        <div className="flex items-center gap-2">
-                          {type === 'bancario' && <Building2 className="h-4 w-4 text-blue-500" />}
-                          {type === 'direto' && <Home className="h-4 w-4 text-primary" />}
-                          {type === 'avista' && <Banknote className="h-4 w-4 text-success" />}
-                          <div>
-                            <p className="text-sm font-medium">{typeLabels[type]}</p>
-                            {type === 'bancario' && proposal.bank && (
-                              <p className="text-xs text-muted-foreground">{proposal.bank}</p>
-                            )}
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div>
-                          {type === 'avista' ? (
-                            <p className="font-semibold text-success">{formatCurrency(proposal.cashPrice || proposal.vehiclePrice)}</p>
-                          ) : (
-                            <>
-                              <p className="font-semibold">{formatCurrency(proposal.vehiclePrice)}</p>
-                              <p className="text-xs text-muted-foreground">
-                                {proposal.installments}x {formatCurrency(proposal.installmentValue)}
-                              </p>
-                            </>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Select
-                          value={proposal.status}
-                          onValueChange={(v) => handleStatusChange(proposal.id, v as ProposalStatus)}
-                        >
-                          <SelectTrigger className={cn('h-8 w-32', statusColors[proposal.status])}>
+                        <Select value={proposal.status} onValueChange={(v) => handleStatusChange(proposal.id, v as ProposalStatus)}>
+                          <SelectTrigger className={cn('h-8 text-xs w-28', statusColors[proposal.status])}>
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            {(Object.keys(statusLabels) as ProposalStatus[]).map((s) => (
+                            {(Object.keys(statusLabels) as ProposalStatus[]).map(s => (
                               <SelectItem key={s} value={s}>{statusLabels[s]}</SelectItem>
                             ))}
                           </SelectContent>
@@ -640,12 +642,9 @@ export default function ProposalsPage() {
                       <TableCell>
                         <div className="flex gap-1">
                           <Button
-                            variant={proposal.clientSignature ? "default" : "outline"}
+                            variant={proposal.client_signature ? "default" : "outline"}
                             size="sm"
-                            className={cn(
-                              "h-7 text-xs",
-                              proposal.clientSignature && "bg-success hover:bg-success/90"
-                            )}
+                            className={cn("h-7 text-xs", proposal.client_signature && "bg-success hover:bg-success/90")}
                             onClick={() => {
                               setSigningProposal(proposal);
                               setSignatureType('client');
@@ -656,12 +655,9 @@ export default function ProposalsPage() {
                             Cliente
                           </Button>
                           <Button
-                            variant={proposal.vendorSignature ? "default" : "outline"}
+                            variant={proposal.vendor_signature ? "default" : "outline"}
                             size="sm"
-                            className={cn(
-                              "h-7 text-xs",
-                              proposal.vendorSignature && "bg-success hover:bg-success/90"
-                            )}
+                            className={cn("h-7 text-xs", proposal.vendor_signature && "bg-success hover:bg-success/90")}
                             onClick={() => {
                               setSigningProposal(proposal);
                               setSignatureType('vendor');
@@ -706,9 +702,10 @@ export default function ProposalsPage() {
             <FileText className="h-12 w-12 text-muted-foreground/30 mx-auto mb-4" />
             <h3 className="text-lg font-medium mb-1">Nenhuma proposta encontrada</h3>
             <p className="text-muted-foreground">
-              {search || statusFilter !== 'all' 
-                ? 'Tente ajustar os filtros de busca' 
-                : 'Crie sua primeira proposta de venda'}
+              {search || statusFilter !== 'all'
+                ? 'Tente ajustar os filtros de busca'
+                : 'Crie sua primeira proposta clicando no botão acima'
+              }
             </p>
           </div>
         </Card>

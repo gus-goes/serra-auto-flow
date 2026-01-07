@@ -1,16 +1,15 @@
 import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { 
-  contractStorage, warrantyStorage, transferAuthStorage, 
-  withdrawalStorage, reservationStorage, clientStorage, 
-  vehicleStorage, generateId, generateNumber 
-} from '@/lib/storage';
+import { useContracts, useCreateContract, useDeleteContract } from '@/hooks/useContracts';
+import { useReservations, useCreateReservation, useDeleteReservation } from '@/hooks/useReservations';
+import { useWarranties, useTransferAuthorizations, useWithdrawalDeclarations, useCreateWarranty, useCreateTransferAuthorization, useCreateWithdrawalDeclaration } from '@/hooks/useDocuments';
+import { useClients } from '@/hooks/useClients';
+import { useVehicles, useUpdateVehicle } from '@/hooks/useVehicles';
 import { 
   generateContractPDF, generateWarrantyPDF, generateTransferAuthPDF,
   generateWithdrawalPDF, generateReservationPDF 
 } from '@/lib/documentPdfGenerator';
-import type { Contract, Warranty, TransferAuthorization, WithdrawalDeclaration, Reservation } from '@/types';
-import { formatDateDisplay, getCurrentDateString, getCurrentTimestamp } from '@/lib/dateUtils';
+import { formatDateDisplay, getCurrentDateString } from '@/lib/dateUtils';
 import { formatCurrency } from '@/lib/formatters';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
@@ -21,28 +20,19 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Card, CardContent } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 import { ContractPreviewDialog, type ContractData } from '@/components/ContractPreviewDialog';
 import { 
   FileText, Plus, Search, Download, Trash2, 
-  FileSignature, Shield, Car, XCircle, CalendarClock, Eye
+  FileSignature, Shield, Car, XCircle, CalendarClock, Eye, Loader2
 } from 'lucide-react';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from '@/components/ui/alert-dialog';
+import { cn } from '@/lib/utils';
 
 const statusColors = {
   ativa: 'bg-success/10 text-success border border-success/20',
   convertida: 'bg-primary/10 text-primary border border-primary/20',
   cancelada: 'bg-destructive/10 text-destructive border border-destructive/20',
-  expirada: 'bg-muted text-muted-foreground',
 };
 
 export default function DocumentsPage() {
@@ -51,23 +41,32 @@ export default function DocumentsPage() {
   const [search, setSearch] = useState('');
   const [activeTab, setActiveTab] = useState('contracts');
 
-  // Data states
-  const [contracts, setContracts] = useState<Contract[]>(contractStorage.getAll());
-  const [warranties, setWarranties] = useState<Warranty[]>(warrantyStorage.getAll());
-  const [transfers, setTransfers] = useState<TransferAuthorization[]>(transferAuthStorage.getAll());
-  const [withdrawals, setWithdrawals] = useState<WithdrawalDeclaration[]>(withdrawalStorage.getAll());
-  const [reservations, setReservations] = useState<Reservation[]>(reservationStorage.getAll());
+  // Data hooks
+  const { data: contracts = [], isLoading: loadingContracts } = useContracts();
+  const { data: reservations = [], isLoading: loadingReservations } = useReservations();
+  const { data: warranties = [], isLoading: loadingWarranties } = useWarranties();
+  const { data: transfers = [], isLoading: loadingTransfers } = useTransferAuthorizations();
+  const { data: withdrawals = [], isLoading: loadingWithdrawals } = useWithdrawalDeclarations();
+  const { data: clients = [], isLoading: loadingClients } = useClients();
+  const { data: vehicles = [], isLoading: loadingVehicles } = useVehicles();
 
-  const clients = clientStorage.getAll().filter(c => isAdmin || c.vendorId === user?.id);
-  const vehicles = vehicleStorage.getAll();
+  // Mutations
+  const createContract = useCreateContract();
+  const deleteContract = useDeleteContract();
+  const createReservation = useCreateReservation();
+  const deleteReservation = useDeleteReservation();
+  const createWarranty = useCreateWarranty();
+  const createTransfer = useCreateTransferAuthorization();
+  const createWithdrawal = useCreateWithdrawalDeclaration();
+  const updateVehicle = useUpdateVehicle();
 
-  // Dialog states
   const [isContractOpen, setIsContractOpen] = useState(false);
   const [isContractPreviewOpen, setIsContractPreviewOpen] = useState(false);
   const [isWarrantyOpen, setIsWarrantyOpen] = useState(false);
   const [isTransferOpen, setIsTransferOpen] = useState(false);
   const [isWithdrawalOpen, setIsWithdrawalOpen] = useState(false);
   const [isReservationOpen, setIsReservationOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Form states
   const [contractForm, setContractForm] = useState({
@@ -92,6 +91,8 @@ export default function DocumentsPage() {
     clientId: '', vehicleId: '', depositAmount: 0
   });
 
+  const isLoading = loadingContracts || loadingReservations || loadingWarranties || loadingTransfers || loadingWithdrawals || loadingClients || loadingVehicles;
+
   // Reset form functions
   const resetContractForm = () => setContractForm({ clientId: '', vehicleId: '', vehiclePrice: 0, paymentType: 'avista', downPayment: 0, installments: 12, installmentValue: 0 });
   const resetWarrantyForm = () => setWarrantyForm({ clientId: '', vehicleId: '', warrantyPeriod: '6 meses', warrantyCoverage: 'Motor e Câmbio', warrantyKm: 200000, conditions: '' });
@@ -99,186 +100,184 @@ export default function DocumentsPage() {
   const resetWithdrawalForm = () => setWithdrawalForm({ clientId: '', vehicleId: '', reason: 'motivos pessoais' });
   const resetReservationForm = () => setReservationForm({ clientId: '', vehicleId: '', depositAmount: 0 });
 
-  const refreshData = () => {
-    setContracts(contractStorage.getAll());
-    setWarranties(warrantyStorage.getAll());
-    setTransfers(transferAuthStorage.getAll());
-    setWithdrawals(withdrawalStorage.getAll());
-    setReservations(reservationStorage.getAll());
-  };
-
-  // Handler to open preview
   const handleOpenContractPreview = () => {
     if (!contractForm.clientId || !contractForm.vehicleId) {
       toast({ title: 'Campos obrigatórios', description: 'Selecione cliente e veículo.', variant: 'destructive' });
       return;
     }
-
-    // Avoid Radix Dialog focus-trap issues when opening a second dialog
     setIsContractOpen(false);
     window.setTimeout(() => setIsContractPreviewOpen(true), 0);
   };
 
-  // Handler for confirmed contract creation
-  const handleConfirmContract = (data: ContractData) => {
-    const contract: Contract = {
-      id: generateId(),
-      number: generateNumber('CONT'),
-      clientId: contractForm.clientId,
-      vehicleId: contractForm.vehicleId,
-      vendorId: user!.id,
-      vehiclePrice: data.vehiclePrice,
-      paymentType: data.paymentType,
-      downPayment: data.paymentType === 'parcelado' ? data.downPayment : undefined,
-      installments: data.paymentType === 'parcelado' ? data.installments : undefined,
-      installmentValue: data.paymentType === 'parcelado' ? data.installmentValue : undefined,
-      dueDay: data.paymentType === 'parcelado' ? data.dueDay : undefined,
-      firstDueDate: data.paymentType === 'parcelado' ? data.firstDueDate : undefined,
-      deliveryPercentage: data.paymentType === 'avista' ? data.deliveryPercentage : undefined,
-      clientData: {
-        name: data.clientName,
-        cpf: data.clientCpf,
-        rg: data.clientRg,
-        email: data.clientEmail,
-        maritalStatus: data.clientMaritalStatus,
-        occupation: data.clientOccupation,
-        address: data.clientAddress,
-      },
-      vehicleData: {
-        brand: data.vehicleBrand,
-        model: data.vehicleModel,
-        year: data.vehicleYear,
-        color: data.vehicleColor,
-        plate: data.vehiclePlate,
-        chassis: data.vehicleChassis,
-        renavam: data.vehicleRenavam,
-        fuel: data.vehicleFuel,
-        transmission: data.vehicleTransmission,
-        mileage: data.vehicleMileage,
-      },
-      createdAt: getCurrentTimestamp(),
-    };
-    contractStorage.save(contract);
-    refreshData();
-    setIsContractPreviewOpen(false);
-    resetContractForm();
-    generateContractPDF(contract);
-    toast({ title: 'Contrato criado', description: 'PDF gerado com sucesso.' });
+  const handleConfirmContract = async (data: ContractData) => {
+    setIsSubmitting(true);
+    try {
+      await createContract.mutateAsync({
+        client_id: contractForm.clientId,
+        vehicle_id: contractForm.vehicleId,
+        vehicle_price: data.vehiclePrice,
+        payment_type: data.paymentType,
+        down_payment: data.paymentType === 'parcelado' ? data.downPayment : null,
+        installments: data.paymentType === 'parcelado' ? data.installments : null,
+        installment_value: data.paymentType === 'parcelado' ? data.installmentValue : null,
+        due_day: data.paymentType === 'parcelado' ? data.dueDay : null,
+        first_due_date: data.paymentType === 'parcelado' ? data.firstDueDate : null,
+        delivery_percentage: data.paymentType === 'avista' ? data.deliveryPercentage : null,
+        client_data: {
+          name: data.clientName,
+          cpf: data.clientCpf,
+          rg: data.clientRg,
+          email: data.clientEmail,
+          maritalStatus: data.clientMaritalStatus,
+          occupation: data.clientOccupation,
+          address: data.clientAddress,
+        },
+        vehicle_data: {
+          brand: data.vehicleBrand,
+          model: data.vehicleModel,
+          year: data.vehicleYear,
+          color: data.vehicleColor,
+          plate: data.vehiclePlate,
+          chassis: data.vehicleChassis,
+          renavam: data.vehicleRenavam,
+          fuel: data.vehicleFuel,
+          transmission: data.vehicleTransmission,
+          mileage: data.vehicleMileage,
+        },
+      });
+
+      setIsContractPreviewOpen(false);
+      resetContractForm();
+      toast({ title: 'Contrato criado', description: 'Contrato salvo com sucesso.' });
+    } catch (error) {
+      toast({ title: 'Erro', description: 'Não foi possível criar o contrato.', variant: 'destructive' });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const handleCreateWarranty = () => {
+  const handleCreateWarranty = async () => {
     if (!warrantyForm.clientId || !warrantyForm.vehicleId) {
       toast({ title: 'Campos obrigatórios', description: 'Selecione cliente e veículo.', variant: 'destructive' });
       return;
     }
-    const warranty: Warranty = {
-      id: generateId(),
-      number: generateNumber('GAR'),
-      clientId: warrantyForm.clientId,
-      vehicleId: warrantyForm.vehicleId,
-      vendorId: user!.id,
-      warrantyPeriod: warrantyForm.warrantyPeriod,
-      warrantyCoverage: warrantyForm.warrantyCoverage,
-      warrantyKm: warrantyForm.warrantyKm,
-      conditions: warrantyForm.conditions,
-      createdAt: getCurrentTimestamp(),
-    };
-    warrantyStorage.save(warranty);
-    refreshData();
-    setIsWarrantyOpen(false);
-    resetWarrantyForm();
-    generateWarrantyPDF(warranty);
-    toast({ title: 'Garantia criada', description: 'PDF gerado com sucesso.' });
+    setIsSubmitting(true);
+    try {
+      await createWarranty.mutateAsync({
+        client_id: warrantyForm.clientId,
+        vehicle_id: warrantyForm.vehicleId,
+        warranty_period: warrantyForm.warrantyPeriod,
+        warranty_coverage: warrantyForm.warrantyCoverage,
+        warranty_km: warrantyForm.warrantyKm,
+        conditions: warrantyForm.conditions || null,
+      });
+      setIsWarrantyOpen(false);
+      resetWarrantyForm();
+      toast({ title: 'Garantia criada', description: 'Termo de garantia salvo.' });
+    } catch (error) {
+      toast({ title: 'Erro', description: 'Não foi possível criar a garantia.', variant: 'destructive' });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const handleCreateTransfer = () => {
+  const handleCreateTransfer = async () => {
     if (!transferForm.clientId || !transferForm.vehicleId) {
       toast({ title: 'Campos obrigatórios', description: 'Selecione cliente e veículo.', variant: 'destructive' });
       return;
     }
-    const transfer: TransferAuthorization = {
-      id: generateId(),
-      number: generateNumber('ATPV'),
-      clientId: transferForm.clientId,
-      vehicleId: transferForm.vehicleId,
-      vendorId: user!.id,
-      vehicleValue: transferForm.vehicleValue,
-      transferDate: getCurrentDateString(),
-      location: transferForm.location,
-      createdAt: getCurrentTimestamp(),
-    };
-    transferAuthStorage.save(transfer);
-    refreshData();
-    setIsTransferOpen(false);
-    resetTransferForm();
-    generateTransferAuthPDF(transfer);
-    toast({ title: 'ATPV criada', description: 'PDF gerado com sucesso.' });
+    setIsSubmitting(true);
+    try {
+      await createTransfer.mutateAsync({
+        client_id: transferForm.clientId,
+        vehicle_id: transferForm.vehicleId,
+        vehicle_value: transferForm.vehicleValue,
+        location: transferForm.location,
+        transfer_date: getCurrentDateString(),
+      });
+      setIsTransferOpen(false);
+      resetTransferForm();
+      toast({ title: 'ATPV criada', description: 'Autorização de transferência salva.' });
+    } catch (error) {
+      toast({ title: 'Erro', description: 'Não foi possível criar a ATPV.', variant: 'destructive' });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const handleCreateWithdrawal = () => {
+  const handleCreateWithdrawal = async () => {
     if (!withdrawalForm.clientId || !withdrawalForm.vehicleId) {
       toast({ title: 'Campos obrigatórios', description: 'Selecione cliente e veículo.', variant: 'destructive' });
       return;
     }
-    const withdrawal: WithdrawalDeclaration = {
-      id: generateId(),
-      number: generateNumber('DES'),
-      clientId: withdrawalForm.clientId,
-      vehicleId: withdrawalForm.vehicleId,
-      vendorId: user!.id,
-      reason: withdrawalForm.reason,
-      declarationDate: getCurrentDateString(),
-      createdAt: getCurrentTimestamp(),
-    };
-    withdrawalStorage.save(withdrawal);
-    refreshData();
-    setIsWithdrawalOpen(false);
-    resetWithdrawalForm();
-    generateWithdrawalPDF(withdrawal);
-    toast({ title: 'Desistência criada', description: 'PDF gerado com sucesso.' });
+    setIsSubmitting(true);
+    try {
+      await createWithdrawal.mutateAsync({
+        client_id: withdrawalForm.clientId,
+        vehicle_id: withdrawalForm.vehicleId,
+        reason: withdrawalForm.reason || null,
+        declaration_date: getCurrentDateString(),
+      });
+      setIsWithdrawalOpen(false);
+      resetWithdrawalForm();
+      toast({ title: 'Desistência criada', description: 'Declaração salva.' });
+    } catch (error) {
+      toast({ title: 'Erro', description: 'Não foi possível criar a desistência.', variant: 'destructive' });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const handleCreateReservation = () => {
+  const handleCreateReservation = async () => {
     if (!reservationForm.clientId || !reservationForm.vehicleId) {
       toast({ title: 'Campos obrigatórios', description: 'Selecione cliente e veículo.', variant: 'destructive' });
       return;
     }
-    const today = new Date();
-    const validUntil = new Date(today);
-    validUntil.setDate(validUntil.getDate() + 10);
-    
-    const reservation: Reservation = {
-      id: generateId(),
-      number: generateNumber('RES'),
-      clientId: reservationForm.clientId,
-      vehicleId: reservationForm.vehicleId,
-      vendorId: user!.id,
-      depositAmount: reservationForm.depositAmount,
-      reservationDate: getCurrentDateString(),
-      validUntil: validUntil.toISOString().split('T')[0],
-      status: 'ativa',
-      createdAt: getCurrentTimestamp(),
-    };
-    reservationStorage.save(reservation);
-    
-    // Atualizar status do veículo para reservado
-    const vehicle = vehicleStorage.getById(reservationForm.vehicleId);
-    if (vehicle) {
-      vehicleStorage.save({ ...vehicle, status: 'reservado', updatedAt: getCurrentTimestamp() });
+    setIsSubmitting(true);
+    try {
+      const today = new Date();
+      const validUntil = new Date(today);
+      validUntil.setDate(validUntil.getDate() + 10);
+
+      await createReservation.mutateAsync({
+        client_id: reservationForm.clientId,
+        vehicle_id: reservationForm.vehicleId,
+        deposit_amount: reservationForm.depositAmount,
+        reservation_date: getCurrentDateString(),
+        valid_until: validUntil.toISOString().split('T')[0],
+      });
+
+      // Update vehicle status
+      await updateVehicle.mutateAsync({ id: reservationForm.vehicleId, status: 'reservado' });
+
+      setIsReservationOpen(false);
+      resetReservationForm();
+      toast({ title: 'Reserva criada', description: 'Reserva e veículo atualizados.' });
+    } catch (error) {
+      toast({ title: 'Erro', description: 'Não foi possível criar a reserva.', variant: 'destructive' });
+    } finally {
+      setIsSubmitting(false);
     }
-    
-    refreshData();
-    setIsReservationOpen(false);
-    resetReservationForm();
-    generateReservationPDF(reservation);
-    toast({ title: 'Reserva criada', description: 'PDF gerado e veículo marcado como reservado.' });
   };
 
-  const getClientName = (id: string) => clientStorage.getById(id)?.name || '-';
-  const getVehicleInfo = (id: string) => {
-    const v = vehicleStorage.getById(id);
+  const getClientName = (id: string | null) => clients.find(c => c.id === id)?.name || '-';
+  const getVehicleInfo = (id: string | null) => {
+    const v = vehicles.find(veh => veh.id === id);
     return v ? `${v.brand} ${v.model}` : '-';
   };
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6 animate-fade-in">
+        <div>
+          <Skeleton className="h-8 w-48" />
+          <Skeleton className="h-4 w-64 mt-2" />
+        </div>
+        <Skeleton className="h-10 w-full" />
+        <Skeleton className="h-64 w-full" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -339,7 +338,7 @@ export default function DocumentsPage() {
                       <Label>Veículo</Label>
                       <Select value={contractForm.vehicleId} onValueChange={(v) => {
                         const veh = vehicles.find(x => x.id === v);
-                        setContractForm({...contractForm, vehicleId: v, vehiclePrice: veh?.price || 0});
+                        setContractForm({...contractForm, vehicleId: v, vehiclePrice: Number(veh?.price) || 0});
                       }}>
                         <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
                         <SelectContent>{vehicles.map(v => <SelectItem key={v.id} value={v.id}>{v.brand} {v.model}</SelectItem>)}</SelectContent>
@@ -384,7 +383,6 @@ export default function DocumentsPage() {
               </DialogContent>
             </Dialog>
             
-            {/* Contract Preview Dialog */}
             <ContractPreviewDialog
               open={isContractPreviewOpen}
               onOpenChange={setIsContractPreviewOpen}
@@ -398,72 +396,55 @@ export default function DocumentsPage() {
               onConfirm={handleConfirmContract}
             />
           </div>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Nº</TableHead>
-                <TableHead>Cliente</TableHead>
-                <TableHead>Veículo</TableHead>
-                <TableHead>Valor</TableHead>
-                <TableHead>Data</TableHead>
-                <TableHead className="w-20">Ações</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {contracts.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="h-24 text-center">
-                    <div className="flex flex-col items-center justify-center text-muted-foreground">
-                      <FileSignature className="h-8 w-8 mb-2 opacity-50" />
-                      <p>Nenhum contrato encontrado</p>
-                      <p className="text-sm">Crie seu primeiro contrato de venda</p>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ) : contracts.map(c => (
-                <TableRow key={c.id}>
-                  <TableCell className="font-mono text-sm">{c.number}</TableCell>
-                  <TableCell>{getClientName(c.clientId)}</TableCell>
-                  <TableCell>{getVehicleInfo(c.vehicleId)}</TableCell>
-                  <TableCell>{formatCurrency(c.vehiclePrice)}</TableCell>
-                  <TableCell>{formatDateDisplay(c.createdAt)}</TableCell>
-                  <TableCell>
-                    <div className="flex gap-1">
-                      <Button size="icon" variant="ghost" onClick={() => generateContractPDF(c)}><Download className="h-4 w-4" /></Button>
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button size="icon" variant="ghost" className="text-destructive hover:text-destructive">
+
+          <Card>
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Número</TableHead>
+                    <TableHead>Cliente</TableHead>
+                    <TableHead>Veículo</TableHead>
+                    <TableHead>Valor</TableHead>
+                    <TableHead>Data</TableHead>
+                    <TableHead className="w-24">Ações</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {contracts.length > 0 ? contracts.map((contract) => (
+                    <TableRow key={contract.id}>
+                      <TableCell className="font-mono text-sm">{contract.contract_number}</TableCell>
+                      <TableCell>{getClientName(contract.client_id)}</TableCell>
+                      <TableCell>{getVehicleInfo(contract.vehicle_id)}</TableCell>
+                      <TableCell>{formatCurrency(Number(contract.vehicle_price))}</TableCell>
+                      <TableCell>{formatDateDisplay(contract.contract_date)}</TableCell>
+                      <TableCell>
+                        <div className="flex gap-1">
+                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <Download className="h-4 w-4" />
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-8 w-8 text-destructive"
+                            onClick={() => deleteContract.mutate(contract.id)}
+                          >
                             <Trash2 className="h-4 w-4" />
                           </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Excluir contrato?</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              Esta ação não pode ser desfeita. O contrato será permanentemente removido.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                            <AlertDialogAction
-                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                              onClick={() => {
-                                contractStorage.delete(c.id);
-                                refreshData();
-                                toast({ title: 'Contrato excluído' });
-                              }}
-                            >
-                              Excluir
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )) : (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                        Nenhum contrato encontrado
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* WARRANTIES TAB */}
@@ -474,7 +455,7 @@ export default function DocumentsPage() {
                 <Button className="btn-primary"><Plus className="h-4 w-4 mr-2" />Nova Garantia</Button>
               </DialogTrigger>
               <DialogContent>
-                <DialogHeader><DialogTitle>Nova Garantia</DialogTitle></DialogHeader>
+                <DialogHeader><DialogTitle>Termo de Garantia</DialogTitle></DialogHeader>
                 <div className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
@@ -495,83 +476,65 @@ export default function DocumentsPage() {
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label>Período</Label>
-                      <Input value="6 meses" disabled className="bg-muted" />
+                      <Select value={warrantyForm.warrantyPeriod} onValueChange={(v) => setWarrantyForm({...warrantyForm, warrantyPeriod: v})}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="3 meses">3 meses</SelectItem>
+                          <SelectItem value="6 meses">6 meses</SelectItem>
+                          <SelectItem value="12 meses">12 meses</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
                     <div className="space-y-2">
                       <Label>KM Limite</Label>
-                      <Input value="200.000 km" disabled className="bg-muted" />
+                      <Input type="number" value={warrantyForm.warrantyKm} onChange={(e) => setWarrantyForm({...warrantyForm, warrantyKm: parseInt(e.target.value) || 0})} />
                     </div>
                   </div>
                   <div className="space-y-2">
                     <Label>Cobertura</Label>
-                    <Input value={warrantyForm.warrantyCoverage} onChange={(e) => setWarrantyForm({...warrantyForm, warrantyCoverage: e.target.value})} placeholder="Motor e Câmbio" />
+                    <Input value={warrantyForm.warrantyCoverage} onChange={(e) => setWarrantyForm({...warrantyForm, warrantyCoverage: e.target.value})} />
                   </div>
-                  <div className="space-y-2">
-                    <Label>Observações</Label>
-                    <Textarea value={warrantyForm.conditions} onChange={(e) => setWarrantyForm({...warrantyForm, conditions: e.target.value})} />
-                  </div>
-                  <Button onClick={handleCreateWarranty} className="w-full btn-primary">Gerar Garantia</Button>
+                  <Button onClick={handleCreateWarranty} className="w-full btn-primary" disabled={isSubmitting}>
+                    {isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                    Criar Garantia
+                  </Button>
                 </div>
               </DialogContent>
             </Dialog>
           </div>
-          <Table>
-            <TableHeader><TableRow><TableHead>Nº</TableHead><TableHead>Cliente</TableHead><TableHead>Veículo</TableHead><TableHead>Período</TableHead><TableHead>Cobertura</TableHead><TableHead className="w-20">Ações</TableHead></TableRow></TableHeader>
-            <TableBody>
-              {warranties.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="h-24 text-center">
-                    <div className="flex flex-col items-center justify-center text-muted-foreground">
-                      <Shield className="h-8 w-8 mb-2 opacity-50" />
-                      <p>Nenhuma garantia encontrada</p>
-                      <p className="text-sm">Crie sua primeira garantia</p>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ) : warranties.map(w => (
-                <TableRow key={w.id}>
-                  <TableCell className="font-mono text-sm">{w.number}</TableCell>
-                  <TableCell>{getClientName(w.clientId)}</TableCell>
-                  <TableCell>{getVehicleInfo(w.vehicleId)}</TableCell>
-                  <TableCell>{w.warrantyPeriod}</TableCell>
-                  <TableCell>{w.warrantyCoverage}</TableCell>
-                  <TableCell>
-                    <div className="flex gap-1">
-                      <Button size="icon" variant="ghost" onClick={() => generateWarrantyPDF(w)}><Download className="h-4 w-4" /></Button>
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button size="icon" variant="ghost" className="text-destructive hover:text-destructive">
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Excluir garantia?</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              Esta ação não pode ser desfeita. A garantia será permanentemente removida.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                            <AlertDialogAction
-                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                              onClick={() => {
-                                warrantyStorage.delete(w.id);
-                                refreshData();
-                                toast({ title: 'Garantia excluída' });
-                              }}
-                            >
-                              Excluir
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+
+          <Card>
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Número</TableHead>
+                    <TableHead>Cliente</TableHead>
+                    <TableHead>Veículo</TableHead>
+                    <TableHead>Período</TableHead>
+                    <TableHead>Data</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {warranties.length > 0 ? warranties.map((warranty) => (
+                    <TableRow key={warranty.id}>
+                      <TableCell className="font-mono text-sm">{warranty.warranty_number}</TableCell>
+                      <TableCell>{getClientName(warranty.client_id)}</TableCell>
+                      <TableCell>{getVehicleInfo(warranty.vehicle_id)}</TableCell>
+                      <TableCell>{warranty.warranty_period}</TableCell>
+                      <TableCell>{formatDateDisplay(warranty.created_at)}</TableCell>
+                    </TableRow>
+                  )) : (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                        Nenhuma garantia encontrada
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* TRANSFERS TAB */}
@@ -582,11 +545,11 @@ export default function DocumentsPage() {
                 <Button className="btn-primary"><Plus className="h-4 w-4 mr-2" />Nova ATPV</Button>
               </DialogTrigger>
               <DialogContent>
-                <DialogHeader><DialogTitle>Nova Autorização de Transferência</DialogTitle></DialogHeader>
+                <DialogHeader><DialogTitle>Autorização de Transferência</DialogTitle></DialogHeader>
                 <div className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label>Cliente (Comprador)</Label>
+                      <Label>Cliente</Label>
                       <Select value={transferForm.clientId} onValueChange={(v) => setTransferForm({...transferForm, clientId: v})}>
                         <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
                         <SelectContent>{clients.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
@@ -596,79 +559,64 @@ export default function DocumentsPage() {
                       <Label>Veículo</Label>
                       <Select value={transferForm.vehicleId} onValueChange={(v) => {
                         const veh = vehicles.find(x => x.id === v);
-                        setTransferForm({...transferForm, vehicleId: v, vehicleValue: veh?.price || 0});
+                        setTransferForm({...transferForm, vehicleId: v, vehicleValue: Number(veh?.price) || 0});
                       }}>
                         <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-                        <SelectContent>{vehicles.map(v => <SelectItem key={v.id} value={v.id}>{v.brand} {v.model} - {v.plate}</SelectItem>)}</SelectContent>
+                        <SelectContent>{vehicles.map(v => <SelectItem key={v.id} value={v.id}>{v.brand} {v.model}</SelectItem>)}</SelectContent>
                       </Select>
                     </div>
                   </div>
-                  <div className="space-y-2">
-                    <Label>Valor (R$)</Label>
-                    <Input type="number" value={transferForm.vehicleValue} onChange={(e) => setTransferForm({...transferForm, vehicleValue: parseFloat(e.target.value) || 0})} />
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Valor</Label>
+                      <Input type="number" value={transferForm.vehicleValue} onChange={(e) => setTransferForm({...transferForm, vehicleValue: parseFloat(e.target.value) || 0})} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Local</Label>
+                      <Input value={transferForm.location} onChange={(e) => setTransferForm({...transferForm, location: e.target.value})} />
+                    </div>
                   </div>
-                  <Button onClick={handleCreateTransfer} className="w-full btn-primary">Gerar ATPV</Button>
+                  <Button onClick={handleCreateTransfer} className="w-full btn-primary" disabled={isSubmitting}>
+                    {isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                    Criar ATPV
+                  </Button>
                 </div>
               </DialogContent>
             </Dialog>
           </div>
-          <Table>
-            <TableHeader><TableRow><TableHead>Nº</TableHead><TableHead>Comprador</TableHead><TableHead>Veículo</TableHead><TableHead>Valor</TableHead><TableHead>Data</TableHead><TableHead className="w-20">Ações</TableHead></TableRow></TableHeader>
-            <TableBody>
-              {transfers.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="h-24 text-center">
-                    <div className="flex flex-col items-center justify-center text-muted-foreground">
-                      <Car className="h-8 w-8 mb-2 opacity-50" />
-                      <p>Nenhuma ATPV encontrada</p>
-                      <p className="text-sm">Crie sua primeira autorização de transferência</p>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ) : transfers.map(t => (
-                <TableRow key={t.id}>
-                  <TableCell className="font-mono text-sm">{t.number}</TableCell>
-                  <TableCell>{getClientName(t.clientId)}</TableCell>
-                  <TableCell>{getVehicleInfo(t.vehicleId)}</TableCell>
-                  <TableCell>{formatCurrency(t.vehicleValue)}</TableCell>
-                  <TableCell>{formatDateDisplay(t.transferDate)}</TableCell>
-                  <TableCell>
-                    <div className="flex gap-1">
-                      <Button size="icon" variant="ghost" onClick={() => generateTransferAuthPDF(t)}><Download className="h-4 w-4" /></Button>
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button size="icon" variant="ghost" className="text-destructive hover:text-destructive">
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Excluir ATPV?</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              Esta ação não pode ser desfeita. A autorização será permanentemente removida.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                            <AlertDialogAction
-                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                              onClick={() => {
-                                transferAuthStorage.delete(t.id);
-                                refreshData();
-                                toast({ title: 'ATPV excluída' });
-                              }}
-                            >
-                              Excluir
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+
+          <Card>
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Número</TableHead>
+                    <TableHead>Cliente</TableHead>
+                    <TableHead>Veículo</TableHead>
+                    <TableHead>Valor</TableHead>
+                    <TableHead>Data</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {transfers.length > 0 ? transfers.map((transfer) => (
+                    <TableRow key={transfer.id}>
+                      <TableCell className="font-mono text-sm">{transfer.authorization_number}</TableCell>
+                      <TableCell>{getClientName(transfer.client_id)}</TableCell>
+                      <TableCell>{getVehicleInfo(transfer.vehicle_id)}</TableCell>
+                      <TableCell>{formatCurrency(Number(transfer.vehicle_value))}</TableCell>
+                      <TableCell>{formatDateDisplay(transfer.transfer_date)}</TableCell>
+                    </TableRow>
+                  )) : (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                        Nenhuma ATPV encontrada
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* WITHDRAWALS TAB */}
@@ -679,7 +627,7 @@ export default function DocumentsPage() {
                 <Button className="btn-primary"><Plus className="h-4 w-4 mr-2" />Nova Desistência</Button>
               </DialogTrigger>
               <DialogContent>
-                <DialogHeader><DialogTitle>Nova Declaração de Desistência</DialogTitle></DialogHeader>
+                <DialogHeader><DialogTitle>Declaração de Desistência</DialogTitle></DialogHeader>
                 <div className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
@@ -699,69 +647,47 @@ export default function DocumentsPage() {
                   </div>
                   <div className="space-y-2">
                     <Label>Motivo</Label>
-                    <Textarea value={withdrawalForm.reason} onChange={(e) => setWithdrawalForm({...withdrawalForm, reason: e.target.value})} placeholder="motivos pessoais" />
+                    <Textarea value={withdrawalForm.reason} onChange={(e) => setWithdrawalForm({...withdrawalForm, reason: e.target.value})} rows={3} />
                   </div>
-                  <Button onClick={handleCreateWithdrawal} className="w-full btn-primary">Gerar Declaração</Button>
+                  <Button onClick={handleCreateWithdrawal} className="w-full btn-primary" disabled={isSubmitting}>
+                    {isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                    Criar Desistência
+                  </Button>
                 </div>
               </DialogContent>
             </Dialog>
           </div>
-          <Table>
-            <TableHeader><TableRow><TableHead>Nº</TableHead><TableHead>Cliente</TableHead><TableHead>Veículo</TableHead><TableHead>Data</TableHead><TableHead className="w-20">Ações</TableHead></TableRow></TableHeader>
-            <TableBody>
-              {withdrawals.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={5} className="h-24 text-center">
-                    <div className="flex flex-col items-center justify-center text-muted-foreground">
-                      <XCircle className="h-8 w-8 mb-2 opacity-50" />
-                      <p>Nenhuma desistência encontrada</p>
-                      <p className="text-sm">Crie sua primeira declaração de desistência</p>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ) : withdrawals.map(w => (
-                <TableRow key={w.id}>
-                  <TableCell className="font-mono text-sm">{w.number}</TableCell>
-                  <TableCell>{getClientName(w.clientId)}</TableCell>
-                  <TableCell>{getVehicleInfo(w.vehicleId)}</TableCell>
-                  <TableCell>{formatDateDisplay(w.declarationDate)}</TableCell>
-                  <TableCell>
-                    <div className="flex gap-1">
-                      <Button size="icon" variant="ghost" onClick={() => generateWithdrawalPDF(w)}><Download className="h-4 w-4" /></Button>
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button size="icon" variant="ghost" className="text-destructive hover:text-destructive">
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Excluir desistência?</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              Esta ação não pode ser desfeita. A declaração será permanentemente removida.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                            <AlertDialogAction
-                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                              onClick={() => {
-                                withdrawalStorage.delete(w.id);
-                                refreshData();
-                                toast({ title: 'Desistência excluída' });
-                              }}
-                            >
-                              Excluir
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+
+          <Card>
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Número</TableHead>
+                    <TableHead>Cliente</TableHead>
+                    <TableHead>Veículo</TableHead>
+                    <TableHead>Data</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {withdrawals.length > 0 ? withdrawals.map((withdrawal) => (
+                    <TableRow key={withdrawal.id}>
+                      <TableCell className="font-mono text-sm">{withdrawal.declaration_number}</TableCell>
+                      <TableCell>{getClientName(withdrawal.client_id)}</TableCell>
+                      <TableCell>{getVehicleInfo(withdrawal.vehicle_id)}</TableCell>
+                      <TableCell>{formatDateDisplay(withdrawal.declaration_date)}</TableCell>
+                    </TableRow>
+                  )) : (
+                    <TableRow>
+                      <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+                        Nenhuma desistência encontrada
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* RESERVATIONS TAB */}
@@ -772,7 +698,7 @@ export default function DocumentsPage() {
                 <Button className="btn-primary"><Plus className="h-4 w-4 mr-2" />Nova Reserva</Button>
               </DialogTrigger>
               <DialogContent>
-                <DialogHeader><DialogTitle>Nova Reserva de Veículo</DialogTitle></DialogHeader>
+                <DialogHeader><DialogTitle>Nova Reserva</DialogTitle></DialogHeader>
                 <div className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
@@ -786,7 +712,11 @@ export default function DocumentsPage() {
                       <Label>Veículo</Label>
                       <Select value={reservationForm.vehicleId} onValueChange={(v) => setReservationForm({...reservationForm, vehicleId: v})}>
                         <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-                        <SelectContent>{vehicles.filter(v => v.status === 'disponivel').map(v => <SelectItem key={v.id} value={v.id}>{v.brand} {v.model}</SelectItem>)}</SelectContent>
+                        <SelectContent>
+                          {vehicles.filter(v => v.status === 'disponivel').map(v => (
+                            <SelectItem key={v.id} value={v.id}>{v.brand} {v.model}</SelectItem>
+                          ))}
+                        </SelectContent>
                       </Select>
                     </div>
                   </div>
@@ -794,69 +724,53 @@ export default function DocumentsPage() {
                     <Label>Valor do Sinal (R$)</Label>
                     <Input type="number" value={reservationForm.depositAmount} onChange={(e) => setReservationForm({...reservationForm, depositAmount: parseFloat(e.target.value) || 0})} />
                   </div>
-                  <Button onClick={handleCreateReservation} className="w-full btn-primary">Gerar Reserva</Button>
+                  <Button onClick={handleCreateReservation} className="w-full btn-primary" disabled={isSubmitting}>
+                    {isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                    Criar Reserva
+                  </Button>
                 </div>
               </DialogContent>
             </Dialog>
           </div>
-          <Table>
-            <TableHeader><TableRow><TableHead>Nº</TableHead><TableHead>Cliente</TableHead><TableHead>Veículo</TableHead><TableHead>Sinal</TableHead><TableHead>Validade</TableHead><TableHead>Status</TableHead><TableHead className="w-20">Ações</TableHead></TableRow></TableHeader>
-            <TableBody>
-              {reservations.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={7} className="h-24 text-center">
-                    <div className="flex flex-col items-center justify-center text-muted-foreground">
-                      <CalendarClock className="h-8 w-8 mb-2 opacity-50" />
-                      <p>Nenhuma reserva encontrada</p>
-                      <p className="text-sm">Crie sua primeira reserva de veículo</p>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ) : reservations.map(r => (
-                <TableRow key={r.id}>
-                  <TableCell className="font-mono text-sm">{r.number}</TableCell>
-                  <TableCell>{getClientName(r.clientId)}</TableCell>
-                  <TableCell>{getVehicleInfo(r.vehicleId)}</TableCell>
-                  <TableCell>{r.depositAmount ? formatCurrency(r.depositAmount) : '-'}</TableCell>
-                  <TableCell>{formatDateDisplay(r.validUntil)}</TableCell>
-                  <TableCell><span className={`px-2 py-1 rounded-full text-xs ${statusColors[r.status]}`}>{r.status}</span></TableCell>
-                  <TableCell>
-                    <div className="flex gap-1">
-                      <Button size="icon" variant="ghost" onClick={() => generateReservationPDF(r)}><Download className="h-4 w-4" /></Button>
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button size="icon" variant="ghost" className="text-destructive hover:text-destructive">
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Excluir reserva?</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              Esta ação não pode ser desfeita. A reserva será permanentemente removida.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                            <AlertDialogAction
-                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                              onClick={() => {
-                                reservationStorage.delete(r.id);
-                                refreshData();
-                                toast({ title: 'Reserva excluída' });
-                              }}
-                            >
-                              Excluir
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+
+          <Card>
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Número</TableHead>
+                    <TableHead>Cliente</TableHead>
+                    <TableHead>Veículo</TableHead>
+                    <TableHead>Sinal</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Válido até</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {reservations.length > 0 ? reservations.map((reservation) => (
+                    <TableRow key={reservation.id}>
+                      <TableCell className="font-mono text-sm">{reservation.reservation_number}</TableCell>
+                      <TableCell>{getClientName(reservation.client_id)}</TableCell>
+                      <TableCell>{getVehicleInfo(reservation.vehicle_id)}</TableCell>
+                      <TableCell>{formatCurrency(Number(reservation.deposit_amount))}</TableCell>
+                      <TableCell>
+                        <span className={cn('px-2 py-1 rounded-full text-xs', statusColors[reservation.status])}>
+                          {reservation.status}
+                        </span>
+                      </TableCell>
+                      <TableCell>{reservation.valid_until ? formatDateDisplay(reservation.valid_until) : '-'}</TableCell>
+                    </TableRow>
+                  )) : (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                        Nenhuma reserva encontrada
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
     </div>

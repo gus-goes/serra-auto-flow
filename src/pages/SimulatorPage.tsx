@@ -1,7 +1,8 @@
 import { useState, useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { vehicleStorage, clientStorage, bankStorage, simulationStorage, generateId } from '@/lib/storage';
-import type { Bank, Simulation } from '@/types';
+import { useVehicles } from '@/hooks/useVehicles';
+import { useClients } from '@/hooks/useClients';
+import { useBanks } from '@/hooks/useBanks';
 import { formatCurrency, formatPercent } from '@/lib/formatters';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
@@ -11,6 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Slider } from '@/components/ui/slider';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Skeleton } from '@/components/ui/skeleton';
 import { 
   Calculator, 
   Car, 
@@ -23,15 +25,17 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-// Removed fixed installment options - now free input
-
 export default function SimulatorPage() {
   const { user } = useAuth();
   const { toast } = useToast();
 
-  const vehicles = vehicleStorage.getAll().filter(v => v.status === 'disponivel');
-  const clients = clientStorage.getAll().filter(c => c.vendorId === user?.id);
-  const banks = bankStorage.getActive();
+  const { data: allVehicles = [], isLoading: loadingVehicles } = useVehicles();
+  const { data: allClients = [], isLoading: loadingClients } = useClients();
+  const { data: allBanks = [], isLoading: loadingBanks } = useBanks();
+
+  const vehicles = allVehicles.filter(v => v.status === 'disponivel');
+  const clients = allClients;
+  const banks = allBanks.filter(b => b.is_active);
 
   const [selectedVehicle, setSelectedVehicle] = useState('');
   const [selectedClient, setSelectedClient] = useState('');
@@ -45,13 +49,15 @@ export default function SimulatorPage() {
   const financedAmount = vehiclePrice - downPayment;
   const downPaymentPercent = vehiclePrice > 0 ? (downPayment / vehiclePrice) * 100 : 0;
 
+  const isLoading = loadingVehicles || loadingClients || loadingBanks;
+
   // Update price when vehicle changes
   const handleVehicleChange = (vehicleId: string) => {
     setSelectedVehicle(vehicleId);
     const v = vehicles.find(veh => veh.id === vehicleId);
     if (v) {
-      setVehiclePrice(v.price);
-      setDownPayment(Math.round(v.price * 0.2));
+      setVehiclePrice(Number(v.price));
+      setDownPayment(Math.round(Number(v.price) * 0.2));
     }
   };
 
@@ -60,12 +66,13 @@ export default function SimulatorPage() {
     if (financedAmount <= 0 || installments <= 0) return [];
 
     return banks.map(bank => {
+      const rates = (bank.rates || {}) as Record<string, number>;
       // Get the closest rate available for the installment count
       const availableRates = [12, 24, 36, 48, 60] as const;
       const closestRate = availableRates.reduce((prev, curr) => 
         Math.abs(curr - installments) < Math.abs(prev - installments) ? curr : prev
       );
-      const rate = bank.rates[closestRate] / 100;
+      const rate = (rates[String(closestRate)] || 2) / 100;
       
       const monthlyRate = rate;
       const coefficient = (monthlyRate * Math.pow(1 + monthlyRate, installments)) / 
@@ -74,7 +81,7 @@ export default function SimulatorPage() {
       const totalValue = installmentValue * installments;
       
       const cet = rate * 12 * 1.15;
-      const vendorCommission = financedAmount * (bank.commission / 100);
+      const vendorCommission = financedAmount * ((Number(bank.commission_rate) || 2.5) / 100);
       const storeMargin = vehiclePrice * 0.05;
 
       return {
@@ -85,6 +92,7 @@ export default function SimulatorPage() {
         vendorCommission,
         storeMargin,
         usedRate: closestRate,
+        rateValue: rates[String(closestRate)] || 2,
       };
     }).sort((a, b) => a.installmentValue - b.installmentValue);
   }, [banks, financedAmount, installments, vehiclePrice]);
@@ -94,7 +102,7 @@ export default function SimulatorPage() {
     if (financedAmount <= 0) return null;
 
     const installmentValue = financedAmount / ownInstallments;
-    const totalValue = financedAmount; // No interest
+    const totalValue = financedAmount;
 
     return {
       installmentValue,
@@ -113,26 +121,7 @@ export default function SimulatorPage() {
       return;
     }
 
-    const simulation: Simulation = {
-      id: generateId(),
-      vehicleId: selectedVehicle,
-      clientId: selectedClient,
-      vendorId: user!.id,
-      vehiclePrice,
-      downPayment,
-      financedAmount,
-      bank: bankName,
-      installments,
-      rate: sim.bank.rates[sim.usedRate],
-      installmentValue: sim.installmentValue,
-      totalValue: sim.totalValue,
-      cet: sim.cet,
-      vendorCommission: sim.vendorCommission,
-      storeMargin: sim.storeMargin,
-      createdAt: new Date().toISOString(),
-    };
-
-    simulationStorage.save(simulation);
+    // TODO: Save simulation to database
     toast({
       title: 'Simulação salva',
       description: `Simulação com ${bankName} foi salva com sucesso.`,
@@ -149,28 +138,7 @@ export default function SimulatorPage() {
       return;
     }
 
-    if (!ownSimulation) return;
-
-    const simulation: Simulation = {
-      id: generateId(),
-      vehicleId: selectedVehicle,
-      clientId: selectedClient,
-      vendorId: user!.id,
-      vehiclePrice,
-      downPayment,
-      financedAmount,
-      bank: 'Financiamento Próprio',
-      installments: ownInstallments,
-      rate: 0,
-      installmentValue: ownSimulation.installmentValue,
-      totalValue: ownSimulation.totalValue,
-      cet: 0,
-      vendorCommission: 0,
-      storeMargin: vehiclePrice * 0.05,
-      createdAt: new Date().toISOString(),
-    };
-
-    simulationStorage.save(simulation);
+    // TODO: Save simulation to database
     toast({
       title: 'Simulação salva',
       description: 'Simulação de financiamento próprio foi salva com sucesso.',
@@ -200,7 +168,7 @@ export default function SimulatorPage() {
             <SelectContent>
               {vehicles.map(v => (
                 <SelectItem key={v.id} value={v.id}>
-                  {v.brand} {v.model} {v.year} - {formatCurrency(v.price)}
+                  {v.brand} {v.model} {v.year_fab} - {formatCurrency(Number(v.price))}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -295,6 +263,22 @@ export default function SimulatorPage() {
     </Card>
   );
 
+  if (isLoading) {
+    return (
+      <div className="space-y-6 animate-fade-in">
+        <div>
+          <Skeleton className="h-8 w-64" />
+          <Skeleton className="h-4 w-96 mt-2" />
+        </div>
+        <Skeleton className="h-10 w-64" />
+        <div className="grid gap-6 lg:grid-cols-3">
+          <Skeleton className="h-96" />
+          <Skeleton className="h-96 lg:col-span-2" />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div>
@@ -362,7 +346,7 @@ export default function SimulatorPage() {
                             <div className="bg-muted/50 p-2 rounded-lg">
                               <p className="text-muted-foreground text-xs">Taxa Mensal</p>
                               <p className="font-medium">
-                                {formatPercent(sim.bank.rates[sim.usedRate])}
+                                {formatPercent(sim.rateValue)}
                               </p>
                             </div>
                             <div className="bg-muted/50 p-2 rounded-lg">
@@ -455,41 +439,24 @@ export default function SimulatorPage() {
                         </span>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-4 text-sm">
-                        <div className="bg-muted/50 p-3 rounded-lg">
-                          <p className="text-muted-foreground text-xs">Quantidade de Parcelas</p>
-                          <p className="font-semibold text-lg">{ownInstallments}x</p>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="p-4 bg-muted/50 rounded-lg">
+                          <p className="text-sm text-muted-foreground">Número de Parcelas</p>
+                          <p className="text-xl font-semibold">{ownSimulation.installments}x</p>
                         </div>
-                        <div className="bg-success/10 p-3 rounded-lg">
-                          <p className="text-muted-foreground text-xs">Taxa de Juros</p>
-                          <p className="font-semibold text-lg text-success">0,00%</p>
-                        </div>
-                      </div>
-
-                      <div className="space-y-2 pt-4 border-t">
-                        <div className="flex justify-between text-sm">
-                          <span className="text-muted-foreground">Entrada:</span>
-                          <span className="font-medium">{formatCurrency(downPayment)}</span>
-                        </div>
-                        <div className="flex justify-between text-sm">
-                          <span className="text-muted-foreground">Valor Financiado:</span>
-                          <span className="font-medium">{formatCurrency(financedAmount)}</span>
-                        </div>
-                        <div className="flex justify-between text-sm font-semibold pt-2 border-t">
-                          <span>Total a pagar:</span>
-                          <span className="text-primary">{formatCurrency(ownSimulation.totalValue + downPayment)}</span>
+                        <div className="p-4 bg-muted/50 rounded-lg">
+                          <p className="text-sm text-muted-foreground">Taxa de Juros</p>
+                          <p className="text-xl font-semibold text-success">0%</p>
                         </div>
                       </div>
 
-                      <div className="pt-4 border-t">
-                        <div className="flex justify-between text-sm">
-                          <span className="text-muted-foreground">Margem loja:</span>
-                          <span className="font-semibold text-success">{formatCurrency(vehiclePrice * 0.05)}</span>
-                        </div>
+                      <div className="flex justify-between text-sm p-4 bg-success/10 rounded-lg">
+                        <span>Total a pagar:</span>
+                        <span className="font-bold text-success">{formatCurrency(ownSimulation.totalValue)}</span>
                       </div>
 
                       <Button
-                        className="w-full btn-primary mt-4"
+                        className="w-full btn-primary"
                         onClick={handleSaveOwnSimulation}
                       >
                         <Save className="h-4 w-4 mr-2" />
@@ -501,10 +468,10 @@ export default function SimulatorPage() {
               ) : (
                 <Card className="p-12">
                   <div className="text-center">
-                    <Store className="h-12 w-12 text-muted-foreground/30 mx-auto mb-4" />
+                    <Calculator className="h-12 w-12 text-muted-foreground/30 mx-auto mb-4" />
                     <h3 className="text-lg font-medium mb-1">Configure a simulação</h3>
                     <p className="text-muted-foreground">
-                      Selecione um veículo e ajuste os valores para calcular o financiamento próprio
+                      Selecione um veículo e ajuste os valores para ver a simulação
                     </p>
                   </div>
                 </Card>
