@@ -355,61 +355,63 @@ export default function SettingsPage() {
                     />
                   </div>
 
-                  {/* Color and Logo */}
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label className="flex items-center gap-2">
-                        <Palette className="h-4 w-4" />
-                        Cor
-                      </Label>
-                      <div className="flex gap-2">
-                        <Input
-                          type="color"
-                          value={form.colorHex}
-                          onChange={(e) => setForm({ ...form, colorHex: e.target.value })}
-                          className="w-12 h-10 p-1 cursor-pointer"
-                        />
-                        <Input
-                          value={form.colorHex}
-                          onChange={(e) => setForm({ ...form, colorHex: e.target.value })}
-                          placeholder="#003A70"
-                          className="flex-1"
-                        />
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="flex items-center gap-2">
-                        <Image className="h-4 w-4" />
-                        Logo
-                      </Label>
-                      <div className="flex items-center gap-2">
-                        <input
-                          ref={logoInputRef}
-                          type="file"
-                          accept="image/*"
-                          onChange={handleLogoUpload}
-                          className="hidden"
-                        />
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => logoInputRef.current?.click()}
-                          className="flex-1"
-                        >
-                          <Upload className="h-4 w-4 mr-2" />
-                          Upload
-                        </Button>
-                        {(pendingLogo || editingBank?.logo_url) && (
-                          <img 
-                            src={pendingLogo ? URL.createObjectURL(pendingLogo) : editingBank?.logo_url || ''} 
-                            alt="Preview" 
-                            className="h-10 w-auto max-w-[60px] rounded border" 
+                  {/* Color and Logo - only for external banks */}
+                  {activeTab !== 'proprio' && !form.isOwn && (
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label className="flex items-center gap-2">
+                          <Palette className="h-4 w-4" />
+                          Cor
+                        </Label>
+                        <div className="flex gap-2">
+                          <Input
+                            type="color"
+                            value={form.colorHex}
+                            onChange={(e) => setForm({ ...form, colorHex: e.target.value })}
+                            className="w-12 h-10 p-1 cursor-pointer"
                           />
-                        )}
+                          <Input
+                            value={form.colorHex}
+                            onChange={(e) => setForm({ ...form, colorHex: e.target.value })}
+                            placeholder="#003A70"
+                            className="flex-1"
+                          />
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="flex items-center gap-2">
+                          <Image className="h-4 w-4" />
+                          Logo
+                        </Label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            ref={logoInputRef}
+                            type="file"
+                            accept="image/*"
+                            onChange={handleLogoUpload}
+                            className="hidden"
+                          />
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => logoInputRef.current?.click()}
+                            className="flex-1"
+                          >
+                            <Upload className="h-4 w-4 mr-2" />
+                            Upload
+                          </Button>
+                          {(pendingLogo || editingBank?.logo_url) && (
+                            <img 
+                              src={pendingLogo ? URL.createObjectURL(pendingLogo) : editingBank?.logo_url || ''} 
+                              alt="Preview" 
+                              className="h-10 w-auto max-w-[60px] rounded border" 
+                            />
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  )}
 
                   <div className="grid grid-cols-5 gap-2">
                     <div className="space-y-2">
