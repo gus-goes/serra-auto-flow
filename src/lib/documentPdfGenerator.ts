@@ -47,11 +47,15 @@ function drawDocumentHeader(doc: jsPDF, title: string): number {
   
   let y = 52;
   
-  // Document title
-  doc.setFillColor(...colors.secondary);
-  doc.rect(15, y, pageWidth - 30, 12, 'F');
+  // Document title - calculate width based on text
   doc.setFontSize(14);
   doc.setFont('helvetica', 'bold');
+  const titleWidth = doc.getTextWidth(title);
+  const rectWidth = Math.max(pageWidth - 30, titleWidth + 20);
+  const rectX = (pageWidth - rectWidth) / 2;
+  
+  doc.setFillColor(...colors.secondary);
+  doc.rect(rectX, y, rectWidth, 12, 'F');
   doc.setTextColor(30, 30, 30);
   doc.text(title, pageWidth / 2, y + 8.5, { align: 'center' });
   
@@ -248,7 +252,7 @@ export function generateContractPDF(contract: Contract): void {
     const firstDue = contract.firstDueDate ? formatDateDisplay(contract.firstDueDate) : null;
     
     if (contract.downPayment && contract.downPayment > 0) {
-      y = drawSubClause('2.2.', `Entrada no valor de ${formatCurrency(contract.downPayment)} (${entradaExtenso}), paga no ato da assinatura deste contrato.`);
+      y = drawSubClause('2.2.', `Entrada no valor de ${formatCurrency(contract.downPayment)} (${entradaExtenso}).`);
     }
     
     y = drawSubClause(

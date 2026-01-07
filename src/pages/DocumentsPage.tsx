@@ -407,7 +407,23 @@ export default function DocumentsPage() {
                   <TableCell>{formatCurrency(c.vehiclePrice)}</TableCell>
                   <TableCell>{formatDateDisplay(c.createdAt)}</TableCell>
                   <TableCell>
-                    <Button size="icon" variant="ghost" onClick={() => generateContractPDF(c)}><Download className="h-4 w-4" /></Button>
+                    <div className="flex gap-1">
+                      <Button size="icon" variant="ghost" onClick={() => generateContractPDF(c)}><Download className="h-4 w-4" /></Button>
+                      <Button 
+                        size="icon" 
+                        variant="ghost" 
+                        className="text-destructive hover:text-destructive"
+                        onClick={() => {
+                          if (confirm('Excluir este contrato?')) {
+                            contractStorage.delete(c.id);
+                            refreshData();
+                            toast({ title: 'Contrato excluído' });
+                          }
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
@@ -474,7 +490,25 @@ export default function DocumentsPage() {
                   <TableCell>{getVehicleInfo(w.vehicleId)}</TableCell>
                   <TableCell>{w.warrantyPeriod}</TableCell>
                   <TableCell>{w.warrantyCoverage}</TableCell>
-                  <TableCell><Button size="icon" variant="ghost" onClick={() => generateWarrantyPDF(w)}><Download className="h-4 w-4" /></Button></TableCell>
+                  <TableCell>
+                    <div className="flex gap-1">
+                      <Button size="icon" variant="ghost" onClick={() => generateWarrantyPDF(w)}><Download className="h-4 w-4" /></Button>
+                      <Button 
+                        size="icon" 
+                        variant="ghost" 
+                        className="text-destructive hover:text-destructive"
+                        onClick={() => {
+                          if (confirm('Excluir esta garantia?')) {
+                            warrantyStorage.delete(w.id);
+                            refreshData();
+                            toast({ title: 'Garantia excluída' });
+                          }
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -529,7 +563,25 @@ export default function DocumentsPage() {
                   <TableCell>{getVehicleInfo(t.vehicleId)}</TableCell>
                   <TableCell>{formatCurrency(t.vehicleValue)}</TableCell>
                   <TableCell>{formatDateDisplay(t.transferDate)}</TableCell>
-                  <TableCell><Button size="icon" variant="ghost" onClick={() => generateTransferAuthPDF(t)}><Download className="h-4 w-4" /></Button></TableCell>
+                  <TableCell>
+                    <div className="flex gap-1">
+                      <Button size="icon" variant="ghost" onClick={() => generateTransferAuthPDF(t)}><Download className="h-4 w-4" /></Button>
+                      <Button 
+                        size="icon" 
+                        variant="ghost" 
+                        className="text-destructive hover:text-destructive"
+                        onClick={() => {
+                          if (confirm('Excluir esta ATPV?')) {
+                            transferAuthStorage.delete(t.id);
+                            refreshData();
+                            toast({ title: 'ATPV excluída' });
+                          }
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -580,7 +632,25 @@ export default function DocumentsPage() {
                   <TableCell>{getClientName(w.clientId)}</TableCell>
                   <TableCell>{getVehicleInfo(w.vehicleId)}</TableCell>
                   <TableCell>{formatDateDisplay(w.declarationDate)}</TableCell>
-                  <TableCell><Button size="icon" variant="ghost" onClick={() => generateWithdrawalPDF(w)}><Download className="h-4 w-4" /></Button></TableCell>
+                  <TableCell>
+                    <div className="flex gap-1">
+                      <Button size="icon" variant="ghost" onClick={() => generateWithdrawalPDF(w)}><Download className="h-4 w-4" /></Button>
+                      <Button 
+                        size="icon" 
+                        variant="ghost" 
+                        className="text-destructive hover:text-destructive"
+                        onClick={() => {
+                          if (confirm('Excluir esta desistência?')) {
+                            withdrawalStorage.delete(w.id);
+                            refreshData();
+                            toast({ title: 'Desistência excluída' });
+                          }
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -633,7 +703,25 @@ export default function DocumentsPage() {
                   <TableCell>{r.depositAmount ? formatCurrency(r.depositAmount) : '-'}</TableCell>
                   <TableCell>{formatDateDisplay(r.validUntil)}</TableCell>
                   <TableCell><span className={`px-2 py-1 rounded-full text-xs ${statusColors[r.status]}`}>{r.status}</span></TableCell>
-                  <TableCell><Button size="icon" variant="ghost" onClick={() => generateReservationPDF(r)}><Download className="h-4 w-4" /></Button></TableCell>
+                  <TableCell>
+                    <div className="flex gap-1">
+                      <Button size="icon" variant="ghost" onClick={() => generateReservationPDF(r)}><Download className="h-4 w-4" /></Button>
+                      <Button 
+                        size="icon" 
+                        variant="ghost" 
+                        className="text-destructive hover:text-destructive"
+                        onClick={() => {
+                          if (confirm('Excluir esta reserva?')) {
+                            reservationStorage.delete(r.id);
+                            refreshData();
+                            toast({ title: 'Reserva excluída' });
+                          }
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
