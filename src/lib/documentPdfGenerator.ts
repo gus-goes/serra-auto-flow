@@ -9,17 +9,23 @@ import companyLogo from '@/assets/logo.png';
 /**
  * PDF Data interfaces - all data must be passed directly
  */
+export interface PDFGeneratorOptions {
+  legalRepSignature?: string; // Assinatura do representante legal do Supabase
+}
+
 export interface ContractPDFData {
   contract: Contract;
   client: Client;
   vehicle: Vehicle;
   vendor?: User | null;
+  options?: PDFGeneratorOptions;
 }
 
 export interface WarrantyPDFData {
   warranty: Warranty;
   client: Client;
   vehicle: Vehicle;
+  options?: PDFGeneratorOptions;
 }
 
 export interface TransferAuthPDFData {
@@ -27,18 +33,21 @@ export interface TransferAuthPDFData {
   client: Client;
   vehicle: Vehicle;
   vendor?: User | null;
+  options?: PDFGeneratorOptions;
 }
 
 export interface WithdrawalPDFData {
   declaration: WithdrawalDeclaration;
   client: Client;
   vehicle: Vehicle;
+  options?: PDFGeneratorOptions;
 }
 
 export interface ReservationPDFData {
   reservation: Reservation;
   client: Client;
   vehicle: Vehicle;
+  options?: PDFGeneratorOptions;
 }
 
 /**
@@ -125,8 +134,9 @@ function drawInfoRow(doc: jsPDF, label: string, value: string, x: number, y: num
 // ===== CONTRACT PDF (ELABORADO) =====
 
 export function generateContractPDF(data: ContractPDFData): void {
-  const { contract, client, vehicle, vendor } = data;
+  const { contract, client, vehicle, vendor, options } = data;
   const company = getCompanyConfig();
+  const legalRepSig = options?.legalRepSignature || company.legalRepresentative?.signature;
   
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.getWidth();
@@ -424,7 +434,7 @@ export function generateContractPDF(data: ContractPDFData): void {
   doc.rect(leftX, y, sigWidth, 25);
   
   // Use vendor signature, or legal representative signature if available
-  const vendorSig = contract.vendorSignature || company.legalRepresentative?.signature;
+  const vendorSig = contract.vendorSignature || legalRepSig;
   if (vendorSig) {
     try {
       doc.addImage(vendorSig, 'PNG', leftX + 5, y + 2, sigWidth - 10, 21);
@@ -667,8 +677,9 @@ export function generateWarrantyPDF(data: WarrantyPDFData): void {
 // ===== ATPV PDF (IDENTICAL TO OFFICIAL DETRAN FORMAT) =====
 
 export function generateTransferAuthPDF(data: TransferAuthPDFData): void {
-  const { transfer, client, vehicle, vendor } = data;
+  const { transfer, client, vehicle, vendor, options } = data;
   const company = getCompanyConfig();
+  const legalRepSig = options?.legalRepSignature || company.legalRepresentative?.signature;
   
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.getWidth();
@@ -797,7 +808,7 @@ export function generateTransferAuthPDF(data: TransferAuthPDFData): void {
   
   // Signature line
   // Use vendor signature, or legal representative signature if available
-  const vendorSig = transfer.vendorSignature || company.legalRepresentative?.signature;
+  const vendorSig = transfer.vendorSignature || legalRepSig;
   if (vendorSig) {
     try {
       doc.addImage(vendorSig, 'PNG', pageWidth / 2 - 40, y - 20, 80, 18);
