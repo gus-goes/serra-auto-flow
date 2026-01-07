@@ -9,6 +9,11 @@ import { ptBR } from 'date-fns/locale';
 import logo from '@/assets/logo.png';
 import { useClientRecord, useClientContracts, useClientProposals, useClientReceipts } from '@/hooks/useClientDocuments';
 import { formatCurrency } from '@/lib/formatters';
+import { generateContractPDF } from '@/lib/documentPdfGenerator';
+import { generateReceiptPDF } from '@/lib/pdfGenerator';
+import { mapClientFromDB, mapVehicleFromDB, mapContractFromDB, mapReceiptFromDB } from '@/lib/pdfDataMappers';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
 const proposalStatusMap: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
   pendente: { label: 'Pendente', variant: 'secondary' },
@@ -25,6 +30,7 @@ const proposalTypeMap: Record<string, string> = {
 
 export default function ClienteDashboardPage() {
   const { profile, logout } = useAuth();
+  const { toast } = useToast();
   const { data: clientRecord, isLoading: isLoadingClient } = useClientRecord();
   const { data: contracts = [], isLoading: isLoadingContracts } = useClientContracts();
   const { data: proposals = [], isLoading: isLoadingProposals } = useClientProposals();
@@ -34,6 +40,95 @@ export default function ClienteDashboardPage() {
 
   // Check if client record exists for this user
   const hasClientRecord = !!clientRecord;
+
+  const handleDownloadContract = async (contract: typeof contracts[0]) => {
+    try {
+      // Get vehicle data if available
+      let vehicleData = null;
+      if (contract.vehicle_id) {
+        const { data } = await supabase
+          .from('vehicles')
+          .select('*')
+          .eq('id', contract.vehicle_id)
+          .single();
+        vehicleData = data;
+      }
+
+      // Get seller data
+      let sellerData = null;
+      if (contract.seller_id) {
+        const { data } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', contract.seller_id)
+          .single();
+        sellerData = data;
+      }
+
+      const mappedClient = clientRecord ? mapClientFromDB(clientRecord) : null;
+      const mappedVehicle = vehicleData ? mapVehicleFromDB(vehicleData) : null;
+      const mappedContract = mapContractFromDB(contract);
+
+      if (!mappedClient || !mappedVehicle) {
+        throw new Error('Dados incompletos para gerar o contrato');
+      }
+
+      generateContractPDF({
+        contract: mappedContract,
+        client: mappedClient,
+        vehicle: mappedVehicle,
+      });
+
+      toast({
+        title: 'PDF gerado',
+        description: 'O contrato foi baixado com sucesso.',
+      });
+    } catch (error) {
+      console.error('Error generating contract PDF:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Erro ao gerar PDF',
+        description: 'Não foi possível gerar o contrato.',
+      });
+    }
+  };
+
+  const handleDownloadReceipt = async (receipt: typeof receipts[0]) => {
+    try {
+      // Get vehicle data if available
+      let vehicleData = null;
+      if (receipt.vehicle_id) {
+        const { data } = await supabase
+          .from('vehicles')
+          .select('*')
+          .eq('id', receipt.vehicle_id)
+          .single();
+        vehicleData = data;
+      }
+
+      const mappedClient = clientRecord ? mapClientFromDB(clientRecord) : null;
+      const mappedVehicle = vehicleData ? mapVehicleFromDB(vehicleData) : null;
+      const mappedReceipt = mapReceiptFromDB(receipt);
+
+      generateReceiptPDF({
+        receipt: mappedReceipt,
+        client: mappedClient,
+        vehicle: mappedVehicle,
+      });
+
+      toast({
+        title: 'PDF gerado',
+        description: 'O recibo foi baixado com sucesso.',
+      });
+    } catch (error) {
+      console.error('Error generating receipt PDF:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Erro ao gerar PDF',
+        description: 'Não foi possível gerar o recibo.',
+      });
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -131,7 +226,11 @@ export default function ClienteDashboardPage() {
                           <span className="text-sm font-medium">
                             {formatCurrency(contract.vehicle_price || 0)}
                           </span>
-                          <Button variant="outline" size="sm" disabled>
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => handleDownloadContract(contract)}
+                          >
                             <Download className="h-4 w-4" />
                           </Button>
                         </div>
@@ -248,7 +347,11 @@ export default function ClienteDashboardPage() {
                         <span className="text-sm font-medium text-green-600">
                           {formatCurrency(receipt.amount)}
                         </span>
-                        <Button variant="outline" size="sm" disabled>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => handleDownloadReceipt(receipt)}
+                        >
                           <Download className="h-4 w-4" />
                         </Button>
                       </div>
