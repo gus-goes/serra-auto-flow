@@ -39,6 +39,7 @@ import {
   useClientReservations,
   useClientWithdrawals
 } from '@/hooks/useClientDocuments';
+import { useAdminPhone } from '@/hooks/useAdminPhone';
 import { formatCurrency } from '@/lib/formatters';
 import { formatDateDisplay } from '@/lib/dateUtils';
 import { generateContractPDF, generateWarrantyPDF, generateTransferAuthPDF, generateReservationPDF, generateWithdrawalPDF } from '@/lib/documentPdfGenerator';
