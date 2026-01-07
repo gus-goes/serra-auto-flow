@@ -1,9 +1,9 @@
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { 
   FileText, 
   LogOut, 
@@ -19,17 +19,30 @@ import {
   XCircle,
   HourglassIcon,
   Settings,
-  ChevronRight
+  ChevronRight,
+  Shield,
+  FileSignature,
+  CalendarCheck,
+  Ban
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useNavigate } from 'react-router-dom';
 import logo from '@/assets/logo.png';
-import { useClientRecord, useClientContracts, useClientProposals, useClientReceipts } from '@/hooks/useClientDocuments';
+import { 
+  useClientRecord, 
+  useClientContracts, 
+  useClientProposals, 
+  useClientReceipts,
+  useClientWarranties,
+  useClientTransferAuths,
+  useClientReservations,
+  useClientWithdrawals
+} from '@/hooks/useClientDocuments';
 import { formatCurrency } from '@/lib/formatters';
-import { generateContractPDF } from '@/lib/documentPdfGenerator';
+import { generateContractPDF, generateWarrantyPDF, generateTransferAuthPDF, generateReservationPDF, generateWithdrawalPDF } from '@/lib/documentPdfGenerator';
 import { generateReceiptPDF } from '@/lib/pdfGenerator';
-import { mapClientFromDB, mapVehicleFromDB, mapContractFromDB, mapReceiptFromDB } from '@/lib/pdfDataMappers';
+import { mapClientFromDB, mapVehicleFromDB, mapContractFromDB, mapReceiptFromDB, mapWarrantyFromDB, mapTransferFromDB, mapReservationFromDB, mapWithdrawalFromDB } from '@/lib/pdfDataMappers';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useState } from 'react';
@@ -49,6 +62,12 @@ const proposalTypeMap: Record<string, string> = {
   a_vista: 'Pagamento à Vista',
 };
 
+const reservationStatusConfig: Record<string, { label: string; color: string }> = {
+  ativa: { label: 'Ativa', color: 'text-green-500' },
+  cancelada: { label: 'Cancelada', color: 'text-red-500' },
+  convertida: { label: 'Convertida', color: 'text-blue-500' },
+};
+
 export default function ClienteDashboardPage() {
   const { profile, logout } = useAuth();
   const { toast } = useToast();
@@ -57,6 +76,10 @@ export default function ClienteDashboardPage() {
   const { data: contracts = [], isLoading: isLoadingContracts } = useClientContracts();
   const { data: proposals = [], isLoading: isLoadingProposals } = useClientProposals();
   const { data: receipts = [], isLoading: isLoadingReceipts } = useClientReceipts();
+  const { data: warranties = [], isLoading: isLoadingWarranties } = useClientWarranties();
+  const { data: transferAuths = [], isLoading: isLoadingTransferAuths } = useClientTransferAuths();
+  const { data: reservations = [], isLoading: isLoadingReservations } = useClientReservations();
+  const { data: withdrawals = [], isLoading: isLoadingWithdrawals } = useClientWithdrawals();
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
   const isLoading = isLoadingClient || isLoadingContracts || isLoadingProposals || isLoadingReceipts;
@@ -67,6 +90,7 @@ export default function ClienteDashboardPage() {
   const totalContracts = contracts.length;
   const totalProposals = proposals.length;
   const totalReceipts = receipts.length;
+  const totalWarranties = warranties.length;
   const approvedProposals = proposals.filter(p => p.status === 'aprovada').length;
 
   const handleDownloadContract = async (contract: typeof contracts[0]) => {
@@ -80,16 +104,6 @@ export default function ClienteDashboardPage() {
           .eq('id', contract.vehicle_id)
           .single();
         vehicleData = data;
-      }
-
-      let sellerData = null;
-      if (contract.seller_id) {
-        const { data } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', contract.seller_id)
-          .single();
-        sellerData = data;
       }
 
       const mappedClient = clientRecord ? mapClientFromDB(clientRecord) : null;
@@ -161,45 +175,175 @@ export default function ClienteDashboardPage() {
     }
   };
 
+  const handleDownloadWarranty = async (warranty: typeof warranties[0]) => {
+    setDownloadingId(warranty.id);
+    try {
+      let vehicleData = null;
+      if (warranty.vehicle_id) {
+        const { data } = await supabase
+          .from('vehicles')
+          .select('*')
+          .eq('id', warranty.vehicle_id)
+          .single();
+        vehicleData = data;
+      }
+
+      const mappedClient = clientRecord ? mapClientFromDB(clientRecord) : null;
+      const mappedVehicle = vehicleData ? mapVehicleFromDB(vehicleData) : null;
+      const mappedWarranty = mapWarrantyFromDB(warranty);
+
+      if (!mappedClient || !mappedVehicle) {
+        throw new Error('Dados incompletos');
+      }
+
+      generateWarrantyPDF({
+        warranty: mappedWarranty,
+        client: mappedClient,
+        vehicle: mappedVehicle,
+      });
+
+      toast({ title: 'Download iniciado!', description: 'Sua garantia está sendo baixada.' });
+    } catch (error) {
+      console.error('Error generating warranty PDF:', error);
+      toast({ variant: 'destructive', title: 'Erro ao baixar', description: 'Não foi possível gerar o documento.' });
+    } finally {
+      setDownloadingId(null);
+    }
+  };
+
+  const handleDownloadTransferAuth = async (transfer: typeof transferAuths[0]) => {
+    setDownloadingId(transfer.id);
+    try {
+      let vehicleData = null;
+      if (transfer.vehicle_id) {
+        const { data } = await supabase.from('vehicles').select('*').eq('id', transfer.vehicle_id).single();
+        vehicleData = data;
+      }
+
+      const mappedClient = clientRecord ? mapClientFromDB(clientRecord) : null;
+      const mappedVehicle = vehicleData ? mapVehicleFromDB(vehicleData) : null;
+      const mappedTransfer = mapTransferFromDB(transfer);
+
+      if (!mappedClient || !mappedVehicle) throw new Error('Dados incompletos');
+
+      generateTransferAuthPDF({ transfer: mappedTransfer, client: mappedClient, vehicle: mappedVehicle });
+      toast({ title: 'Download iniciado!', description: 'Sua ATPV está sendo baixada.' });
+    } catch (error) {
+      console.error('Error generating transfer auth PDF:', error);
+      toast({ variant: 'destructive', title: 'Erro ao baixar', description: 'Não foi possível gerar o documento.' });
+    } finally {
+      setDownloadingId(null);
+    }
+  };
+
+  const handleDownloadReservation = async (reservation: typeof reservations[0]) => {
+    setDownloadingId(reservation.id);
+    try {
+      let vehicleData = null;
+      if (reservation.vehicle_id) {
+        const { data } = await supabase.from('vehicles').select('*').eq('id', reservation.vehicle_id).single();
+        vehicleData = data;
+      }
+
+      const mappedClient = clientRecord ? mapClientFromDB(clientRecord) : null;
+      const mappedVehicle = vehicleData ? mapVehicleFromDB(vehicleData) : null;
+      const mappedReservation = mapReservationFromDB(reservation);
+
+      if (!mappedClient || !mappedVehicle) throw new Error('Dados incompletos');
+
+      generateReservationPDF({ reservation: mappedReservation, client: mappedClient, vehicle: mappedVehicle });
+      toast({ title: 'Download iniciado!', description: 'Sua reserva está sendo baixada.' });
+    } catch (error) {
+      console.error('Error generating reservation PDF:', error);
+      toast({ variant: 'destructive', title: 'Erro ao baixar', description: 'Não foi possível gerar o documento.' });
+    } finally {
+      setDownloadingId(null);
+    }
+  };
+
+  const handleDownloadWithdrawal = async (withdrawal: typeof withdrawals[0]) => {
+    setDownloadingId(withdrawal.id);
+    try {
+      let vehicleData = null;
+      if (withdrawal.vehicle_id) {
+        const { data } = await supabase.from('vehicles').select('*').eq('id', withdrawal.vehicle_id).single();
+        vehicleData = data;
+      }
+
+      const mappedClient = clientRecord ? mapClientFromDB(clientRecord) : null;
+      const mappedVehicle = vehicleData ? mapVehicleFromDB(vehicleData) : null;
+      const mappedWithdrawal = mapWithdrawalFromDB(withdrawal);
+
+      if (!mappedClient || !mappedVehicle) throw new Error('Dados incompletos');
+
+      generateWithdrawalPDF({ declaration: mappedWithdrawal, client: mappedClient, vehicle: mappedVehicle });
+      toast({ title: 'Download iniciado!', description: 'Sua declaração está sendo baixada.' });
+    } catch (error) {
+      console.error('Error generating withdrawal PDF:', error);
+      toast({ variant: 'destructive', title: 'Erro ao baixar', description: 'Não foi possível gerar o documento.' });
+    } finally {
+      setDownloadingId(null);
+    }
+  };
+
+  // Loading skeleton for documents
+  const DocumentSkeleton = () => (
+    <div className="space-y-3">
+      {[1, 2].map((i) => (
+        <div key={i} className="flex items-center gap-3 p-3 sm:p-4 rounded-xl bg-[hsl(220,20%,12%)]">
+          <Skeleton className="h-10 w-10 sm:h-14 sm:w-14 rounded-xl bg-[hsl(220,20%,16%)] shrink-0" />
+          <div className="flex-1 space-y-2 min-w-0">
+            <Skeleton className="h-4 w-3/4 bg-[hsl(220,20%,16%)]" />
+            <Skeleton className="h-3 w-1/2 bg-[hsl(220,20%,16%)]" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+
+  // Empty state component
+  const EmptyState = ({ icon: Icon, title, description }: { icon: typeof FileCheck; title: string; description: string }) => (
+    <div className="text-center py-10 sm:py-16">
+      <div className="w-16 h-16 sm:w-20 sm:h-20 mx-auto mb-4 rounded-2xl bg-[hsl(220,20%,12%)] flex items-center justify-center">
+        <Icon className="h-8 w-8 sm:h-10 sm:w-10 text-gray-600" />
+      </div>
+      <h3 className="font-medium text-white text-sm sm:text-base">{title}</h3>
+      <p className="text-xs sm:text-sm text-gray-500 mt-1">{description}</p>
+    </div>
+  );
+
   return (
     <PageTransition>
     <div className="min-h-screen bg-[hsl(220,20%,8%)]">
       {/* Hero Header */}
       <header className="relative overflow-hidden bg-[hsl(220,20%,6%)] border-b-2 border-primary">
-        {/* Background pattern */}
         <div className="absolute inset-0 opacity-10">
           <div className="absolute inset-0" style={{
-            backgroundImage: `repeating-linear-gradient(
-              45deg,
-              transparent,
-              transparent 10px,
-              hsl(48, 100%, 50%) 10px,
-              hsl(48, 100%, 50%) 11px
-            )`
+            backgroundImage: `repeating-linear-gradient(45deg, transparent, transparent 10px, hsl(48, 100%, 50%) 10px, hsl(48, 100%, 50%) 11px)`
           }} />
         </div>
         
-        <div className="container mx-auto px-4 py-5 relative">
+        <div className="container mx-auto px-3 sm:px-4 py-3 sm:py-5 relative">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 sm:gap-4">
               <div className="relative group">
-                <div className="absolute -inset-1.5 bg-primary rounded-xl opacity-60 blur-md group-hover:opacity-100 transition-opacity" />
-                <div className="relative bg-[hsl(220,20%,10%)] p-2 rounded-xl border border-primary/50">
-                  <img src={logo} alt="Logo" className="h-10 w-10 object-contain" />
+                <div className="absolute -inset-1 sm:-inset-1.5 bg-primary rounded-lg sm:rounded-xl opacity-60 blur-md group-hover:opacity-100 transition-opacity" />
+                <div className="relative bg-[hsl(220,20%,10%)] p-1.5 sm:p-2 rounded-lg sm:rounded-xl border border-primary/50">
+                  <img src={logo} alt="Logo" className="h-7 w-7 sm:h-10 sm:w-10 object-contain" />
                 </div>
               </div>
               <div>
-                <h1 className="text-xl font-bold text-white tracking-tight">
+                <h1 className="text-base sm:text-xl font-bold text-white tracking-tight">
                   Área do <span className="text-primary">Cliente</span>
                 </h1>
-                <p className="text-xs text-gray-400">
+                <p className="text-[10px] sm:text-xs text-gray-400 hidden xs:block">
                   Seus documentos em um só lugar
                 </p>
               </div>
             </div>
             
-            <div className="flex items-center gap-2">
-              <div className="hidden md:flex flex-col items-end mr-2">
+            <div className="flex items-center gap-1 sm:gap-2">
+              <div className="hidden lg:flex flex-col items-end mr-2">
                 <p className="text-sm font-medium text-white">{profile?.name}</p>
                 <p className="text-xs text-gray-500">{profile?.email}</p>
               </div>
@@ -207,19 +351,19 @@ export default function ClienteDashboardPage() {
                 variant="ghost" 
                 size="icon"
                 onClick={() => navigate('/cliente/perfil')}
-                className="text-gray-400 hover:text-primary hover:bg-primary/10 transition-colors"
+                className="h-8 w-8 sm:h-10 sm:w-10 text-gray-400 hover:text-primary hover:bg-primary/10 transition-colors"
                 title="Meu Perfil"
               >
-                <Settings className="h-5 w-5" />
+                <Settings className="h-4 w-4 sm:h-5 sm:w-5" />
               </Button>
               <Button 
                 variant="ghost" 
                 size="icon"
                 onClick={logout}
-                className="text-gray-400 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                className="h-8 w-8 sm:h-10 sm:w-10 text-gray-400 hover:text-red-400 hover:bg-red-500/10 transition-colors"
                 title="Sair"
               >
-                <LogOut className="h-5 w-5" />
+                <LogOut className="h-4 w-4 sm:h-5 sm:w-5" />
               </Button>
             </div>
           </div>
@@ -227,39 +371,38 @@ export default function ClienteDashboardPage() {
       </header>
 
       {/* Main Content */}
-      <main className="container mx-auto px-4 py-8">
-        <div className="space-y-8 animate-fade-in">
+      <main className="container mx-auto px-3 sm:px-4 py-4 sm:py-8">
+        <div className="space-y-4 sm:space-y-8">
           
           {/* Welcome Section */}
-          <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4">
+          <div className="flex flex-col gap-3 sm:gap-4">
             <div>
-              <p className="text-primary font-medium text-sm mb-1">Bem-vindo de volta</p>
-              <h2 className="text-3xl md:text-4xl font-bold text-white">
+              <p className="text-primary font-medium text-xs sm:text-sm mb-1">Bem-vindo de volta</p>
+              <h2 className="text-xl sm:text-3xl md:text-4xl font-bold text-white">
                 Olá, {firstName}! 
               </h2>
-              <p className="text-gray-400 mt-2">
-                Acompanhe seus contratos, propostas e recibos
+              <p className="text-gray-400 mt-1 sm:mt-2 text-sm sm:text-base">
+                Acompanhe seus documentos e pagamentos
               </p>
             </div>
-            <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[hsl(220,20%,12%)] border border-[hsl(220,18%,18%)]">
-              <Calendar className="h-4 w-4 text-primary" />
-              <span className="text-sm text-gray-300">
-                {format(new Date(), "EEEE, dd 'de' MMMM", { locale: ptBR })}
+            <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[hsl(220,20%,12%)] border border-[hsl(220,18%,18%)] w-fit">
+              <Calendar className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-primary" />
+              <span className="text-xs sm:text-sm text-gray-300">
+                {format(new Date(), "dd 'de' MMMM", { locale: ptBR })}
               </span>
             </div>
           </div>
 
           {/* No Client Record Warning */}
           {!isLoadingClient && !hasClientRecord && (
-            <div className="p-4 rounded-xl bg-yellow-500/10 border border-yellow-500/30 flex items-start gap-4">
-              <div className="p-2 rounded-lg bg-yellow-500/20">
-                <AlertCircle className="h-5 w-5 text-yellow-500" />
+            <div className="p-3 sm:p-4 rounded-xl bg-yellow-500/10 border border-yellow-500/30 flex items-start gap-3 sm:gap-4">
+              <div className="p-1.5 sm:p-2 rounded-lg bg-yellow-500/20 shrink-0">
+                <AlertCircle className="h-4 w-4 sm:h-5 sm:w-5 text-yellow-500" />
               </div>
               <div>
-                <h3 className="font-semibold text-yellow-500">Cadastro pendente</h3>
-                <p className="text-sm text-gray-400 mt-1">
-                  Seu e-mail ({profile?.email}) ainda não está vinculado a um cadastro de cliente. 
-                  Entre em contato com a loja para concluir seu cadastro.
+                <h3 className="font-semibold text-yellow-500 text-sm sm:text-base">Cadastro pendente</h3>
+                <p className="text-xs sm:text-sm text-gray-400 mt-1">
+                  Seu e-mail ainda não está vinculado a um cadastro. Entre em contato com a loja.
                 </p>
               </div>
             </div>
@@ -268,105 +411,83 @@ export default function ClienteDashboardPage() {
           {/* Stats Cards */}
           {hasClientRecord && (
             <motion.div 
-              className="grid grid-cols-2 lg:grid-cols-4 gap-4"
+              className="grid grid-cols-2 gap-2 sm:gap-4 lg:grid-cols-4"
               initial="hidden"
               animate="visible"
               variants={{
                 hidden: {},
-                visible: {
-                  transition: {
-                    staggerChildren: 0.1,
-                  },
-                },
+                visible: { transition: { staggerChildren: 0.1 } },
               }}
             >
               {/* Contracts Card */}
               <motion.div
-                variants={{
-                  hidden: { opacity: 0, y: 20, scale: 0.95 },
-                  visible: { opacity: 1, y: 0, scale: 1 },
-                }}
+                variants={{ hidden: { opacity: 0, y: 20, scale: 0.95 }, visible: { opacity: 1, y: 0, scale: 1 } }}
                 transition={{ type: 'spring', stiffness: 300, damping: 24 }}
-                className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-[hsl(220,20%,12%)] to-[hsl(220,20%,8%)] border border-[hsl(220,18%,18%)] p-5 hover:border-primary/50 transition-all duration-300"
+                className="group relative overflow-hidden rounded-xl sm:rounded-2xl bg-gradient-to-br from-[hsl(220,20%,12%)] to-[hsl(220,20%,8%)] border border-[hsl(220,18%,18%)] p-3 sm:p-5 hover:border-primary/50 transition-all duration-300"
               >
-                <div className="absolute top-0 right-0 w-20 h-20 bg-primary/10 rounded-full blur-2xl group-hover:bg-primary/20 transition-colors" />
+                <div className="absolute top-0 right-0 w-16 h-16 sm:w-20 sm:h-20 bg-primary/10 rounded-full blur-2xl group-hover:bg-primary/20 transition-colors" />
                 <div className="relative">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">Contratos</span>
-                    <div className="p-2 rounded-lg bg-primary/10 text-primary">
-                      <FileCheck className="h-4 w-4" />
+                  <div className="flex items-center justify-between mb-2 sm:mb-3">
+                    <span className="text-[10px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider">Contratos</span>
+                    <div className="p-1.5 sm:p-2 rounded-lg bg-primary/10 text-primary">
+                      <FileCheck className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                     </div>
                   </div>
-                  <p className="text-3xl font-bold text-white">{totalContracts}</p>
+                  <p className="text-2xl sm:text-3xl font-bold text-white">{totalContracts}</p>
                 </div>
               </motion.div>
 
-              {/* Proposals Card */}
+              {/* Warranties Card */}
               <motion.div
-                variants={{
-                  hidden: { opacity: 0, y: 20, scale: 0.95 },
-                  visible: { opacity: 1, y: 0, scale: 1 },
-                }}
+                variants={{ hidden: { opacity: 0, y: 20, scale: 0.95 }, visible: { opacity: 1, y: 0, scale: 1 } }}
                 transition={{ type: 'spring', stiffness: 300, damping: 24 }}
-                className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-[hsl(220,20%,12%)] to-[hsl(220,20%,8%)] border border-[hsl(220,18%,18%)] p-5 hover:border-primary/50 transition-all duration-300"
+                className="group relative overflow-hidden rounded-xl sm:rounded-2xl bg-gradient-to-br from-[hsl(220,20%,12%)] to-[hsl(220,20%,8%)] border border-[hsl(220,18%,18%)] p-3 sm:p-5 hover:border-purple-500/50 transition-all duration-300"
               >
-                <div className="absolute top-0 right-0 w-20 h-20 bg-blue-500/10 rounded-full blur-2xl group-hover:bg-blue-500/20 transition-colors" />
+                <div className="absolute top-0 right-0 w-16 h-16 sm:w-20 sm:h-20 bg-purple-500/10 rounded-full blur-2xl group-hover:bg-purple-500/20 transition-colors" />
                 <div className="relative">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">Propostas</span>
-                    <div className="p-2 rounded-lg bg-blue-500/10 text-blue-400">
-                      <FileText className="h-4 w-4" />
+                  <div className="flex items-center justify-between mb-2 sm:mb-3">
+                    <span className="text-[10px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider">Garantias</span>
+                    <div className="p-1.5 sm:p-2 rounded-lg bg-purple-500/10 text-purple-400">
+                      <Shield className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                     </div>
                   </div>
-                  <p className="text-3xl font-bold text-white">{totalProposals}</p>
-                  {approvedProposals > 0 && (
-                    <p className="text-xs text-green-400 mt-1 flex items-center gap-1">
-                      <CheckCircle2 className="h-3 w-3" />
-                      {approvedProposals} aprovada{approvedProposals > 1 ? 's' : ''}
-                    </p>
-                  )}
+                  <p className="text-2xl sm:text-3xl font-bold text-white">{totalWarranties}</p>
                 </div>
               </motion.div>
 
               {/* Receipts Card */}
               <motion.div
-                variants={{
-                  hidden: { opacity: 0, y: 20, scale: 0.95 },
-                  visible: { opacity: 1, y: 0, scale: 1 },
-                }}
+                variants={{ hidden: { opacity: 0, y: 20, scale: 0.95 }, visible: { opacity: 1, y: 0, scale: 1 } }}
                 transition={{ type: 'spring', stiffness: 300, damping: 24 }}
-                className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-[hsl(220,20%,12%)] to-[hsl(220,20%,8%)] border border-[hsl(220,18%,18%)] p-5 hover:border-primary/50 transition-all duration-300"
+                className="group relative overflow-hidden rounded-xl sm:rounded-2xl bg-gradient-to-br from-[hsl(220,20%,12%)] to-[hsl(220,20%,8%)] border border-[hsl(220,18%,18%)] p-3 sm:p-5 hover:border-green-500/50 transition-all duration-300"
               >
-                <div className="absolute top-0 right-0 w-20 h-20 bg-green-500/10 rounded-full blur-2xl group-hover:bg-green-500/20 transition-colors" />
+                <div className="absolute top-0 right-0 w-16 h-16 sm:w-20 sm:h-20 bg-green-500/10 rounded-full blur-2xl group-hover:bg-green-500/20 transition-colors" />
                 <div className="relative">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">Recibos</span>
-                    <div className="p-2 rounded-lg bg-green-500/10 text-green-400">
-                      <Receipt className="h-4 w-4" />
+                  <div className="flex items-center justify-between mb-2 sm:mb-3">
+                    <span className="text-[10px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider">Recibos</span>
+                    <div className="p-1.5 sm:p-2 rounded-lg bg-green-500/10 text-green-400">
+                      <Receipt className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                     </div>
                   </div>
-                  <p className="text-3xl font-bold text-white">{totalReceipts}</p>
+                  <p className="text-2xl sm:text-3xl font-bold text-white">{totalReceipts}</p>
                 </div>
               </motion.div>
 
               {/* Total Paid Card */}
               <motion.div
-                variants={{
-                  hidden: { opacity: 0, y: 20, scale: 0.95 },
-                  visible: { opacity: 1, y: 0, scale: 1 },
-                }}
+                variants={{ hidden: { opacity: 0, y: 20, scale: 0.95 }, visible: { opacity: 1, y: 0, scale: 1 } }}
                 transition={{ type: 'spring', stiffness: 300, damping: 24 }}
-                className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/20 to-[hsl(220,20%,8%)] border border-primary/30 p-5 hover:border-primary transition-all duration-300"
+                className="group relative overflow-hidden rounded-xl sm:rounded-2xl bg-gradient-to-br from-primary/20 to-[hsl(220,20%,8%)] border border-primary/30 p-3 sm:p-5 hover:border-primary transition-all duration-300"
               >
-                <div className="absolute top-0 right-0 w-20 h-20 bg-primary/20 rounded-full blur-2xl" />
+                <div className="absolute top-0 right-0 w-16 h-16 sm:w-20 sm:h-20 bg-primary/20 rounded-full blur-2xl" />
                 <div className="relative">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-xs font-medium text-primary uppercase tracking-wider">Total Pago</span>
-                    <div className="p-2 rounded-lg bg-primary/20 text-primary">
-                      <CreditCard className="h-4 w-4" />
+                  <div className="flex items-center justify-between mb-2 sm:mb-3">
+                    <span className="text-[10px] sm:text-xs font-medium text-primary uppercase tracking-wider">Total Pago</span>
+                    <div className="p-1.5 sm:p-2 rounded-lg bg-primary/20 text-primary">
+                      <CreditCard className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                     </div>
                   </div>
-                  <p className="text-2xl font-bold text-white">
+                  <p className="text-lg sm:text-2xl font-bold text-white">
                     {formatCurrency(receipts.reduce((acc, r) => acc + r.amount, 0))}
                   </p>
                 </div>
@@ -376,102 +497,95 @@ export default function ClienteDashboardPage() {
 
           {/* Documents Tabs */}
           <Tabs defaultValue="contracts" className="w-full">
-            <TabsList className="w-full lg:w-auto inline-flex h-12 bg-[hsl(220,20%,10%)] border border-[hsl(220,18%,18%)] p-1 rounded-xl">
-              <TabsTrigger 
-                value="contracts" 
-                className="flex-1 lg:flex-none data-[state=active]:bg-primary data-[state=active]:text-black rounded-lg px-6 text-gray-400 hover:text-white transition-colors"
-              >
-                <FileCheck className="h-4 w-4 mr-2" />
-                Contratos
-              </TabsTrigger>
-              <TabsTrigger 
-                value="proposals" 
-                className="flex-1 lg:flex-none data-[state=active]:bg-primary data-[state=active]:text-black rounded-lg px-6 text-gray-400 hover:text-white transition-colors"
-              >
-                <FileText className="h-4 w-4 mr-2" />
-                Propostas
-              </TabsTrigger>
-              <TabsTrigger 
-                value="receipts" 
-                className="flex-1 lg:flex-none data-[state=active]:bg-primary data-[state=active]:text-black rounded-lg px-6 text-gray-400 hover:text-white transition-colors"
-              >
-                <Receipt className="h-4 w-4 mr-2" />
-                Recibos
-              </TabsTrigger>
-            </TabsList>
+            <ScrollArea className="w-full">
+              <TabsList className="inline-flex h-10 sm:h-12 bg-[hsl(220,20%,10%)] border border-[hsl(220,18%,18%)] p-1 rounded-xl w-max min-w-full sm:min-w-0 sm:w-auto">
+                <TabsTrigger 
+                  value="contracts" 
+                  className="data-[state=active]:bg-primary data-[state=active]:text-black rounded-lg px-2 sm:px-4 text-xs sm:text-sm text-gray-400 hover:text-white transition-colors whitespace-nowrap"
+                >
+                  <FileCheck className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                  Contratos
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="warranties" 
+                  className="data-[state=active]:bg-primary data-[state=active]:text-black rounded-lg px-2 sm:px-4 text-xs sm:text-sm text-gray-400 hover:text-white transition-colors whitespace-nowrap"
+                >
+                  <Shield className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                  Garantias
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="receipts" 
+                  className="data-[state=active]:bg-primary data-[state=active]:text-black rounded-lg px-2 sm:px-4 text-xs sm:text-sm text-gray-400 hover:text-white transition-colors whitespace-nowrap"
+                >
+                  <Receipt className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                  Recibos
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="proposals" 
+                  className="data-[state=active]:bg-primary data-[state=active]:text-black rounded-lg px-2 sm:px-4 text-xs sm:text-sm text-gray-400 hover:text-white transition-colors whitespace-nowrap"
+                >
+                  <FileText className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                  Propostas
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="transfers" 
+                  className="data-[state=active]:bg-primary data-[state=active]:text-black rounded-lg px-2 sm:px-4 text-xs sm:text-sm text-gray-400 hover:text-white transition-colors whitespace-nowrap"
+                >
+                  <FileSignature className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                  ATPVs
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="reservations" 
+                  className="data-[state=active]:bg-primary data-[state=active]:text-black rounded-lg px-2 sm:px-4 text-xs sm:text-sm text-gray-400 hover:text-white transition-colors whitespace-nowrap"
+                >
+                  <CalendarCheck className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                  Reservas
+                </TabsTrigger>
+              </TabsList>
+              <ScrollBar orientation="horizontal" className="invisible" />
+            </ScrollArea>
 
             {/* Contracts Tab */}
-            <TabsContent value="contracts" className="mt-6">
-              <div className="rounded-2xl bg-[hsl(220,20%,10%)] border border-[hsl(220,18%,18%)] overflow-hidden">
-                <div className="p-6 border-b border-[hsl(220,18%,18%)]">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2.5 rounded-xl bg-primary/10">
-                      <FileCheck className="h-5 w-5 text-primary" />
+            <TabsContent value="contracts" className="mt-4 sm:mt-6">
+              <div className="rounded-xl sm:rounded-2xl bg-[hsl(220,20%,10%)] border border-[hsl(220,18%,18%)] overflow-hidden">
+                <div className="p-3 sm:p-6 border-b border-[hsl(220,18%,18%)]">
+                  <div className="flex items-center gap-2 sm:gap-3">
+                    <div className="p-2 sm:p-2.5 rounded-lg sm:rounded-xl bg-primary/10">
+                      <FileCheck className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
                     </div>
                     <div>
-                      <h3 className="font-semibold text-white">Meus Contratos</h3>
-                      <p className="text-sm text-gray-500">Contratos de compra e venda de veículos</p>
+                      <h3 className="font-semibold text-white text-sm sm:text-base">Meus Contratos</h3>
+                      <p className="text-xs sm:text-sm text-gray-500 hidden sm:block">Contratos de compra e venda</p>
                     </div>
                   </div>
                 </div>
-                <div className="p-4">
-                  {isLoadingContracts ? (
-                    <div className="space-y-3">
-                      {[1, 2].map((i) => (
-                        <div key={i} className="flex items-center gap-4 p-4 rounded-xl bg-[hsl(220,20%,12%)]">
-                          <Skeleton className="h-14 w-14 rounded-xl bg-[hsl(220,20%,16%)]" />
-                          <div className="flex-1 space-y-2">
-                            <Skeleton className="h-4 w-48 bg-[hsl(220,20%,16%)]" />
-                            <Skeleton className="h-3 w-32 bg-[hsl(220,20%,16%)]" />
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : contracts.length === 0 ? (
-                    <div className="text-center py-16">
-                      <div className="w-20 h-20 mx-auto mb-4 rounded-2xl bg-[hsl(220,20%,12%)] flex items-center justify-center">
-                        <FileCheck className="h-10 w-10 text-gray-600" />
-                      </div>
-                      <h3 className="font-medium text-white">Nenhum contrato encontrado</h3>
-                      <p className="text-sm text-gray-500 mt-1">
-                        Seus contratos aparecerão aqui quando disponíveis
-                      </p>
-                    </div>
+                <div className="p-3 sm:p-4">
+                  {isLoadingContracts ? <DocumentSkeleton /> : contracts.length === 0 ? (
+                    <EmptyState icon={FileCheck} title="Nenhum contrato encontrado" description="Seus contratos aparecerão aqui" />
                   ) : (
-                    <div className="space-y-3">
+                    <div className="space-y-2 sm:space-y-3">
                       {contracts.map((contract) => {
                         const vehicleData = contract.vehicle_data as { brand?: string; model?: string; plate?: string; year?: number } | null;
                         const isDownloading = downloadingId === contract.id;
                         return (
-                          <div
-                            key={contract.id}
-                            className="group flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl bg-[hsl(220,20%,12%)] hover:bg-[hsl(220,20%,14%)] border border-transparent hover:border-primary/30 transition-all duration-200"
-                          >
-                            <div className="flex items-start gap-4">
-                              <div className="p-3 rounded-xl bg-primary/10 text-primary group-hover:bg-primary group-hover:text-black transition-colors">
-                                <Car className="h-6 w-6" />
+                          <div key={contract.id} className="group flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 sm:p-4 rounded-xl bg-[hsl(220,20%,12%)] hover:bg-[hsl(220,20%,14%)] border border-transparent hover:border-primary/30 transition-all">
+                            <div className="flex items-start gap-3 min-w-0">
+                              <div className="p-2 sm:p-3 rounded-lg sm:rounded-xl bg-primary/10 text-primary group-hover:bg-primary group-hover:text-black transition-colors shrink-0">
+                                <Car className="h-5 w-5 sm:h-6 sm:w-6" />
                               </div>
-                              <div>
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  <p className="font-semibold text-white">
-                                    {vehicleData?.brand} {vehicleData?.model}
-                                  </p>
-                                  {vehicleData?.year && (
-                                    <span className="text-xs px-2 py-0.5 rounded-full bg-primary/20 text-primary font-medium">
-                                      {vehicleData.year}
-                                    </span>
-                                  )}
-                                </div>
-                                <p className="text-sm text-gray-500 mt-0.5">
-                                  Contrato #{contract.contract_number}
-                                  {vehicleData?.plate && ` • ${vehicleData.plate}`}
+                              <div className="min-w-0 flex-1">
+                                <p className="font-semibold text-white text-sm sm:text-base truncate">
+                                  {vehicleData?.brand} {vehicleData?.model}
                                 </p>
-                                <div className="flex items-center gap-4 mt-2">
-                                  <span className="flex items-center gap-1 text-xs text-gray-500">
+                                <p className="text-xs sm:text-sm text-gray-500 truncate">
+                                  #{contract.contract_number} {vehicleData?.plate && `• ${vehicleData.plate}`}
+                                </p>
+                                <div className="flex items-center gap-3 mt-1.5">
+                                  <span className="flex items-center gap-1 text-[10px] sm:text-xs text-gray-500">
                                     <Calendar className="h-3 w-3" />
-                                    {format(new Date(contract.contract_date), "dd/MM/yyyy")}
+                                    {format(new Date(contract.contract_date), "dd/MM/yy")}
                                   </span>
-                                  <span className="text-sm font-bold text-primary">
+                                  <span className="text-xs sm:text-sm font-bold text-primary">
                                     {formatCurrency(contract.vehicle_price || 0)}
                                   </span>
                                 </div>
@@ -479,16 +593,12 @@ export default function ClienteDashboardPage() {
                             </div>
                             <Button 
                               size="sm"
-                              className="mt-4 sm:mt-0 bg-primary hover:bg-primary/90 text-black font-medium"
+                              className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-black font-medium text-xs sm:text-sm"
                               onClick={() => handleDownloadContract(contract)}
                               disabled={isDownloading}
                             >
-                              {isDownloading ? (
-                                <Clock className="h-4 w-4 mr-2 animate-spin" />
-                              ) : (
-                                <Download className="h-4 w-4 mr-2" />
-                              )}
-                              Baixar PDF
+                              {isDownloading ? <Clock className="h-4 w-4 mr-1.5 animate-spin" /> : <Download className="h-4 w-4 mr-1.5" />}
+                              PDF
                             </Button>
                           </div>
                         );
@@ -499,84 +609,165 @@ export default function ClienteDashboardPage() {
               </div>
             </TabsContent>
 
-            {/* Proposals Tab */}
-            <TabsContent value="proposals" className="mt-6">
-              <div className="rounded-2xl bg-[hsl(220,20%,10%)] border border-[hsl(220,18%,18%)] overflow-hidden">
-                <div className="p-6 border-b border-[hsl(220,18%,18%)]">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2.5 rounded-xl bg-blue-500/10">
-                      <FileText className="h-5 w-5 text-blue-400" />
+            {/* Warranties Tab */}
+            <TabsContent value="warranties" className="mt-4 sm:mt-6">
+              <div className="rounded-xl sm:rounded-2xl bg-[hsl(220,20%,10%)] border border-[hsl(220,18%,18%)] overflow-hidden">
+                <div className="p-3 sm:p-6 border-b border-[hsl(220,18%,18%)]">
+                  <div className="flex items-center gap-2 sm:gap-3">
+                    <div className="p-2 sm:p-2.5 rounded-lg sm:rounded-xl bg-purple-500/10">
+                      <Shield className="h-4 w-4 sm:h-5 sm:w-5 text-purple-400" />
                     </div>
                     <div>
-                      <h3 className="font-semibold text-white">Minhas Propostas</h3>
-                      <p className="text-sm text-gray-500">Propostas de financiamento e compra</p>
+                      <h3 className="font-semibold text-white text-sm sm:text-base">Minhas Garantias</h3>
+                      <p className="text-xs sm:text-sm text-gray-500 hidden sm:block">Termos de garantia dos veículos</p>
                     </div>
                   </div>
                 </div>
-                <div className="p-4">
-                  {isLoadingProposals ? (
-                    <div className="space-y-3">
-                      {[1, 2].map((i) => (
-                        <div key={i} className="flex items-center gap-4 p-4 rounded-xl bg-[hsl(220,20%,12%)]">
-                          <Skeleton className="h-14 w-14 rounded-xl bg-[hsl(220,20%,16%)]" />
-                          <div className="flex-1 space-y-2">
-                            <Skeleton className="h-4 w-48 bg-[hsl(220,20%,16%)]" />
-                            <Skeleton className="h-3 w-32 bg-[hsl(220,20%,16%)]" />
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : proposals.length === 0 ? (
-                    <div className="text-center py-16">
-                      <div className="w-20 h-20 mx-auto mb-4 rounded-2xl bg-[hsl(220,20%,12%)] flex items-center justify-center">
-                        <FileText className="h-10 w-10 text-gray-600" />
-                      </div>
-                      <h3 className="font-medium text-white">Nenhuma proposta encontrada</h3>
-                      <p className="text-sm text-gray-500 mt-1">
-                        Suas propostas aparecerão aqui quando disponíveis
-                      </p>
-                    </div>
+                <div className="p-3 sm:p-4">
+                  {isLoadingWarranties ? <DocumentSkeleton /> : warranties.length === 0 ? (
+                    <EmptyState icon={Shield} title="Nenhuma garantia encontrada" description="Suas garantias aparecerão aqui" />
                   ) : (
-                    <div className="space-y-3">
+                    <div className="space-y-2 sm:space-y-3">
+                      {warranties.map((warranty) => {
+                        const isDownloading = downloadingId === warranty.id;
+                        return (
+                          <div key={warranty.id} className="group flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 sm:p-4 rounded-xl bg-[hsl(220,20%,12%)] hover:bg-[hsl(220,20%,14%)] border border-transparent hover:border-purple-500/30 transition-all">
+                            <div className="flex items-start gap-3 min-w-0">
+                              <div className="p-2 sm:p-3 rounded-lg sm:rounded-xl bg-purple-500/10 text-purple-400 group-hover:bg-purple-500 group-hover:text-white transition-colors shrink-0">
+                                <Shield className="h-5 w-5 sm:h-6 sm:w-6" />
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <p className="font-semibold text-white text-sm sm:text-base">Garantia #{warranty.warranty_number}</p>
+                                <p className="text-xs sm:text-sm text-gray-500">{warranty.warranty_period} • {warranty.warranty_km?.toLocaleString()} km</p>
+                                <span className="flex items-center gap-1 text-[10px] sm:text-xs text-gray-500 mt-1.5">
+                                  <Calendar className="h-3 w-3" />
+                                  {format(new Date(warranty.created_at), "dd/MM/yyyy")}
+                                </span>
+                              </div>
+                            </div>
+                            <Button 
+                              size="sm"
+                              className="w-full sm:w-auto bg-purple-500 hover:bg-purple-600 text-white font-medium text-xs sm:text-sm"
+                              onClick={() => handleDownloadWarranty(warranty)}
+                              disabled={isDownloading}
+                            >
+                              {isDownloading ? <Clock className="h-4 w-4 mr-1.5 animate-spin" /> : <Download className="h-4 w-4 mr-1.5" />}
+                              PDF
+                            </Button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </TabsContent>
+
+            {/* Receipts Tab */}
+            <TabsContent value="receipts" className="mt-4 sm:mt-6">
+              <div className="rounded-xl sm:rounded-2xl bg-[hsl(220,20%,10%)] border border-[hsl(220,18%,18%)] overflow-hidden">
+                <div className="p-3 sm:p-6 border-b border-[hsl(220,18%,18%)]">
+                  <div className="flex items-center gap-2 sm:gap-3">
+                    <div className="p-2 sm:p-2.5 rounded-lg sm:rounded-xl bg-green-500/10">
+                      <Receipt className="h-4 w-4 sm:h-5 sm:w-5 text-green-400" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-white text-sm sm:text-base">Meus Recibos</h3>
+                      <p className="text-xs sm:text-sm text-gray-500 hidden sm:block">Comprovantes de pagamentos</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="p-3 sm:p-4">
+                  {isLoadingReceipts ? <DocumentSkeleton /> : receipts.length === 0 ? (
+                    <EmptyState icon={Receipt} title="Nenhum recibo encontrado" description="Seus recibos aparecerão aqui" />
+                  ) : (
+                    <div className="space-y-2 sm:space-y-3">
+                      {receipts.map((receipt) => {
+                        const isDownloading = downloadingId === receipt.id;
+                        return (
+                          <div key={receipt.id} className="group flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 sm:p-4 rounded-xl bg-[hsl(220,20%,12%)] hover:bg-[hsl(220,20%,14%)] border border-transparent hover:border-green-500/30 transition-all">
+                            <div className="flex items-start gap-3 min-w-0">
+                              <div className="p-2 sm:p-3 rounded-lg sm:rounded-xl bg-green-500/10 text-green-400 group-hover:bg-green-500 group-hover:text-black transition-colors shrink-0">
+                                <Receipt className="h-5 w-5 sm:h-6 sm:w-6" />
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <p className="font-semibold text-white text-sm sm:text-base">Recibo #{receipt.receipt_number}</p>
+                                <p className="text-xs sm:text-sm text-gray-500 truncate">{receipt.description || 'Pagamento'}</p>
+                                <span className="flex items-center gap-1 text-[10px] sm:text-xs text-gray-500 mt-1.5">
+                                  <Calendar className="h-3 w-3" />
+                                  {format(new Date(receipt.payment_date), "dd/MM/yyyy")}
+                                </span>
+                              </div>
+                            </div>
+                            <div className="flex items-center justify-between sm:justify-end gap-3 sm:gap-4">
+                              <span className="text-lg sm:text-xl font-bold text-green-400">
+                                {formatCurrency(receipt.amount)}
+                              </span>
+                              <Button 
+                                size="sm"
+                                className="bg-green-500 hover:bg-green-600 text-black font-medium text-xs sm:text-sm"
+                                onClick={() => handleDownloadReceipt(receipt)}
+                                disabled={isDownloading}
+                              >
+                                {isDownloading ? <Clock className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                              </Button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </TabsContent>
+
+            {/* Proposals Tab */}
+            <TabsContent value="proposals" className="mt-4 sm:mt-6">
+              <div className="rounded-xl sm:rounded-2xl bg-[hsl(220,20%,10%)] border border-[hsl(220,18%,18%)] overflow-hidden">
+                <div className="p-3 sm:p-6 border-b border-[hsl(220,18%,18%)]">
+                  <div className="flex items-center gap-2 sm:gap-3">
+                    <div className="p-2 sm:p-2.5 rounded-lg sm:rounded-xl bg-blue-500/10">
+                      <FileText className="h-4 w-4 sm:h-5 sm:w-5 text-blue-400" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-white text-sm sm:text-base">Minhas Propostas</h3>
+                      <p className="text-xs sm:text-sm text-gray-500 hidden sm:block">Propostas de financiamento</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="p-3 sm:p-4">
+                  {isLoadingProposals ? <DocumentSkeleton /> : proposals.length === 0 ? (
+                    <EmptyState icon={FileText} title="Nenhuma proposta encontrada" description="Suas propostas aparecerão aqui" />
+                  ) : (
+                    <div className="space-y-2 sm:space-y-3">
                       {proposals.map((proposal) => {
                         const statusConfig = proposalStatusConfig[proposal.status] || proposalStatusConfig.pendente;
                         const StatusIcon = statusConfig.icon;
                         return (
-                          <div
-                            key={proposal.id}
-                            className="group flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl bg-[hsl(220,20%,12%)] hover:bg-[hsl(220,20%,14%)] border border-transparent hover:border-blue-500/30 transition-all duration-200"
-                          >
-                            <div className="flex items-start gap-4">
-                              <div className="p-3 rounded-xl bg-blue-500/10 text-blue-400">
-                                <FileText className="h-6 w-6" />
+                          <div key={proposal.id} className="group flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 sm:p-4 rounded-xl bg-[hsl(220,20%,12%)] hover:bg-[hsl(220,20%,14%)] border border-transparent hover:border-blue-500/30 transition-all">
+                            <div className="flex items-start gap-3 min-w-0">
+                              <div className="p-2 sm:p-3 rounded-lg sm:rounded-xl bg-blue-500/10 text-blue-400 shrink-0">
+                                <FileText className="h-5 w-5 sm:h-6 sm:w-6" />
                               </div>
-                              <div>
+                              <div className="min-w-0 flex-1">
                                 <div className="flex items-center gap-2 flex-wrap">
-                                  <p className="font-semibold text-white">
-                                    Proposta #{proposal.proposal_number}
-                                  </p>
-                                  <span className={`flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-[hsl(220,20%,16%)] ${statusConfig.color}`}>
-                                    <StatusIcon className="h-3 w-3" />
+                                  <p className="font-semibold text-white text-sm sm:text-base">#{proposal.proposal_number}</p>
+                                  <span className={`flex items-center gap-1 text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5 rounded-full bg-[hsl(220,20%,16%)] ${statusConfig.color}`}>
+                                    <StatusIcon className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
                                     {statusConfig.label}
                                   </span>
                                 </div>
-                                <p className="text-sm text-gray-500 mt-0.5">
-                                  {proposalTypeMap[proposal.type] || proposal.type}
-                                </p>
-                                <span className="flex items-center gap-1 text-xs text-gray-500 mt-2">
+                                <p className="text-xs sm:text-sm text-gray-500">{proposalTypeMap[proposal.type]}</p>
+                                <span className="flex items-center gap-1 text-[10px] sm:text-xs text-gray-500 mt-1.5">
                                   <Calendar className="h-3 w-3" />
                                   {format(new Date(proposal.created_at), "dd/MM/yyyy")}
                                 </span>
                               </div>
                             </div>
-                            <div className="mt-4 sm:mt-0 text-right">
-                              <p className="text-xl font-bold text-white">
-                                {formatCurrency(proposal.total_amount)}
-                              </p>
+                            <div className="text-right">
+                              <p className="text-lg sm:text-xl font-bold text-white">{formatCurrency(proposal.total_amount)}</p>
                               {proposal.installments && proposal.installments > 1 && (
-                                <p className="text-xs text-gray-500">
-                                  {proposal.installments}x de {formatCurrency(proposal.installment_value || 0)}
-                                </p>
+                                <p className="text-[10px] sm:text-xs text-gray-500">{proposal.installments}x de {formatCurrency(proposal.installment_value || 0)}</p>
                               )}
                             </div>
                           </div>
@@ -588,87 +779,113 @@ export default function ClienteDashboardPage() {
               </div>
             </TabsContent>
 
-            {/* Receipts Tab */}
-            <TabsContent value="receipts" className="mt-6">
-              <div className="rounded-2xl bg-[hsl(220,20%,10%)] border border-[hsl(220,18%,18%)] overflow-hidden">
-                <div className="p-6 border-b border-[hsl(220,18%,18%)]">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2.5 rounded-xl bg-green-500/10">
-                      <Receipt className="h-5 w-5 text-green-400" />
+            {/* Transfer Authorizations Tab */}
+            <TabsContent value="transfers" className="mt-4 sm:mt-6">
+              <div className="rounded-xl sm:rounded-2xl bg-[hsl(220,20%,10%)] border border-[hsl(220,18%,18%)] overflow-hidden">
+                <div className="p-3 sm:p-6 border-b border-[hsl(220,18%,18%)]">
+                  <div className="flex items-center gap-2 sm:gap-3">
+                    <div className="p-2 sm:p-2.5 rounded-lg sm:rounded-xl bg-orange-500/10">
+                      <FileSignature className="h-4 w-4 sm:h-5 sm:w-5 text-orange-400" />
                     </div>
                     <div>
-                      <h3 className="font-semibold text-white">Meus Recibos</h3>
-                      <p className="text-sm text-gray-500">Comprovantes de pagamentos realizados</p>
+                      <h3 className="font-semibold text-white text-sm sm:text-base">Minhas ATPVs</h3>
+                      <p className="text-xs sm:text-sm text-gray-500 hidden sm:block">Autorizações de transferência</p>
                     </div>
                   </div>
                 </div>
-                <div className="p-4">
-                  {isLoadingReceipts ? (
-                    <div className="space-y-3">
-                      {[1, 2].map((i) => (
-                        <div key={i} className="flex items-center gap-4 p-4 rounded-xl bg-[hsl(220,20%,12%)]">
-                          <Skeleton className="h-14 w-14 rounded-xl bg-[hsl(220,20%,16%)]" />
-                          <div className="flex-1 space-y-2">
-                            <Skeleton className="h-4 w-48 bg-[hsl(220,20%,16%)]" />
-                            <Skeleton className="h-3 w-32 bg-[hsl(220,20%,16%)]" />
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : receipts.length === 0 ? (
-                    <div className="text-center py-16">
-                      <div className="w-20 h-20 mx-auto mb-4 rounded-2xl bg-[hsl(220,20%,12%)] flex items-center justify-center">
-                        <Receipt className="h-10 w-10 text-gray-600" />
-                      </div>
-                      <h3 className="font-medium text-white">Nenhum recibo encontrado</h3>
-                      <p className="text-sm text-gray-500 mt-1">
-                        Seus recibos aparecerão aqui quando disponíveis
-                      </p>
-                    </div>
+                <div className="p-3 sm:p-4">
+                  {isLoadingTransferAuths ? <DocumentSkeleton /> : transferAuths.length === 0 ? (
+                    <EmptyState icon={FileSignature} title="Nenhuma ATPV encontrada" description="Suas autorizações aparecerão aqui" />
                   ) : (
-                    <div className="space-y-3">
-                      {receipts.map((receipt) => {
-                        const isDownloading = downloadingId === receipt.id;
+                    <div className="space-y-2 sm:space-y-3">
+                      {transferAuths.map((transfer) => {
+                        const isDownloading = downloadingId === transfer.id;
                         return (
-                          <div
-                            key={receipt.id}
-                            className="group flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl bg-[hsl(220,20%,12%)] hover:bg-[hsl(220,20%,14%)] border border-transparent hover:border-green-500/30 transition-all duration-200"
-                          >
-                            <div className="flex items-start gap-4">
-                              <div className="p-3 rounded-xl bg-green-500/10 text-green-400 group-hover:bg-green-500 group-hover:text-black transition-colors">
-                                <Receipt className="h-6 w-6" />
+                          <div key={transfer.id} className="group flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 sm:p-4 rounded-xl bg-[hsl(220,20%,12%)] hover:bg-[hsl(220,20%,14%)] border border-transparent hover:border-orange-500/30 transition-all">
+                            <div className="flex items-start gap-3 min-w-0">
+                              <div className="p-2 sm:p-3 rounded-lg sm:rounded-xl bg-orange-500/10 text-orange-400 group-hover:bg-orange-500 group-hover:text-white transition-colors shrink-0">
+                                <FileSignature className="h-5 w-5 sm:h-6 sm:w-6" />
                               </div>
-                              <div>
-                                <p className="font-semibold text-white">
-                                  Recibo #{receipt.receipt_number}
-                                </p>
-                                <p className="text-sm text-gray-500 mt-0.5">
-                                  {receipt.description || 'Pagamento'}
-                                </p>
-                                <span className="flex items-center gap-1 text-xs text-gray-500 mt-2">
+                              <div className="min-w-0 flex-1">
+                                <p className="font-semibold text-white text-sm sm:text-base">ATPV #{transfer.authorization_number}</p>
+                                <p className="text-xs sm:text-sm text-gray-500">{transfer.location}</p>
+                                <span className="flex items-center gap-1 text-[10px] sm:text-xs text-gray-500 mt-1.5">
                                   <Calendar className="h-3 w-3" />
-                                  {format(new Date(receipt.payment_date), "dd/MM/yyyy")}
+                                  {format(new Date(transfer.transfer_date), "dd/MM/yyyy")}
                                 </span>
                               </div>
                             </div>
-                            <div className="flex items-center gap-4 mt-4 sm:mt-0">
-                              <span className="text-xl font-bold text-green-400">
-                                {formatCurrency(receipt.amount)}
-                              </span>
-                              <Button 
-                                size="sm"
-                                className="bg-green-500 hover:bg-green-600 text-black font-medium"
-                                onClick={() => handleDownloadReceipt(receipt)}
-                                disabled={isDownloading}
-                              >
-                                {isDownloading ? (
-                                  <Clock className="h-4 w-4 mr-2 animate-spin" />
-                                ) : (
-                                  <Download className="h-4 w-4 mr-2" />
+                            <Button 
+                              size="sm"
+                              className="w-full sm:w-auto bg-orange-500 hover:bg-orange-600 text-white font-medium text-xs sm:text-sm"
+                              onClick={() => handleDownloadTransferAuth(transfer)}
+                              disabled={isDownloading}
+                            >
+                              {isDownloading ? <Clock className="h-4 w-4 mr-1.5 animate-spin" /> : <Download className="h-4 w-4 mr-1.5" />}
+                              PDF
+                            </Button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </TabsContent>
+
+            {/* Reservations Tab */}
+            <TabsContent value="reservations" className="mt-4 sm:mt-6">
+              <div className="rounded-xl sm:rounded-2xl bg-[hsl(220,20%,10%)] border border-[hsl(220,18%,18%)] overflow-hidden">
+                <div className="p-3 sm:p-6 border-b border-[hsl(220,18%,18%)]">
+                  <div className="flex items-center gap-2 sm:gap-3">
+                    <div className="p-2 sm:p-2.5 rounded-lg sm:rounded-xl bg-cyan-500/10">
+                      <CalendarCheck className="h-4 w-4 sm:h-5 sm:w-5 text-cyan-400" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-white text-sm sm:text-base">Minhas Reservas</h3>
+                      <p className="text-xs sm:text-sm text-gray-500 hidden sm:block">Veículos reservados</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="p-3 sm:p-4">
+                  {isLoadingReservations ? <DocumentSkeleton /> : reservations.length === 0 ? (
+                    <EmptyState icon={CalendarCheck} title="Nenhuma reserva encontrada" description="Suas reservas aparecerão aqui" />
+                  ) : (
+                    <div className="space-y-2 sm:space-y-3">
+                      {reservations.map((reservation) => {
+                        const isDownloading = downloadingId === reservation.id;
+                        const statusConf = reservationStatusConfig[reservation.status] || reservationStatusConfig.ativa;
+                        return (
+                          <div key={reservation.id} className="group flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 sm:p-4 rounded-xl bg-[hsl(220,20%,12%)] hover:bg-[hsl(220,20%,14%)] border border-transparent hover:border-cyan-500/30 transition-all">
+                            <div className="flex items-start gap-3 min-w-0">
+                              <div className="p-2 sm:p-3 rounded-lg sm:rounded-xl bg-cyan-500/10 text-cyan-400 group-hover:bg-cyan-500 group-hover:text-white transition-colors shrink-0">
+                                <CalendarCheck className="h-5 w-5 sm:h-6 sm:w-6" />
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <p className="font-semibold text-white text-sm sm:text-base">Reserva #{reservation.reservation_number}</p>
+                                  <span className={`text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5 rounded-full bg-[hsl(220,20%,16%)] ${statusConf.color}`}>
+                                    {statusConf.label}
+                                  </span>
+                                </div>
+                                {reservation.deposit_amount && (
+                                  <p className="text-xs sm:text-sm text-gray-500">Sinal: {formatCurrency(reservation.deposit_amount)}</p>
                                 )}
-                                PDF
-                              </Button>
+                                <span className="flex items-center gap-1 text-[10px] sm:text-xs text-gray-500 mt-1.5">
+                                  <Calendar className="h-3 w-3" />
+                                  {format(new Date(reservation.reservation_date), "dd/MM/yyyy")}
+                                </span>
+                              </div>
                             </div>
+                            <Button 
+                              size="sm"
+                              className="w-full sm:w-auto bg-cyan-500 hover:bg-cyan-600 text-white font-medium text-xs sm:text-sm"
+                              onClick={() => handleDownloadReservation(reservation)}
+                              disabled={isDownloading}
+                            >
+                              {isDownloading ? <Clock className="h-4 w-4 mr-1.5 animate-spin" /> : <Download className="h-4 w-4 mr-1.5" />}
+                              PDF
+                            </Button>
                           </div>
                         );
                       })}
@@ -681,39 +898,39 @@ export default function ClienteDashboardPage() {
 
           {/* Quick Actions */}
           {hasClientRecord && (
-            <div className="grid sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               <button 
                 onClick={() => navigate('/cliente/perfil')}
-                className="group flex items-center justify-between p-5 rounded-2xl bg-[hsl(220,20%,10%)] border border-[hsl(220,18%,18%)] hover:border-primary/50 transition-all duration-200"
+                className="group flex items-center justify-between p-4 sm:p-5 rounded-xl sm:rounded-2xl bg-[hsl(220,20%,10%)] border border-[hsl(220,18%,18%)] hover:border-primary/50 transition-all duration-200"
               >
-                <div className="flex items-center gap-4">
-                  <div className="p-3 rounded-xl bg-primary/10 text-primary group-hover:bg-primary group-hover:text-black transition-colors">
-                    <Settings className="h-5 w-5" />
+                <div className="flex items-center gap-3 sm:gap-4">
+                  <div className="p-2.5 sm:p-3 rounded-lg sm:rounded-xl bg-primary/10 text-primary group-hover:bg-primary group-hover:text-black transition-colors">
+                    <Settings className="h-4 w-4 sm:h-5 sm:w-5" />
                   </div>
                   <div className="text-left">
-                    <p className="font-semibold text-white">Meu Perfil</p>
-                    <p className="text-sm text-gray-500">Atualize seus dados pessoais</p>
+                    <p className="font-semibold text-white text-sm sm:text-base">Meu Perfil</p>
+                    <p className="text-xs sm:text-sm text-gray-500">Atualize seus dados</p>
                   </div>
                 </div>
-                <ChevronRight className="h-5 w-5 text-gray-600 group-hover:text-primary transition-colors" />
+                <ChevronRight className="h-4 w-4 sm:h-5 sm:w-5 text-gray-600 group-hover:text-primary transition-colors" />
               </button>
 
               <a 
                 href="tel:+5549999999999"
-                className="group flex items-center justify-between p-5 rounded-2xl bg-[hsl(220,20%,10%)] border border-[hsl(220,18%,18%)] hover:border-primary/50 transition-all duration-200"
+                className="group flex items-center justify-between p-4 sm:p-5 rounded-xl sm:rounded-2xl bg-[hsl(220,20%,10%)] border border-[hsl(220,18%,18%)] hover:border-primary/50 transition-all duration-200"
               >
-                <div className="flex items-center gap-4">
-                  <div className="p-3 rounded-xl bg-blue-500/10 text-blue-400 group-hover:bg-blue-500 group-hover:text-white transition-colors">
-                    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <div className="flex items-center gap-3 sm:gap-4">
+                  <div className="p-2.5 sm:p-3 rounded-lg sm:rounded-xl bg-blue-500/10 text-blue-400 group-hover:bg-blue-500 group-hover:text-white transition-colors">
+                    <svg className="h-4 w-4 sm:h-5 sm:w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
                     </svg>
                   </div>
                   <div className="text-left">
-                    <p className="font-semibold text-white">Fale Conosco</p>
-                    <p className="text-sm text-gray-500">Entre em contato com a loja</p>
+                    <p className="font-semibold text-white text-sm sm:text-base">Fale Conosco</p>
+                    <p className="text-xs sm:text-sm text-gray-500">Entre em contato</p>
                   </div>
                 </div>
-                <ChevronRight className="h-5 w-5 text-gray-600 group-hover:text-blue-400 transition-colors" />
+                <ChevronRight className="h-4 w-4 sm:h-5 sm:w-5 text-gray-600 group-hover:text-blue-400 transition-colors" />
               </a>
             </div>
           )}
@@ -721,15 +938,15 @@ export default function ClienteDashboardPage() {
       </main>
 
       {/* Footer */}
-      <footer className="mt-16 border-t border-[hsl(220,18%,14%)] bg-[hsl(220,20%,6%)]">
-        <div className="container mx-auto px-4 py-6">
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <img src={logo} alt="Logo" className="h-8 w-8 object-contain" />
-              <div className="h-6 w-px bg-[hsl(220,18%,18%)]" />
-              <span className="text-sm text-gray-500">Portal do Cliente</span>
+      <footer className="mt-8 sm:mt-16 border-t border-[hsl(220,18%,14%)] bg-[hsl(220,20%,6%)]">
+        <div className="container mx-auto px-3 sm:px-4 py-4 sm:py-6">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <img src={logo} alt="Logo" className="h-6 w-6 sm:h-8 sm:w-8 object-contain" />
+              <div className="h-4 sm:h-6 w-px bg-[hsl(220,18%,18%)]" />
+              <span className="text-xs sm:text-sm text-gray-500">Portal do Cliente</span>
             </div>
-            <p className="text-xs text-gray-600">© {new Date().getFullYear()} Todos os direitos reservados</p>
+            <p className="text-[10px] sm:text-xs text-gray-600">© {new Date().getFullYear()} Todos os direitos reservados</p>
           </div>
         </div>
       </footer>

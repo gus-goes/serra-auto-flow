@@ -6,6 +6,10 @@ import type { Tables } from '@/integrations/supabase/types';
 export type ClientContract = Tables<'contracts'>;
 export type ClientProposal = Tables<'proposals'>;
 export type ClientReceipt = Tables<'receipts'>;
+export type ClientWarranty = Tables<'warranties'>;
+export type ClientTransferAuth = Tables<'transfer_authorizations'>;
+export type ClientReservation = Tables<'reservations'>;
+export type ClientWithdrawal = Tables<'withdrawal_declarations'>;
 
 // Hook to get the client record linked to the authenticated user's email
 export function useClientRecord() {
@@ -90,6 +94,94 @@ export function useClientReceipts() {
       
       if (error) throw error;
       return data as ClientReceipt[];
+    },
+    enabled: !!clientRecord?.id,
+  });
+}
+
+// Hook to fetch warranties for the logged-in client
+export function useClientWarranties() {
+  const { data: clientRecord } = useClientRecord();
+  
+  return useQuery({
+    queryKey: ['client-warranties', clientRecord?.id],
+    queryFn: async () => {
+      if (!clientRecord?.id) return [];
+      
+      const { data, error } = await supabase
+        .from('warranties')
+        .select('*')
+        .eq('client_id', clientRecord.id)
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      return data as ClientWarranty[];
+    },
+    enabled: !!clientRecord?.id,
+  });
+}
+
+// Hook to fetch transfer authorizations for the logged-in client
+export function useClientTransferAuths() {
+  const { data: clientRecord } = useClientRecord();
+  
+  return useQuery({
+    queryKey: ['client-transfer-auths', clientRecord?.id],
+    queryFn: async () => {
+      if (!clientRecord?.id) return [];
+      
+      const { data, error } = await supabase
+        .from('transfer_authorizations')
+        .select('*')
+        .eq('client_id', clientRecord.id)
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      return data as ClientTransferAuth[];
+    },
+    enabled: !!clientRecord?.id,
+  });
+}
+
+// Hook to fetch reservations for the logged-in client
+export function useClientReservations() {
+  const { data: clientRecord } = useClientRecord();
+  
+  return useQuery({
+    queryKey: ['client-reservations', clientRecord?.id],
+    queryFn: async () => {
+      if (!clientRecord?.id) return [];
+      
+      const { data, error } = await supabase
+        .from('reservations')
+        .select('*')
+        .eq('client_id', clientRecord.id)
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      return data as ClientReservation[];
+    },
+    enabled: !!clientRecord?.id,
+  });
+}
+
+// Hook to fetch withdrawal declarations for the logged-in client
+export function useClientWithdrawals() {
+  const { data: clientRecord } = useClientRecord();
+  
+  return useQuery({
+    queryKey: ['client-withdrawals', clientRecord?.id],
+    queryFn: async () => {
+      if (!clientRecord?.id) return [];
+      
+      const { data, error } = await supabase
+        .from('withdrawal_declarations')
+        .select('*')
+        .eq('client_id', clientRecord.id)
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      return data as ClientWithdrawal[];
     },
     enabled: !!clientRecord?.id,
   });
