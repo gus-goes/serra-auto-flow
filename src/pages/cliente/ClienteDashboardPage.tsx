@@ -33,6 +33,7 @@ import { mapClientFromDB, mapVehicleFromDB, mapContractFromDB, mapReceiptFromDB 
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useState } from 'react';
+import { PageTransition } from '@/components/PageTransition';
 
 const proposalStatusConfig: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline'; icon: typeof CheckCircle2; color: string }> = {
   pendente: { label: 'Em Análise', variant: 'secondary', icon: HourglassIcon, color: 'text-yellow-500' },
@@ -160,6 +161,7 @@ export default function ClienteDashboardPage() {
   };
 
   return (
+    <PageTransition>
     <div className="min-h-screen bg-[hsl(220,20%,8%)]">
       {/* Hero Header */}
       <header className="relative overflow-hidden bg-[hsl(220,20%,6%)] border-b-2 border-primary">
@@ -691,5 +693,6 @@ export default function ClienteDashboardPage() {
         </div>
       </footer>
     </div>
+    </PageTransition>
   );
 }
