@@ -123,6 +123,7 @@ export default function DocumentsPage() {
       installmentValue: data.paymentType === 'parcelado' ? data.installmentValue : undefined,
       dueDay: data.paymentType === 'parcelado' ? data.dueDay : undefined,
       firstDueDate: data.paymentType === 'parcelado' ? data.firstDueDate : undefined,
+      deliveryPercentage: data.paymentType === 'avista' ? data.deliveryPercentage : undefined,
       clientData: {
         name: data.clientName,
         cpf: data.clientCpf,
