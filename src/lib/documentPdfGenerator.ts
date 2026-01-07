@@ -160,9 +160,31 @@ export function generateContractPDF(contract: Contract): void {
   y += 10;
   
   // ===== QUALIFICAÇÃO DAS PARTES =====
-  const clientAddress = client.address ? 
-    `${client.address.street}, ${client.address.number}${client.address.complement ? ', ' + client.address.complement : ''}, ${client.address.neighborhood}, ${client.address.city}, ${client.address.state} CEP ${client.address.zipCode}` : 
-    'endereço não informado';
+  // Use edited data if available, otherwise fallback to original
+  const clientData = contract.clientData || {
+    name: client.name,
+    cpf: client.cpf,
+    rg: client.rg,
+    email: client.email || '',
+    maritalStatus: maritalStatusLabels[client.maritalStatus] || 'estado civil não informado',
+    occupation: client.occupation || '',
+    address: client.address ? 
+      `${client.address.street}, ${client.address.number}${client.address.complement ? ', ' + client.address.complement : ''}, ${client.address.neighborhood}, ${client.address.city}, ${client.address.state} CEP ${client.address.zipCode}` : 
+      'endereço não informado',
+  };
+  
+  const vehicleData = contract.vehicleData || {
+    brand: vehicle.brand,
+    model: vehicle.model,
+    year: vehicle.year,
+    color: vehicle.color,
+    plate: vehicle.plate || '',
+    chassis: vehicle.chassis || '',
+    renavam: vehicle.renavam || '',
+    fuel: vehicle.fuel,
+    transmission: vehicle.transmission,
+    mileage: vehicle.mileage,
+  };
   
   // VENDEDOR(A)
   doc.setFontSize(10);
@@ -191,8 +213,7 @@ export function generateContractPDF(contract: Contract): void {
   doc.text('COMPRADOR(A):', marginLeft, y);
   y += 6;
   
-  const estadoCivil = maritalStatusLabels[client.maritalStatus] || 'estado civil não informado';
-  const compradorTexto = `${client.name}, Brasileiro(a), inscrito(a) no CPF Nº ${formatCPF(client.cpf)}, portador(a) do RG Nº ${formatRG(client.rg)}, estado civil ${estadoCivil.toLowerCase()}${client.occupation ? `, ${client.occupation}` : ''}, residente em ${clientAddress}${client.email ? ` e endereço eletrônico ${client.email}` : ''}.`;
+  const compradorTexto = `${clientData.name}, Brasileiro(a), inscrito(a) no CPF Nº ${formatCPF(clientData.cpf)}, portador(a) do RG Nº ${formatRG(clientData.rg)}, estado civil ${clientData.maritalStatus.toLowerCase()}${clientData.occupation ? `, ${clientData.occupation}` : ''}, residente em ${clientData.address}${clientData.email ? ` e endereço eletrônico ${clientData.email}` : ''}.`;
   y = drawParagraph(compradorTexto);
   y += 6;
   
@@ -204,9 +225,8 @@ export function generateContractPDF(contract: Contract): void {
   // ===== CLÁUSULA PRIMEIRA - DO OBJETO =====
   y = drawClauseTitle('CLÁUSULA PRIMEIRA – DO OBJETO');
   
-  const vehicleDesc = `${vehicle.brand} ${vehicle.model}, ano de fabricação/modelo ${vehicle.year}, cor ${vehicle.color}, placa ${vehicle.plate || 'a ser emplacado'}, chassi nº ${vehicle.chassis || '___________________'}, RENAVAM nº ${vehicle.renavam || '___________________'}, combustível ${vehicle.fuel}, câmbio ${vehicle.transmission}, com ${vehicle.mileage.toLocaleString('pt-BR')} km rodados`;
+  const vehicleDesc = `${vehicleData.brand} ${vehicleData.model}, ano de fabricação/modelo ${vehicleData.year}, cor ${vehicleData.color}, placa ${vehicleData.plate || 'a ser emplacado'}, chassi nº ${vehicleData.chassis || '___________________'}, RENAVAM nº ${vehicleData.renavam || '___________________'}, combustível ${vehicleData.fuel}, câmbio ${vehicleData.transmission}, com ${vehicleData.mileage.toLocaleString('pt-BR')} km rodados`;
   
-  const clausulaObjeto = `1.1. O(A) VENDEDOR(A) é legítimo(a) proprietário(a) e possuidor(a) do veículo: ${vehicleDesc}.`;
   y = drawSubClause('1.1.', `O(A) VENDEDOR(A) é legítimo(a) proprietário(a) e possuidor(a) do veículo: ${vehicleDesc}.`);
   
   y = drawSubClause('1.2.', 'O(A) VENDEDOR(A), pelo presente instrumento, vende, transfere e outorga ao(à) COMPRADOR(A) o veículo acima descrito, livre e desembaraçado de quaisquer ônus, dívidas, multas, impostos, taxas ou encargos de qualquer natureza, até a data da assinatura deste contrato.');
@@ -224,12 +244,13 @@ export function generateContractPDF(contract: Contract): void {
   } else {
     const entradaExtenso = numberToWords(contract.downPayment || 0);
     const parcelaExtenso = numberToWords(contract.installmentValue || 0);
+    const dueDay = contract.dueDay || 10;
     
     if (contract.downPayment && contract.downPayment > 0) {
       y = drawSubClause('2.2.', `Entrada no valor de ${formatCurrency(contract.downPayment)} (${entradaExtenso}), paga no ato da assinatura deste contrato.`);
     }
     
-    y = drawSubClause('2.3.', `O saldo remanescente será pago em ${contract.installments || 0} (${numberToWords(contract.installments || 0).replace(' reais', '').replace(' real', '')}) parcelas mensais e consecutivas no valor de ${formatCurrency(contract.installmentValue || 0)} (${parcelaExtenso}) cada, vencendo-se a primeira em _____/_____/_______ e as demais no mesmo dia dos meses subsequentes.`);
+    y = drawSubClause('2.3.', `O saldo remanescente será pago em ${contract.installments || 0} parcelas mensais e consecutivas no valor de ${formatCurrency(contract.installmentValue || 0)} (${parcelaExtenso}) cada, com vencimento todo dia ${dueDay} de cada mês, iniciando no mês subsequente à assinatura deste contrato.`);
   }
   
   y = drawSubClause('2.4.', 'O(A) VENDEDOR(A) declara ter recebido o sinal/entrada ou pagamento conforme descrito acima, dando plena e irrevogável quitação do valor correspondente.');

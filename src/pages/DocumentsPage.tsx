@@ -21,9 +21,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ContractPreviewDialog, type ContractData } from '@/components/ContractPreviewDialog';
 import { 
   FileText, Plus, Search, Download, Trash2, 
-  FileSignature, Shield, Car, XCircle, CalendarClock 
+  FileSignature, Shield, Car, XCircle, CalendarClock, Eye
 } from 'lucide-react';
 
 const statusColors = {
@@ -51,6 +52,7 @@ export default function DocumentsPage() {
 
   // Dialog states
   const [isContractOpen, setIsContractOpen] = useState(false);
+  const [isContractPreviewOpen, setIsContractPreviewOpen] = useState(false);
   const [isWarrantyOpen, setIsWarrantyOpen] = useState(false);
   const [isTransferOpen, setIsTransferOpen] = useState(false);
   const [isWithdrawalOpen, setIsWithdrawalOpen] = useState(false);
@@ -94,28 +96,56 @@ export default function DocumentsPage() {
     setReservations(reservationStorage.getAll());
   };
 
-  // Handlers
-  const handleCreateContract = () => {
+  // Handler to open preview
+  const handleOpenContractPreview = () => {
     if (!contractForm.clientId || !contractForm.vehicleId) {
       toast({ title: 'Campos obrigatórios', description: 'Selecione cliente e veículo.', variant: 'destructive' });
       return;
     }
+    setIsContractOpen(false);
+    setIsContractPreviewOpen(true);
+  };
+
+  // Handler for confirmed contract creation
+  const handleConfirmContract = (data: ContractData) => {
     const contract: Contract = {
       id: generateId(),
       number: generateNumber('CONT'),
       clientId: contractForm.clientId,
       vehicleId: contractForm.vehicleId,
       vendorId: user!.id,
-      vehiclePrice: contractForm.vehiclePrice,
-      paymentType: contractForm.paymentType,
-      downPayment: contractForm.paymentType === 'parcelado' ? contractForm.downPayment : undefined,
-      installments: contractForm.paymentType === 'parcelado' ? contractForm.installments : undefined,
-      installmentValue: contractForm.paymentType === 'parcelado' ? contractForm.installmentValue : undefined,
+      vehiclePrice: data.vehiclePrice,
+      paymentType: data.paymentType,
+      downPayment: data.paymentType === 'parcelado' ? data.downPayment : undefined,
+      installments: data.paymentType === 'parcelado' ? data.installments : undefined,
+      installmentValue: data.paymentType === 'parcelado' ? data.installmentValue : undefined,
+      dueDay: data.paymentType === 'parcelado' ? data.dueDay : undefined,
+      clientData: {
+        name: data.clientName,
+        cpf: data.clientCpf,
+        rg: data.clientRg,
+        email: data.clientEmail,
+        maritalStatus: data.clientMaritalStatus,
+        occupation: data.clientOccupation,
+        address: data.clientAddress,
+      },
+      vehicleData: {
+        brand: data.vehicleBrand,
+        model: data.vehicleModel,
+        year: data.vehicleYear,
+        color: data.vehicleColor,
+        plate: data.vehiclePlate,
+        chassis: data.vehicleChassis,
+        renavam: data.vehicleRenavam,
+        fuel: data.vehicleFuel,
+        transmission: data.vehicleTransmission,
+        mileage: data.vehicleMileage,
+      },
       createdAt: getCurrentTimestamp(),
     };
     contractStorage.save(contract);
     refreshData();
-    setIsContractOpen(false);
+    setIsContractPreviewOpen(false);
     resetContractForm();
     generateContractPDF(contract);
     toast({ title: 'Contrato criado', description: 'PDF gerado com sucesso.' });
@@ -331,10 +361,27 @@ export default function DocumentsPage() {
                       </div>
                     </div>
                   )}
-                  <Button onClick={handleCreateContract} className="w-full btn-primary">Gerar Contrato</Button>
+                  <Button onClick={handleOpenContractPreview} className="w-full btn-primary">
+                    <Eye className="h-4 w-4 mr-2" />
+                    Revisar e Gerar
+                  </Button>
                 </div>
               </DialogContent>
             </Dialog>
+            
+            {/* Contract Preview Dialog */}
+            <ContractPreviewDialog
+              open={isContractPreviewOpen}
+              onOpenChange={setIsContractPreviewOpen}
+              clientId={contractForm.clientId}
+              vehicleId={contractForm.vehicleId}
+              initialPrice={contractForm.vehiclePrice}
+              initialPaymentType={contractForm.paymentType}
+              initialDownPayment={contractForm.downPayment}
+              initialInstallments={contractForm.installments}
+              initialInstallmentValue={contractForm.installmentValue}
+              onConfirm={handleConfirmContract}
+            />
           </div>
           <Table>
             <TableHeader>
