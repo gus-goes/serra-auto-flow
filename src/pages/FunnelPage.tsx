@@ -48,7 +48,11 @@ export default function FunnelPage() {
     };
     
     clients.forEach(client => {
-      grouped[client.funnelStage].push(client);
+      // Migrate old 'lead' stage to 'atendimento' (for legacy data)
+      const stage = (client.funnelStage as string) === 'lead' ? 'atendimento' : client.funnelStage;
+      if (grouped[stage]) {
+        grouped[stage].push(client);
+      }
     });
     
     return grouped;
