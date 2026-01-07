@@ -2,6 +2,15 @@
  * Company configuration - fixed data for PDFs and documents
  */
 
+export interface LegalRepresentative {
+  name: string;
+  nationality: string;
+  maritalStatus: string;
+  occupation: string;
+  rg: string;
+  cpf: string;
+}
+
 export interface CompanyConfig {
   name: string;
   fantasyName: string;
@@ -16,23 +25,32 @@ export interface CompanyConfig {
   phone?: string;
   email?: string;
   logo?: string;
+  legalRepresentative?: LegalRepresentative;
 }
 
 const STORAGE_KEY = 'autos_serra_company_config';
 
 const DEFAULT_COMPANY: CompanyConfig = {
   name: 'Autos da Serra',
-  fantasyName: 'AUTOS DA SERRA',
+  fantasyName: 'AUTO DA SERRA MULTIMARCAS',
   cnpj: '29.030.365/0001-40',
   address: {
     street: 'Av. Dom Pedro II',
     neighborhood: 'São Cristóvão',
     city: 'Lages',
     state: 'SC',
-    zipCode: '88.509-000',
+    zipCode: '88509-001',
   },
   phone: '(49) 9999-9999',
-  email: 'contato@autosdoserra.com.br',
+  email: 'jacksonautomoveislages@gmail.com',
+  legalRepresentative: {
+    name: 'JACKSON DELFES DE MORAES',
+    nationality: 'Brasileiro',
+    maritalStatus: 'solteiro(a)',
+    occupation: 'Empresário',
+    rg: '3047601',
+    cpf: '875.174.417-87',
+  },
 };
 
 export function getCompanyConfig(): CompanyConfig {

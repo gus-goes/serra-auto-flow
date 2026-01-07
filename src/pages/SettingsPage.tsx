@@ -1,6 +1,7 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { bankStorage, backup, generateId } from '@/lib/storage';
+import { getCompanyConfig, saveCompanyConfig, type CompanyConfig, type LegalRepresentative } from '@/lib/companyConfig';
 import type { Bank } from '@/types';
 import { formatPercent } from '@/lib/formatters';
 import { useToast } from '@/hooks/use-toast';
@@ -12,6 +13,7 @@ import { Switch } from '@/components/ui/switch';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { 
   Settings, 
   Building2, 
@@ -24,7 +26,9 @@ import {
   AlertTriangle,
   Palette,
   Image,
-  Home
+  Home,
+  User,
+  Save
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -37,6 +41,17 @@ export default function SettingsPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const logoInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+
+  // Company config state
+  const [companyConfig, setCompanyConfig] = useState<CompanyConfig>(getCompanyConfig());
+  const [legalRep, setLegalRep] = useState<LegalRepresentative>(companyConfig.legalRepresentative || {
+    name: '',
+    nationality: 'Brasileiro',
+    maritalStatus: 'solteiro(a)',
+    occupation: '',
+    rg: '',
+    cpf: '',
+  });
 
   const [form, setForm] = useState({
     name: '',
@@ -478,6 +493,102 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
 
+
+        {/* Legal Representative */}
+        <Card className="lg:col-span-2">
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <User className="h-5 w-5 text-primary" />
+              Representante Legal da Empresa
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground mb-4">
+              Dados do representante legal para inclusão em contratos e documentos oficiais.
+            </p>
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              <div className="space-y-2">
+                <Label htmlFor="rep-name">Nome Completo</Label>
+                <Input
+                  id="rep-name"
+                  value={legalRep.name}
+                  onChange={(e) => setLegalRep({ ...legalRep, name: e.target.value })}
+                  placeholder="NOME COMPLETO"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="rep-nationality">Nacionalidade</Label>
+                <Input
+                  id="rep-nationality"
+                  value={legalRep.nationality}
+                  onChange={(e) => setLegalRep({ ...legalRep, nationality: e.target.value })}
+                  placeholder="Brasileiro"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="rep-marital">Estado Civil</Label>
+                <Select
+                  value={legalRep.maritalStatus}
+                  onValueChange={(value) => setLegalRep({ ...legalRep, maritalStatus: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="solteiro(a)">Solteiro(a)</SelectItem>
+                    <SelectItem value="casado(a)">Casado(a)</SelectItem>
+                    <SelectItem value="divorciado(a)">Divorciado(a)</SelectItem>
+                    <SelectItem value="viúvo(a)">Viúvo(a)</SelectItem>
+                    <SelectItem value="união estável">União Estável</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="rep-occupation">Profissão</Label>
+                <Input
+                  id="rep-occupation"
+                  value={legalRep.occupation}
+                  onChange={(e) => setLegalRep({ ...legalRep, occupation: e.target.value })}
+                  placeholder="Empresário"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="rep-rg">RG</Label>
+                <Input
+                  id="rep-rg"
+                  value={legalRep.rg}
+                  onChange={(e) => setLegalRep({ ...legalRep, rg: e.target.value })}
+                  placeholder="0000000"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="rep-cpf">CPF</Label>
+                <Input
+                  id="rep-cpf"
+                  value={legalRep.cpf}
+                  onChange={(e) => setLegalRep({ ...legalRep, cpf: e.target.value })}
+                  placeholder="000.000.000-00"
+                />
+              </div>
+            </div>
+            <div className="mt-4 flex justify-end">
+              <Button
+                onClick={() => {
+                  saveCompanyConfig({ legalRepresentative: legalRep });
+                  setCompanyConfig(getCompanyConfig());
+                  toast({
+                    title: 'Representante salvo',
+                    description: 'Dados do representante legal atualizados com sucesso.',
+                  });
+                }}
+                className="btn-primary"
+              >
+                <Save className="h-4 w-4 mr-2" />
+                Salvar Representante
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Backup */}
         <Card>
