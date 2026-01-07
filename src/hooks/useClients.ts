@@ -120,17 +120,39 @@ export function useDeleteClient() {
 
   return useMutation({
     mutationFn: async (id: string) => {
+      // First get the client to find their email
+      const { data: client, error: fetchError } = await supabase
+        .from('clients')
+        .select('email')
+        .eq('id', id)
+        .single();
+      
+      if (fetchError) throw fetchError;
+
+      // Delete the client record
       const { error } = await supabase
         .from('clients')
         .delete()
         .eq('id', id);
       if (error) throw error;
+
+      // If client had an email, try to delete their auth user too
+      if (client?.email) {
+        try {
+          await supabase.functions.invoke('delete-user', {
+            body: { email: client.email },
+          });
+        } catch (e) {
+          // Log but don't fail if auth user deletion fails
+          console.warn('Could not delete auth user:', e);
+        }
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['clients'] });
       toast({
         title: 'Cliente excluído',
-        description: 'O cliente foi removido do sistema.',
+        description: 'O cliente e suas credenciais foram removidos do sistema.',
       });
     },
     onError: (error) => {
