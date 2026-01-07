@@ -24,6 +24,7 @@ import { useClientRecord } from '@/hooks/useClientDocuments';
 import { useUpdateClientProfile, ClientProfileUpdate } from '@/hooks/useClientProfile';
 import { useState, useEffect } from 'react';
 import { z } from 'zod';
+import { PageTransition } from '@/components/PageTransition';
 
 const maritalStatusOptions = [
   { value: 'solteiro', label: 'Solteiro(a)' },
@@ -141,6 +142,7 @@ export default function ClienteProfilePage() {
   };
 
   return (
+    <PageTransition>
     <div className="min-h-screen bg-[hsl(220,20%,8%)]">
       {/* Header */}
       <header className="relative overflow-hidden bg-[hsl(220,20%,6%)] border-b-2 border-primary">
@@ -462,5 +464,6 @@ export default function ClienteProfilePage() {
         </div>
       </main>
     </div>
+    </PageTransition>
   );
 }
