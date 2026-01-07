@@ -139,11 +139,18 @@ export function useDeleteClient() {
       // If client had an email, try to delete their auth user too
       if (client?.email) {
         try {
-          await supabase.functions.invoke('delete-user', {
+          const res = await supabase.functions.invoke('delete-user', {
             body: { email: client.email },
           });
+
+          if (res.error) {
+            console.warn('delete-user invoke error:', res.error.message);
+          }
+          if ((res.data as any)?.error) {
+            console.warn('delete-user function error:', (res.data as any).error);
+          }
         } catch (e) {
-          // Log but don't fail if auth user deletion fails
+          // Don't fail the client deletion if auth deletion fails
           console.warn('Could not delete auth user:', e);
         }
       }
