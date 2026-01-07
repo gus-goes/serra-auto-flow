@@ -8,13 +8,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
-import { clientStorage, vehicleStorage } from '@/lib/storage';
+import { useClients } from '@/hooks/useClients';
+import { useVehicles } from '@/hooks/useVehicles';
 import { getCompanyConfig } from '@/lib/companyConfig';
 import { formatCurrency, formatCPF, formatRG, maritalStatusLabels } from '@/lib/formatters';
 import { useToast } from '@/hooks/use-toast';
-import type { Client } from '@/types';
 import { FileText, User, Car, CreditCard, Download, Edit2 } from 'lucide-react';
-
+import type { Tables } from '@/integrations/supabase/types';
 interface ContractData {
   // Dados do cliente
   clientName: string;
@@ -76,11 +76,17 @@ export function ContractPreviewDialog({
   const [isEditing, setIsEditing] = useState(false);
   const { toast } = useToast();
 
+  const { data: clients = [] } = useClients();
+  const { data: vehicles = [] } = useVehicles();
+
+  const client = clients.find(c => c.id === clientId);
+  const vehicle = vehicles.find(v => v.id === vehicleId);
+
   const company = getCompanyConfig();
 
-  const buildClientAddress = (c: Client) => {
+  const buildClientAddress = (c: Tables<'clients'>) => {
     if (!c.address) return '';
-    return `${c.address.street}, ${c.address.number}${c.address.complement ? ', ' + c.address.complement : ''}, ${c.address.neighborhood}, ${c.address.city}/${c.address.state}, CEP ${c.address.zipCode}`;
+    return `${c.address}, ${c.city || ''}/${c.state || ''}, CEP ${c.zip_code || ''}`;
   };
 
   const [data, setData] = useState<ContractData>({
@@ -112,33 +118,29 @@ export function ContractPreviewDialog({
     deliveryPercentage: 50,
   });
 
-  // Load data when dialog opens (avoid depending on object references)
+  // Load data when dialog opens
   useEffect(() => {
-    if (!open) return;
-
-    const client = clientStorage.getById(clientId);
-    const vehicle = vehicleStorage.getById(vehicleId);
-    if (!client || !vehicle) return;
+    if (!open || !client || !vehicle) return;
 
     setData({
       clientName: client.name,
-      clientCpf: client.cpf,
-      clientRg: client.rg,
+      clientCpf: client.cpf || '',
+      clientRg: client.rg || '',
       clientEmail: client.email || '',
       clientPhone: client.phone || '',
-      clientMaritalStatus: maritalStatusLabels[client.maritalStatus] || '',
+      clientMaritalStatus: client.marital_status ? maritalStatusLabels[client.marital_status] || '' : '',
       clientOccupation: client.occupation || '',
       clientAddress: buildClientAddress(client),
       vehicleBrand: vehicle.brand,
       vehicleModel: vehicle.model,
-      vehicleYear: vehicle.year,
+      vehicleYear: vehicle.year_model,
       vehicleColor: vehicle.color,
       vehiclePlate: vehicle.plate || '',
-      vehicleChassis: vehicle.chassis || '',
+      vehicleChassis: vehicle.chassi || '',
       vehicleRenavam: vehicle.renavam || '',
       vehicleFuel: vehicle.fuel,
       vehicleTransmission: vehicle.transmission,
-      vehicleMileage: vehicle.mileage,
+      vehicleMileage: vehicle.mileage || 0,
       vehiclePrice: initialPrice || vehicle.price,
       paymentType: initialPaymentType,
       downPayment: initialDownPayment,
@@ -151,10 +153,8 @@ export function ContractPreviewDialog({
 
     setActiveTab('cliente');
     setIsEditing(false);
-  }, [open, clientId, vehicleId, initialPrice, initialPaymentType, initialDownPayment, initialInstallments, initialInstallmentValue]);
+  }, [open, client, vehicle, initialPrice, initialPaymentType, initialDownPayment, initialInstallments, initialInstallmentValue]);
 
-  const client = clientStorage.getById(clientId);
-  const vehicle = vehicleStorage.getById(vehicleId);
   if (!client || !vehicle) return null;
 
   const handleConfirm = () => {
