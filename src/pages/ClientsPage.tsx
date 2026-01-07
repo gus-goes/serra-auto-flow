@@ -122,7 +122,9 @@ export default function ClientsPage() {
     maritalStatus: '' as MaritalStatus | '',
     birthDate: '',
     occupation: '',
-    address: '',
+    street: '',
+    number: '',
+    neighborhood: '',
     city: 'Lages',
     state: 'SC',
     zipCode: '',
@@ -180,7 +182,9 @@ export default function ClientsPage() {
         marital_status: form.maritalStatus || null,
         birth_date: form.birthDate || null,
         occupation: form.occupation.trim() || null,
-        address: form.address.trim() || null,
+        street: form.street.trim() || null,
+        number: form.number.trim() || null,
+        neighborhood: form.neighborhood.trim() || null,
         city: form.city.trim() || null,
         state: form.state.trim() || null,
         zip_code: form.zipCode.trim() || null,
@@ -224,7 +228,9 @@ export default function ClientsPage() {
       maritalStatus: client.marital_status || '',
       birthDate: client.birth_date || '',
       occupation: client.occupation || '',
-      address: client.address || '',
+      street: (client as any).street || client.address || '',
+      number: (client as any).number || '',
+      neighborhood: (client as any).neighborhood || '',
       city: client.city || 'Lages',
       state: client.state || 'SC',
       zipCode: client.zip_code || '',
@@ -297,7 +303,9 @@ export default function ClientsPage() {
       maritalStatus: '',
       birthDate: '',
       occupation: '',
-      address: '',
+      street: '',
+      number: '',
+      neighborhood: '',
       city: 'Lages',
       state: 'SC',
       zipCode: '',
@@ -593,12 +601,32 @@ export default function ClientsPage() {
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2 md:col-span-2">
-                    <Label htmlFor="address">Endereço</Label>
+                    <Label htmlFor="street">Rua</Label>
                     <Input
-                      id="address"
-                      value={form.address}
-                      onChange={(e) => setForm({ ...form, address: e.target.value })}
-                      placeholder="Rua, número, bairro"
+                      id="street"
+                      value={form.street}
+                      onChange={(e) => setForm({ ...form, street: e.target.value })}
+                      placeholder="Nome da rua"
+                    />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="number">Número</Label>
+                    <Input
+                      id="number"
+                      value={form.number}
+                      onChange={(e) => setForm({ ...form, number: e.target.value })}
+                      placeholder="123"
+                    />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="neighborhood">Bairro</Label>
+                    <Input
+                      id="neighborhood"
+                      value={form.neighborhood}
+                      onChange={(e) => setForm({ ...form, neighborhood: e.target.value })}
+                      placeholder="Nome do bairro"
                     />
                   </div>
                   
