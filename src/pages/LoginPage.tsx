@@ -6,14 +6,16 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
+import { Switch } from '@/components/ui/switch';
 import logo from '@/assets/logo.png';
-import { Lock, Mail, AlertCircle, Loader2 } from 'lucide-react';
+import { Lock, Mail, AlertCircle, Loader2, Users, Briefcase } from 'lucide-react';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [isClientMode, setIsClientMode] = useState(false);
   
   const { login, user, role, isLoading } = useAuth();
   const navigate = useNavigate();
@@ -73,9 +75,32 @@ export default function LoginPage() {
           <div className="flex justify-center mb-4">
             <img src={logo} alt="Autos da Serra" className="h-16 object-contain" />
           </div>
-          <CardTitle className="text-2xl font-bold">Sistema Interno</CardTitle>
+          
+          {/* Switch para alternar entre Cliente e Funcionário */}
+          <div className="flex items-center justify-center gap-3 py-3 px-4 bg-muted/50 rounded-lg mb-4">
+            <div className={`flex items-center gap-1.5 transition-colors ${!isClientMode ? 'text-primary font-medium' : 'text-muted-foreground'}`}>
+              <Briefcase className="h-4 w-4" />
+              <span className="text-sm">Funcionário</span>
+            </div>
+            <Switch
+              checked={isClientMode}
+              onCheckedChange={setIsClientMode}
+              aria-label="Alternar entre modo cliente e funcionário"
+            />
+            <div className={`flex items-center gap-1.5 transition-colors ${isClientMode ? 'text-primary font-medium' : 'text-muted-foreground'}`}>
+              <Users className="h-4 w-4" />
+              <span className="text-sm">Cliente</span>
+            </div>
+          </div>
+
+          <CardTitle className="text-2xl font-bold">
+            {isClientMode ? 'Portal do Cliente' : 'Sistema Interno'}
+          </CardTitle>
           <CardDescription className="text-muted-foreground">
-            Acesso para administradores e vendedores
+            {isClientMode 
+              ? 'Acesse seus documentos e acompanhe suas propostas'
+              : 'Acesso para administradores e vendedores'
+            }
           </CardDescription>
         </CardHeader>
         
@@ -136,6 +161,12 @@ export default function LoginPage() {
                 'Entrar'
               )}
             </Button>
+
+            {isClientMode && (
+              <p className="text-xs text-center text-muted-foreground mt-4">
+                Suas credenciais foram fornecidas pela equipe da loja.
+              </p>
+            )}
           </form>
         </CardContent>
       </Card>
