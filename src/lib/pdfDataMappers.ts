@@ -45,9 +45,9 @@ export function mapClientFromDB(dbClient: Tables<'clients'>): Client {
     birthDate: dbClient.birth_date || undefined,
     occupation: dbClient.occupation || undefined,
     address: {
-      street: dbClient.address || '',
-      number: '',
-      neighborhood: '',
+      street: (dbClient as any).street || dbClient.address || '',
+      number: (dbClient as any).number || '',
+      neighborhood: (dbClient as any).neighborhood || '',
       city: dbClient.city || '',
       state: dbClient.state || '',
       zipCode: dbClient.zip_code || '',

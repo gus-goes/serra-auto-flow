@@ -101,12 +101,15 @@ export type Database = {
           id: string
           marital_status: Database["public"]["Enums"]["marital_status"] | null
           name: string
+          neighborhood: string | null
           notes: string | null
+          number: string | null
           occupation: string | null
           phone: string | null
           rg: string | null
           seller_id: string | null
           state: string | null
+          street: string | null
           updated_at: string
           zip_code: string | null
         }
@@ -121,12 +124,15 @@ export type Database = {
           id?: string
           marital_status?: Database["public"]["Enums"]["marital_status"] | null
           name: string
+          neighborhood?: string | null
           notes?: string | null
+          number?: string | null
           occupation?: string | null
           phone?: string | null
           rg?: string | null
           seller_id?: string | null
           state?: string | null
+          street?: string | null
           updated_at?: string
           zip_code?: string | null
         }
@@ -141,12 +147,15 @@ export type Database = {
           id?: string
           marital_status?: Database["public"]["Enums"]["marital_status"] | null
           name?: string
+          neighborhood?: string | null
           notes?: string | null
+          number?: string | null
           occupation?: string | null
           phone?: string | null
           rg?: string | null
           seller_id?: string | null
           state?: string | null
+          street?: string | null
           updated_at?: string
           zip_code?: string | null
         }
