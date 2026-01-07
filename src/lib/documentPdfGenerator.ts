@@ -4,8 +4,42 @@ import { formatDateDisplay, formatDateFullPtBr } from './dateUtils';
 import { getPDFColors } from './bankConfig';
 import { getCompanyConfig, formatCompanyAddress } from './companyConfig';
 import type { Contract, Warranty, TransferAuthorization, WithdrawalDeclaration, Reservation, Client, Vehicle, User } from '@/types';
-import { clientStorage, vehicleStorage, userStorage } from './storage';
 import companyLogo from '@/assets/logo.png';
+
+/**
+ * PDF Data interfaces - all data must be passed directly
+ */
+export interface ContractPDFData {
+  contract: Contract;
+  client: Client;
+  vehicle: Vehicle;
+  vendor?: User | null;
+}
+
+export interface WarrantyPDFData {
+  warranty: Warranty;
+  client: Client;
+  vehicle: Vehicle;
+}
+
+export interface TransferAuthPDFData {
+  transfer: TransferAuthorization;
+  client: Client;
+  vehicle: Vehicle;
+  vendor?: User | null;
+}
+
+export interface WithdrawalPDFData {
+  declaration: WithdrawalDeclaration;
+  client: Client;
+  vehicle: Vehicle;
+}
+
+export interface ReservationPDFData {
+  reservation: Reservation;
+  client: Client;
+  vehicle: Vehicle;
+}
 
 /**
  * Document PDF Generator for Contracts, Warranties, ATPV, Withdrawals, and Reservations
@@ -90,13 +124,9 @@ function drawInfoRow(doc: jsPDF, label: string, value: string, x: number, y: num
 
 // ===== CONTRACT PDF (ELABORADO) =====
 
-export function generateContractPDF(contract: Contract): void {
-  const client = clientStorage.getById(contract.clientId);
-  const vehicle = vehicleStorage.getById(contract.vehicleId);
-  const vendor = userStorage.getById(contract.vendorId);
+export function generateContractPDF(data: ContractPDFData): void {
+  const { contract, client, vehicle, vendor } = data;
   const company = getCompanyConfig();
-  
-  if (!client || !vehicle) return;
   
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.getWidth();
@@ -474,12 +504,9 @@ export function generateContractPDF(contract: Contract): void {
 
 // ===== WARRANTY PDF =====
 
-export function generateWarrantyPDF(warranty: Warranty): void {
-  const client = clientStorage.getById(warranty.clientId);
-  const vehicle = vehicleStorage.getById(warranty.vehicleId);
+export function generateWarrantyPDF(data: WarrantyPDFData): void {
+  const { warranty, client, vehicle } = data;
   const company = getCompanyConfig();
-  
-  if (!client || !vehicle) return;
   
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.getWidth();
@@ -639,13 +666,9 @@ export function generateWarrantyPDF(warranty: Warranty): void {
 
 // ===== ATPV PDF (IDENTICAL TO OFFICIAL DETRAN FORMAT) =====
 
-export function generateTransferAuthPDF(transfer: TransferAuthorization): void {
-  const client = clientStorage.getById(transfer.clientId);
-  const vehicle = vehicleStorage.getById(transfer.vehicleId);
-  const vendor = userStorage.getById(transfer.vendorId);
+export function generateTransferAuthPDF(data: TransferAuthPDFData): void {
+  const { transfer, client, vehicle, vendor } = data;
   const company = getCompanyConfig();
-  
-  if (!client || !vehicle) return;
   
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.getWidth();
@@ -847,12 +870,9 @@ export function generateTransferAuthPDF(transfer: TransferAuthorization): void {
 
 // ===== WITHDRAWAL DECLARATION PDF =====
 
-export function generateWithdrawalPDF(declaration: WithdrawalDeclaration): void {
-  const client = clientStorage.getById(declaration.clientId);
-  const vehicle = vehicleStorage.getById(declaration.vehicleId);
+export function generateWithdrawalPDF(data: WithdrawalPDFData): void {
+  const { declaration, client, vehicle } = data;
   const company = getCompanyConfig();
-  
-  if (!client || !vehicle) return;
   
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.getWidth();
@@ -938,12 +958,9 @@ export function generateWithdrawalPDF(declaration: WithdrawalDeclaration): void 
 
 // ===== RESERVATION PDF =====
 
-export function generateReservationPDF(reservation: Reservation): void {
-  const client = clientStorage.getById(reservation.clientId);
-  const vehicle = vehicleStorage.getById(reservation.vehicleId);
+export function generateReservationPDF(data: ReservationPDFData): void {
+  const { reservation, client, vehicle } = data;
   const company = getCompanyConfig();
-  
-  if (!client || !vehicle) return;
   
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.getWidth();

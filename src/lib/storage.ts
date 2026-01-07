@@ -1,10 +1,9 @@
 // ============================================
 // LEGACY STORAGE UTILITIES
 // ============================================
-// Este arquivo contém funções utilitárias legadas.
+// Este arquivo contém apenas funções utilitárias legadas.
 // O armazenamento de dados foi migrado para Supabase (Lovable Cloud).
-// As funções de storage abaixo são mantidas apenas para compatibilidade
-// com os geradores de PDF que ainda não foram completamente migrados.
+// Todas as operações de dados agora são feitas através de hooks React Query.
 
 // Generate unique ID (legacy - prefer database generated UUIDs)
 export function generateId(): string {
@@ -19,28 +18,3 @@ export function generateNumber(prefix: string): string {
   const random = Math.floor(Math.random() * 9999).toString().padStart(4, '0');
   return `${prefix}${year}${month}${random}`;
 }
-
-// ============================================
-// STUB STORAGE OBJECTS (for PDF compatibility)
-// These return empty data - PDF generators should receive data as parameters
-// ============================================
-
-export const clientStorage = {
-  getById: (_id: string) => null,
-  getAll: () => [],
-};
-
-export const vehicleStorage = {
-  getById: (_id: string) => null,
-  getAll: () => [],
-};
-
-export const userStorage = {
-  getById: (_id: string) => null,
-  getAll: () => [],
-};
-
-export const bankStorage = {
-  getById: (_id: string) => null,
-  getAll: () => [],
-};

@@ -4,7 +4,6 @@ import { formatDateDisplay, formatDateFullPtBr } from './dateUtils';
 import { getPDFColors, getBankConfigByName, BANK_CONFIGS } from './bankConfig';
 import { getCompanyConfig, formatCompanyAddress, formatCompanyShortAddress } from './companyConfig';
 import type { Receipt, Proposal, Client, Vehicle, User, Bank } from '@/types';
-import { clientStorage, vehicleStorage, userStorage, bankStorage } from './storage';
 import companyLogo from '@/assets/logo.png';
 
 /**
