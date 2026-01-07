@@ -79,6 +79,13 @@ export default function DocumentsPage() {
     clientId: '', vehicleId: '', depositAmount: 0
   });
 
+  // Reset form functions
+  const resetContractForm = () => setContractForm({ clientId: '', vehicleId: '', vehiclePrice: 0, paymentType: 'avista', downPayment: 0, installments: 12, installmentValue: 0 });
+  const resetWarrantyForm = () => setWarrantyForm({ clientId: '', vehicleId: '', warrantyPeriod: '3 meses', warrantyCoverage: 'Motor e Câmbio', warrantyKm: 5000, conditions: '' });
+  const resetTransferForm = () => setTransferForm({ clientId: '', vehicleId: '', vehicleValue: 0, location: 'Lages/SC' });
+  const resetWithdrawalForm = () => setWithdrawalForm({ clientId: '', vehicleId: '', reason: 'motivos pessoais' });
+  const resetReservationForm = () => setReservationForm({ clientId: '', vehicleId: '', depositAmount: 0 });
+
   const refreshData = () => {
     setContracts(contractStorage.getAll());
     setWarranties(warrantyStorage.getAll());
@@ -89,6 +96,10 @@ export default function DocumentsPage() {
 
   // Handlers
   const handleCreateContract = () => {
+    if (!contractForm.clientId || !contractForm.vehicleId) {
+      toast({ title: 'Campos obrigatórios', description: 'Selecione cliente e veículo.', variant: 'destructive' });
+      return;
+    }
     const contract: Contract = {
       id: generateId(),
       number: generateNumber('CONT'),
@@ -105,11 +116,16 @@ export default function DocumentsPage() {
     contractStorage.save(contract);
     refreshData();
     setIsContractOpen(false);
+    resetContractForm();
     generateContractPDF(contract);
     toast({ title: 'Contrato criado', description: 'PDF gerado com sucesso.' });
   };
 
   const handleCreateWarranty = () => {
+    if (!warrantyForm.clientId || !warrantyForm.vehicleId) {
+      toast({ title: 'Campos obrigatórios', description: 'Selecione cliente e veículo.', variant: 'destructive' });
+      return;
+    }
     const warranty: Warranty = {
       id: generateId(),
       number: generateNumber('GAR'),
@@ -125,11 +141,16 @@ export default function DocumentsPage() {
     warrantyStorage.save(warranty);
     refreshData();
     setIsWarrantyOpen(false);
+    resetWarrantyForm();
     generateWarrantyPDF(warranty);
     toast({ title: 'Garantia criada', description: 'PDF gerado com sucesso.' });
   };
 
   const handleCreateTransfer = () => {
+    if (!transferForm.clientId || !transferForm.vehicleId) {
+      toast({ title: 'Campos obrigatórios', description: 'Selecione cliente e veículo.', variant: 'destructive' });
+      return;
+    }
     const transfer: TransferAuthorization = {
       id: generateId(),
       number: generateNumber('ATPV'),
@@ -144,11 +165,16 @@ export default function DocumentsPage() {
     transferAuthStorage.save(transfer);
     refreshData();
     setIsTransferOpen(false);
+    resetTransferForm();
     generateTransferAuthPDF(transfer);
     toast({ title: 'ATPV criada', description: 'PDF gerado com sucesso.' });
   };
 
   const handleCreateWithdrawal = () => {
+    if (!withdrawalForm.clientId || !withdrawalForm.vehicleId) {
+      toast({ title: 'Campos obrigatórios', description: 'Selecione cliente e veículo.', variant: 'destructive' });
+      return;
+    }
     const withdrawal: WithdrawalDeclaration = {
       id: generateId(),
       number: generateNumber('DES'),
@@ -162,11 +188,16 @@ export default function DocumentsPage() {
     withdrawalStorage.save(withdrawal);
     refreshData();
     setIsWithdrawalOpen(false);
+    resetWithdrawalForm();
     generateWithdrawalPDF(withdrawal);
     toast({ title: 'Desistência criada', description: 'PDF gerado com sucesso.' });
   };
 
   const handleCreateReservation = () => {
+    if (!reservationForm.clientId || !reservationForm.vehicleId) {
+      toast({ title: 'Campos obrigatórios', description: 'Selecione cliente e veículo.', variant: 'destructive' });
+      return;
+    }
     const today = new Date();
     const validUntil = new Date(today);
     validUntil.setDate(validUntil.getDate() + 10);
@@ -184,10 +215,18 @@ export default function DocumentsPage() {
       createdAt: getCurrentTimestamp(),
     };
     reservationStorage.save(reservation);
+    
+    // Atualizar status do veículo para reservado
+    const vehicle = vehicleStorage.getById(reservationForm.vehicleId);
+    if (vehicle) {
+      vehicleStorage.save({ ...vehicle, status: 'reservado', updatedAt: getCurrentTimestamp() });
+    }
+    
     refreshData();
     setIsReservationOpen(false);
+    resetReservationForm();
     generateReservationPDF(reservation);
-    toast({ title: 'Reserva criada', description: 'PDF gerado com sucesso.' });
+    toast({ title: 'Reserva criada', description: 'PDF gerado e veículo marcado como reservado.' });
   };
 
   const getClientName = (id: string) => clientStorage.getById(id)?.name || '-';

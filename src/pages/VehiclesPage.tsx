@@ -63,6 +63,9 @@ export default function VehiclesPage() {
     transmission: 'Manual' as Vehicle['transmission'],
     color: '',
     plate: '',
+    chassis: '',
+    renavam: '',
+    crv: '',
     status: 'disponivel' as Vehicle['status'],
     description: '',
     images: [] as string[],
@@ -140,6 +143,9 @@ export default function VehiclesPage() {
       transmission: form.transmission,
       color: form.color,
       plate: form.plate || undefined,
+      chassis: form.chassis || undefined,
+      renavam: form.renavam || undefined,
+      crv: form.crv || undefined,
       status: form.status,
       description: form.description || undefined,
       images: form.images,
@@ -170,6 +176,9 @@ export default function VehiclesPage() {
       transmission: vehicle.transmission,
       color: vehicle.color,
       plate: vehicle.plate || '',
+      chassis: vehicle.chassis || '',
+      renavam: vehicle.renavam || '',
+      crv: vehicle.crv || '',
       status: vehicle.status,
       description: vehicle.description || '',
       images: vehicle.images || [],
@@ -200,6 +209,9 @@ export default function VehiclesPage() {
       transmission: 'Manual',
       color: '',
       plate: '',
+      chassis: '',
+      renavam: '',
+      crv: '',
       status: 'disponivel',
       description: '',
       images: [],
@@ -349,6 +361,44 @@ export default function VehiclesPage() {
                     onChange={(e) => setForm({ ...form, plate: e.target.value.toUpperCase() })}
                     placeholder="ABC-1234"
                   />
+                </div>
+              </div>
+
+              {/* Documentação do Veículo */}
+              <div className="space-y-2">
+                <Label className="text-sm font-medium text-muted-foreground">Documentação do Veículo</Label>
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="chassis">Chassi</Label>
+                    <Input
+                      id="chassis"
+                      value={form.chassis}
+                      onChange={(e) => setForm({ ...form, chassis: e.target.value.toUpperCase().slice(0, 17) })}
+                      placeholder="9BWZZZ377VT004251"
+                      maxLength={17}
+                    />
+                    <p className="text-xs text-muted-foreground">17 caracteres</p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="renavam">Renavam</Label>
+                    <Input
+                      id="renavam"
+                      value={form.renavam}
+                      onChange={(e) => setForm({ ...form, renavam: e.target.value.replace(/\D/g, '').slice(0, 11) })}
+                      placeholder="00123456789"
+                      maxLength={11}
+                    />
+                    <p className="text-xs text-muted-foreground">11 dígitos</p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="crv">CRV</Label>
+                    <Input
+                      id="crv"
+                      value={form.crv}
+                      onChange={(e) => setForm({ ...form, crv: e.target.value })}
+                      placeholder="Nº do CRV"
+                    />
+                  </div>
                 </div>
               </div>
 
