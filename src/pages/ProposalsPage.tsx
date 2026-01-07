@@ -4,10 +4,12 @@ import { useProposals, useCreateProposal, useUpdateProposal, useDeleteProposal }
 import { useVehicles } from '@/hooks/useVehicles';
 import { useClients } from '@/hooks/useClients';
 import { useBanks } from '@/hooks/useBanks';
+import { useProfiles } from '@/hooks/useProfiles';
 import type { Database } from '@/integrations/supabase/types';
 import { formatCurrency } from '@/lib/formatters';
 import { formatDateDisplay } from '@/lib/dateUtils';
 import { generateProposalPDF } from '@/lib/pdfGenerator';
+import { mapClientFromDB, mapVehicleFromDB, mapUserFromDB } from '@/lib/pdfDataMappers';
 import { getBankConfigByName } from '@/lib/bankConfig';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
@@ -72,6 +74,7 @@ export default function ProposalsPage() {
   const { data: vehicles = [], isLoading: loadingVehicles } = useVehicles();
   const { data: clients = [], isLoading: loadingClients } = useClients();
   const { data: banks = [], isLoading: loadingBanks } = useBanks();
+  const { data: profiles = [] } = useProfiles();
   
   const createProposal = useCreateProposal();
   const updateProposal = useUpdateProposal();
@@ -233,18 +236,34 @@ export default function ProposalsPage() {
   };
 
   const handleGeneratePDF = (proposal: typeof proposals[0]) => {
-    const client = clients.find(c => c.id === proposal.client_id);
-    const vehicle = vehicles.find(v => v.id === proposal.vehicle_id);
+    const clientData = clients.find(c => c.id === proposal.client_id);
+    const vehicleData = vehicles.find(v => v.id === proposal.vehicle_id);
+    const vendorData = profiles.find(p => p.id === proposal.seller_id);
     
-    // Convert to legacy format for PDF generator
-    const legacyProposal = {
+    if (!clientData || !vehicleData) {
+      toast({
+        title: 'Dados incompletos',
+        description: 'Não foi possível encontrar os dados do cliente ou veículo.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
+    // Map to proper types
+    const mappedClient = mapClientFromDB(clientData);
+    const mappedVehicle = mapVehicleFromDB(vehicleData);
+    const mappedVendor = vendorData ? mapUserFromDB(vendorData) : undefined;
+    
+    // Build proposal object
+    const proposalData = {
       id: proposal.id,
       number: proposal.proposal_number,
       clientId: proposal.client_id || '',
       vehicleId: proposal.vehicle_id || '',
       vendorId: proposal.seller_id || '',
-      status: proposal.status as any,
-      type: proposal.type as any,
+      status: proposal.status,
+      type: proposal.type === 'financiamento_bancario' ? 'bancario' : 
+            proposal.type === 'financiamento_direto' ? 'direto' : 'avista',
       bank: banks.find(b => b.id === proposal.bank_id)?.name,
       vehiclePrice: Number(proposal.vehicle_price),
       cashPrice: proposal.cash_price ? Number(proposal.cash_price) : undefined,
@@ -261,7 +280,12 @@ export default function ProposalsPage() {
       updatedAt: proposal.updated_at,
     };
     
-    generateProposalPDF(legacyProposal as any);
+    generateProposalPDF({
+      proposal: proposalData as any,
+      client: mappedClient,
+      vehicle: mappedVehicle,
+      vendor: mappedVendor,
+    });
     toast({
       title: 'PDF gerado',
       description: 'A proposta foi baixada com sucesso.',

@@ -4,10 +4,12 @@ import { usePrivacy } from '@/contexts/PrivacyContext';
 import { useReceipts, useCreateReceipt, useDeleteReceipt } from '@/hooks/useReceipts';
 import { useClients } from '@/hooks/useClients';
 import { useVehicles } from '@/hooks/useVehicles';
+import { useProfiles } from '@/hooks/useProfiles';
 import type { Database } from '@/integrations/supabase/types';
 import { formatCurrency, formatCPF } from '@/lib/formatters';
 import { formatDateDisplay, getCurrentDateString } from '@/lib/dateUtils';
 import { generateReceiptPDF } from '@/lib/pdfGenerator';
+import { mapClientFromDB, mapVehicleFromDB, mapUserFromDB, mapReceiptFromDB } from '@/lib/pdfDataMappers';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -73,6 +75,7 @@ export default function ReceiptsPage() {
   const { data: receipts = [], isLoading: loadingReceipts } = useReceipts();
   const { data: clients = [], isLoading: loadingClients } = useClients();
   const { data: vehicles = [], isLoading: loadingVehicles } = useVehicles();
+  const { data: profiles = [] } = useProfiles();
   
   const createReceipt = useCreateReceipt();
   const deleteReceipt = useDeleteReceipt();
@@ -178,27 +181,23 @@ export default function ReceiptsPage() {
   };
 
   const handleGeneratePDF = (receipt: typeof receipts[0]) => {
-    // Convert to legacy format for PDF generator
-    const legacyReceipt = {
-      id: receipt.id,
-      number: receipt.receipt_number,
-      clientId: receipt.client_id || '',
-      vehicleId: receipt.vehicle_id || '',
-      vendorId: receipt.seller_id || '',
-      amount: Number(receipt.amount),
-      paymentMethod: receipt.payment_method as any,
-      reference: receipt.payment_reference as any,
-      payerName: receipt.payer_name || '',
-      payerCpf: receipt.payer_cpf || '',
-      paymentDate: receipt.payment_date,
-      description: receipt.description || undefined,
-      location: receipt.location || 'Lages - SC',
-      clientSignature: receipt.client_signature || undefined,
-      vendorSignature: receipt.vendor_signature || undefined,
-      createdAt: receipt.created_at,
-    };
+    const clientData = clients.find(c => c.id === receipt.client_id);
+    const vehicleData = vehicles.find(v => v.id === receipt.vehicle_id);
+    const vendorData = profiles.find(p => p.id === receipt.seller_id);
     
-    generateReceiptPDF(legacyReceipt as any, { privacyMode: false });
+    // Map data for PDF
+    const mappedClient = clientData ? mapClientFromDB(clientData) : undefined;
+    const mappedVehicle = vehicleData ? mapVehicleFromDB(vehicleData) : undefined;
+    const mappedVendor = vendorData ? mapUserFromDB(vendorData) : undefined;
+    const mappedReceipt = mapReceiptFromDB(receipt);
+    
+    generateReceiptPDF({
+      receipt: mappedReceipt,
+      client: mappedClient,
+      vehicle: mappedVehicle,
+      vendor: mappedVendor,
+    }, { privacyMode: false });
+    
     toast({
       title: 'PDF gerado',
       description: 'O recibo foi baixado com sucesso.',

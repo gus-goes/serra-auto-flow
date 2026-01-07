@@ -6,6 +6,7 @@ import { useWarranties, useTransferAuthorizations, useWithdrawalDeclarations, us
 import { useClients } from '@/hooks/useClients';
 import { useVehicles, useUpdateVehicle } from '@/hooks/useVehicles';
 import { useProfiles } from '@/hooks/useProfiles';
+import { useLegalRepresentative } from '@/hooks/useCompanySettings';
 import { 
   generateContractPDF, generateWarrantyPDF, generateTransferAuthPDF,
   generateWithdrawalPDF, generateReservationPDF 
@@ -56,6 +57,7 @@ export default function DocumentsPage() {
   const { data: clients = [], isLoading: loadingClients } = useClients();
   const { data: vehicles = [], isLoading: loadingVehicles } = useVehicles();
   const { data: profiles = [] } = useProfiles();
+  const { data: legalRep } = useLegalRepresentative();
 
   // Mutations
   const createContract = useCreateContract();
@@ -292,6 +294,7 @@ export default function DocumentsPage() {
       client: mapClientFromDB(dbClient),
       vehicle: mapVehicleFromDB(dbVehicle),
       vendor: dbVendor ? mapUserFromDB(dbVendor) : null,
+      options: { legalRepSignature: legalRep?.signature },
     });
   };
 
@@ -332,6 +335,7 @@ export default function DocumentsPage() {
       client: mapClientFromDB(dbClient),
       vehicle: mapVehicleFromDB(dbVehicle),
       vendor: dbVendor ? mapUserFromDB(dbVendor) : null,
+      options: { legalRepSignature: legalRep?.signature },
     });
   };
 
