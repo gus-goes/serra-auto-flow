@@ -410,7 +410,17 @@ export default function DocumentsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {contracts.map(c => (
+              {contracts.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="h-24 text-center">
+                    <div className="flex flex-col items-center justify-center text-muted-foreground">
+                      <FileSignature className="h-8 w-8 mb-2 opacity-50" />
+                      <p>Nenhum contrato encontrado</p>
+                      <p className="text-sm">Crie seu primeiro contrato de venda</p>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ) : contracts.map(c => (
                 <TableRow key={c.id}>
                   <TableCell className="font-mono text-sm">{c.number}</TableCell>
                   <TableCell>{getClientName(c.clientId)}</TableCell>
@@ -508,7 +518,17 @@ export default function DocumentsPage() {
           <Table>
             <TableHeader><TableRow><TableHead>Nº</TableHead><TableHead>Cliente</TableHead><TableHead>Veículo</TableHead><TableHead>Período</TableHead><TableHead>Cobertura</TableHead><TableHead className="w-20">Ações</TableHead></TableRow></TableHeader>
             <TableBody>
-              {warranties.map(w => (
+              {warranties.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="h-24 text-center">
+                    <div className="flex flex-col items-center justify-center text-muted-foreground">
+                      <Shield className="h-8 w-8 mb-2 opacity-50" />
+                      <p>Nenhuma garantia encontrada</p>
+                      <p className="text-sm">Crie sua primeira garantia</p>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ) : warranties.map(w => (
                 <TableRow key={w.id}>
                   <TableCell className="font-mono text-sm">{w.number}</TableCell>
                   <TableCell>{getClientName(w.clientId)}</TableCell>
@@ -595,7 +615,17 @@ export default function DocumentsPage() {
           <Table>
             <TableHeader><TableRow><TableHead>Nº</TableHead><TableHead>Comprador</TableHead><TableHead>Veículo</TableHead><TableHead>Valor</TableHead><TableHead>Data</TableHead><TableHead className="w-20">Ações</TableHead></TableRow></TableHeader>
             <TableBody>
-              {transfers.map(t => (
+              {transfers.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="h-24 text-center">
+                    <div className="flex flex-col items-center justify-center text-muted-foreground">
+                      <Car className="h-8 w-8 mb-2 opacity-50" />
+                      <p>Nenhuma ATPV encontrada</p>
+                      <p className="text-sm">Crie sua primeira autorização de transferência</p>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ) : transfers.map(t => (
                 <TableRow key={t.id}>
                   <TableCell className="font-mono text-sm">{t.number}</TableCell>
                   <TableCell>{getClientName(t.clientId)}</TableCell>
@@ -679,7 +709,17 @@ export default function DocumentsPage() {
           <Table>
             <TableHeader><TableRow><TableHead>Nº</TableHead><TableHead>Cliente</TableHead><TableHead>Veículo</TableHead><TableHead>Data</TableHead><TableHead className="w-20">Ações</TableHead></TableRow></TableHeader>
             <TableBody>
-              {withdrawals.map(w => (
+              {withdrawals.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={5} className="h-24 text-center">
+                    <div className="flex flex-col items-center justify-center text-muted-foreground">
+                      <XCircle className="h-8 w-8 mb-2 opacity-50" />
+                      <p>Nenhuma desistência encontrada</p>
+                      <p className="text-sm">Crie sua primeira declaração de desistência</p>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ) : withdrawals.map(w => (
                 <TableRow key={w.id}>
                   <TableCell className="font-mono text-sm">{w.number}</TableCell>
                   <TableCell>{getClientName(w.clientId)}</TableCell>
@@ -762,7 +802,17 @@ export default function DocumentsPage() {
           <Table>
             <TableHeader><TableRow><TableHead>Nº</TableHead><TableHead>Cliente</TableHead><TableHead>Veículo</TableHead><TableHead>Sinal</TableHead><TableHead>Validade</TableHead><TableHead>Status</TableHead><TableHead className="w-20">Ações</TableHead></TableRow></TableHeader>
             <TableBody>
-              {reservations.map(r => (
+              {reservations.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="h-24 text-center">
+                    <div className="flex flex-col items-center justify-center text-muted-foreground">
+                      <CalendarClock className="h-8 w-8 mb-2 opacity-50" />
+                      <p>Nenhuma reserva encontrada</p>
+                      <p className="text-sm">Crie sua primeira reserva de veículo</p>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ) : reservations.map(r => (
                 <TableRow key={r.id}>
                   <TableCell className="font-mono text-sm">{r.number}</TableCell>
                   <TableCell>{getClientName(r.clientId)}</TableCell>
