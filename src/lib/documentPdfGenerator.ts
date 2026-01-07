@@ -171,7 +171,16 @@ export function generateContractPDF(contract: Contract): void {
   doc.text('VENDEDOR(A):', marginLeft, y);
   y += 6;
   
-  const vendedorTexto = `${company.fantasyName}, sociedade empresária inscrita no CNPJ sob o nº ${company.cnpj}, com sede na ${formatCompanyAddress()}${company.email ? `, e endereço eletrônico ${company.email}` : ''}, neste ato representado(a) por seu(sua) responsável legal.`;
+  // Build vendor text with legal representative if available
+  let vendedorTexto = `${company.fantasyName}, sociedade empresária inscrita no CNPJ sob o nº ${company.cnpj}, com sede na ${formatCompanyAddress()}${company.email ? `, e endereço eletrônico ${company.email}` : ''}`;
+  
+  if (company.legalRepresentative) {
+    const rep = company.legalRepresentative;
+    vendedorTexto += `, neste ato representado(a) por ${rep.name}, ${rep.nationality}, ${rep.maritalStatus}, ${rep.occupation}, portador(a) da Cédula de Identidade RG N°${rep.rg}, inscrito(a) no CPF nº ${rep.cpf}.`;
+  } else {
+    vendedorTexto += ', neste ato representado(a) por seu(sua) responsável legal.';
+  }
+  
   y = drawParagraph(vendedorTexto);
   y += 4;
   
