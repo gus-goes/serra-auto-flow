@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { userStorage, generateId } from '@/lib/storage';
 import { hashPassword } from '@/lib/passwordUtils';
 import { getCurrentTimestamp } from '@/lib/dateUtils';
+import { formatPhone } from '@/lib/formatters';
 import type { User, UserStatus } from '@/types';
 import { formatDateDisplay } from '@/lib/dateUtils';
 import { useToast } from '@/hooks/use-toast';
@@ -22,7 +23,8 @@ import {
   User as UserIcon,
   Key,
   CheckCircle,
-  XCircle
+  XCircle,
+  Phone
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -37,6 +39,7 @@ export default function VendorsPage() {
   const [form, setForm] = useState({
     name: '',
     email: '',
+    phone: '',
     role: 'vendedor' as 'admin' | 'vendedor',
     status: 'ativo' as UserStatus,
     password: '',
@@ -59,6 +62,7 @@ export default function VendorsPage() {
       id: editingUser?.id || generateId(),
       name: form.name,
       email: form.email,
+      phone: form.phone || undefined,
       role: form.role,
       status: form.status,
       passwordHash: passwordHash || editingUser?.passwordHash,
@@ -105,6 +109,7 @@ export default function VendorsPage() {
     setForm({
       name: user.name,
       email: user.email,
+      phone: user.phone || '',
       role: user.role,
       status: user.status,
       password: '',
@@ -141,6 +146,7 @@ export default function VendorsPage() {
     setForm({
       name: '',
       email: '',
+      phone: '',
       role: 'vendedor',
       status: 'ativo',
       password: '',
@@ -187,6 +193,19 @@ export default function VendorsPage() {
                   onChange={(e) => setForm({ ...form, email: e.target.value })}
                   placeholder="usuario@autosdoserra.com.br"
                   required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="phone" className="flex items-center gap-2">
+                  <Phone className="h-4 w-4" />
+                  Telefone (aparece nos PDFs)
+                </Label>
+                <Input
+                  id="phone"
+                  value={form.phone}
+                  onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                  placeholder="(49) 99999-9999"
                 />
               </div>
               
@@ -287,6 +306,7 @@ export default function VendorsPage() {
                 <TableRow>
                   <TableHead>Usuário</TableHead>
                   <TableHead>E-mail</TableHead>
+                  <TableHead>Telefone</TableHead>
                   <TableHead>Perfil</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Cadastrado em</TableHead>
@@ -310,6 +330,16 @@ export default function VendorsPage() {
                       </div>
                     </TableCell>
                     <TableCell className="text-muted-foreground">{user.email}</TableCell>
+                    <TableCell>
+                      {user.phone ? (
+                        <div className="flex items-center gap-2 text-muted-foreground">
+                          <Phone className="h-4 w-4" />
+                          {formatPhone(user.phone)}
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground/50 text-sm">Não informado</span>
+                      )}
+                    </TableCell>
                     <TableCell>
                       <span className={cn(
                         'badge-status',

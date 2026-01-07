@@ -1,13 +1,13 @@
 import { useState, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { bankStorage, userStorage, backup, generateId } from '@/lib/storage';
-import type { Bank, User } from '@/types';
-import { formatPercent, formatPhone } from '@/lib/formatters';
+import { bankStorage, backup, generateId } from '@/lib/storage';
+import type { Bank } from '@/types';
+import { formatPercent } from '@/lib/formatters';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -24,20 +24,15 @@ import {
   AlertTriangle,
   Palette,
   Image,
-  Home,
-  Users,
-  Phone
+  Home
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export default function SettingsPage() {
   const { user, isAdmin } = useAuth();
   const [banks, setBanks] = useState<Bank[]>(bankStorage.getAll());
-  const [users, setUsers] = useState<User[]>(userStorage.getAll());
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [isUserDialogOpen, setIsUserDialogOpen] = useState(false);
   const [editingBank, setEditingBank] = useState<Bank | null>(null);
-  const [editingUser, setEditingUser] = useState<User | null>(null);
   const [activeTab, setActiveTab] = useState('bancarios');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const logoInputRef = useRef<HTMLInputElement>(null);
@@ -54,13 +49,6 @@ export default function SettingsPage() {
     colorHex: '#003A70',
     logo: '',
     isOwn: false,
-  });
-
-  const [userForm, setUserForm] = useState({
-    name: '',
-    email: '',
-    phone: '',
-    role: 'vendedor' as 'admin' | 'vendedor',
   });
 
   // Separate banks by type
@@ -121,31 +109,6 @@ export default function SettingsPage() {
     });
   };
 
-  const handleUserSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!editingUser) return;
-
-    const updatedUser: User = {
-      ...editingUser,
-      name: userForm.name,
-      email: userForm.email,
-      phone: userForm.phone || undefined,
-      role: userForm.role,
-      updatedAt: new Date().toISOString(),
-    };
-
-    userStorage.save(updatedUser);
-    setUsers(userStorage.getAll());
-    setIsUserDialogOpen(false);
-    resetUserForm();
-
-    toast({
-      title: 'Usuário atualizado',
-      description: `${updatedUser.name} foi atualizado com sucesso.`,
-    });
-  };
-
   const handleEdit = (bank: Bank) => {
     setEditingBank(bank);
     setForm({
@@ -161,17 +124,6 @@ export default function SettingsPage() {
       isOwn: bank.slug?.includes('proprio') || false,
     });
     setIsDialogOpen(true);
-  };
-
-  const handleEditUser = (u: User) => {
-    setEditingUser(u);
-    setUserForm({
-      name: u.name,
-      email: u.email,
-      phone: u.phone || '',
-      role: u.role,
-    });
-    setIsUserDialogOpen(true);
   };
 
   const handleToggleActive = (bank: Bank) => {
@@ -222,7 +174,6 @@ export default function SettingsPage() {
       const content = event.target?.result as string;
       if (backup.import(content)) {
         setBanks(bankStorage.getAll());
-        setUsers(userStorage.getAll());
         toast({
           title: 'Backup importado',
           description: 'Os dados foram restaurados com sucesso.',
@@ -258,15 +209,6 @@ export default function SettingsPage() {
     });
   };
 
-  const resetUserForm = () => {
-    setEditingUser(null);
-    setUserForm({
-      name: '',
-      email: '',
-      phone: '',
-      role: 'vendedor',
-    });
-  };
 
   const renderBankTable = (bankList: Bank[], isOwn: boolean) => (
     <Table>
@@ -536,128 +478,6 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
 
-        {/* Users Management - Admin Only */}
-        {isAdmin && (
-          <Card className="lg:col-span-2">
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Users className="h-5 w-5 text-primary" />
-                Vendedores
-              </CardTitle>
-              <CardDescription>
-                Gerencie os vendedores e seus telefones de contato
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="p-0">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Nome</TableHead>
-                    <TableHead>E-mail</TableHead>
-                    <TableHead>Telefone</TableHead>
-                    <TableHead>Perfil</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="w-20">Ações</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {users.map((u) => (
-                    <TableRow key={u.id} className="table-row-hover">
-                      <TableCell className="font-medium">{u.name}</TableCell>
-                      <TableCell className="text-muted-foreground">{u.email}</TableCell>
-                      <TableCell>
-                        {u.phone ? (
-                          <div className="flex items-center gap-2">
-                            <Phone className="h-4 w-4 text-muted-foreground" />
-                            {formatPhone(u.phone)}
-                          </div>
-                        ) : (
-                          <span className="text-muted-foreground text-sm">Não informado</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <span className={cn(
-                          'badge-status',
-                          u.role === 'admin' ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'
-                        )}>
-                          {u.role === 'admin' ? 'Admin' : 'Vendedor'}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <span className={cn(
-                          'badge-status',
-                          u.status === 'ativo' ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive'
-                        )}>
-                          {u.status === 'ativo' ? 'Ativo' : 'Inativo'}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8"
-                          onClick={() => handleEditUser(u)}
-                        >
-                          <Edit2 className="h-4 w-4" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* User Edit Dialog */}
-        <Dialog open={isUserDialogOpen} onOpenChange={(open) => { setIsUserDialogOpen(open); if (!open) resetUserForm(); }}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Editar Vendedor</DialogTitle>
-            </DialogHeader>
-            <form onSubmit={handleUserSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="userName">Nome</Label>
-                <Input
-                  id="userName"
-                  value={userForm.name}
-                  onChange={(e) => setUserForm({ ...userForm, name: e.target.value })}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="userEmail">E-mail</Label>
-                <Input
-                  id="userEmail"
-                  type="email"
-                  value={userForm.email}
-                  onChange={(e) => setUserForm({ ...userForm, email: e.target.value })}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="userPhone" className="flex items-center gap-2">
-                  <Phone className="h-4 w-4" />
-                  Telefone (aparece nos PDFs)
-                </Label>
-                <Input
-                  id="userPhone"
-                  value={userForm.phone}
-                  onChange={(e) => setUserForm({ ...userForm, phone: e.target.value })}
-                  placeholder="(49) 99999-9999"
-                />
-              </div>
-              <div className="flex gap-3 justify-end pt-4">
-                <Button type="button" variant="outline" onClick={() => setIsUserDialogOpen(false)}>
-                  Cancelar
-                </Button>
-                <Button type="submit" className="btn-primary">
-                  Salvar
-                </Button>
-              </div>
-            </form>
-          </DialogContent>
-        </Dialog>
 
         {/* Backup */}
         <Card>

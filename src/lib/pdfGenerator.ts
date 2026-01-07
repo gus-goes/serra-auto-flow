@@ -68,11 +68,14 @@ function drawHeader(doc: jsPDF, options: PDFOptions = {}): number {
   const textStartX = logoX + logoWidth + 8;
   
   // Draw logo
-  if (isBankDocument && storedBank) {
+  if (isBankDocument) {
     // Try to use stored bank logo first, then default bank logo
-    const bankLogoToUse = storedBank.logo || BANK_CONFIGS.find(b => b.id === bankConfig.id)?.logo;
+    const bankLogoToUse = storedBank?.logo || BANK_CONFIGS.find(b => b.id === bankConfig.id)?.logo;
     if (bankLogoToUse) {
       try {
+        // Add white background circle for bank logo visibility
+        doc.setFillColor(255, 255, 255);
+        doc.circle(logoX + logoWidth / 2, logoY + logoHeight / 2, logoWidth / 2 + 2, 'F');
         doc.addImage(bankLogoToUse, 'PNG', logoX, logoY, logoWidth, logoHeight);
       } catch (e) {
         console.error('Error adding bank logo:', e);
@@ -579,11 +582,11 @@ export function generateProposalPDF(proposal: Proposal, options: PDFOptions = {}
     y += notesLines.length * 4 + 8;
   }
   
-  // Calculate signature position - position closer to bottom
+  // Calculate signature position - lower position for better layout
   const pageBottom = pageHeight - 15;
   const signatureHeight = 55;
-  const minY = Math.max(y + 15, 180);
-  const sigY = Math.min(minY, pageBottom - signatureHeight);
+  const minY = Math.max(y + 20, 200);
+  const sigY = Math.min(minY, pageBottom - signatureHeight - 10);
   
   // Signatures
   let finalY = drawSignatureSection(
@@ -757,26 +760,8 @@ export function generateClientPDF(client: Client): void {
     y += notesHeight + 8;
   }
   
-  // Calculate signature position - position closer to bottom
-  const pageBottom = pageHeight - 15;
-  const signatureHeight = 45;
-  const minY = Math.max(y + 20, 200);
-  const sigY = Math.min(minY, pageBottom - signatureHeight);
-  
-  // Signature area for client
-  doc.setDrawColor(120, 120, 120);
-  doc.setLineWidth(0.5);
-  
-  const sigLineWidth = 85;
-  const sigX = pageWidth / 2 - sigLineWidth / 2;
-  doc.line(sigX, sigY + 20, sigX + sigLineWidth, sigY + 20);
-  
-  doc.setFontSize(9);
-  doc.setFont('helvetica', 'normal');
-  doc.setTextColor(80, 80, 80);
-  doc.text('Assinatura do Cliente', pageWidth / 2, sigY + 26, { align: 'center' });
-  doc.setFontSize(8);
-  doc.text(client.name, pageWidth / 2, sigY + 32, { align: 'center' });
+  // Footer
+  drawFooter(doc, 'Ficha de Cadastro');
   
   doc.save(`ficha-cadastro-${client.name.toLowerCase().replace(/\s+/g, '-')}.pdf`);
 }
