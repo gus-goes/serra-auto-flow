@@ -273,12 +273,19 @@ export function generateContractPDF(contract: Contract): void {
   // ===== CLÁUSULA QUARTA - DA ENTREGA =====
   y = drawClauseTitle('CLÁUSULA QUARTA – DA ENTREGA DO VEÍCULO');
   
-  const dataEntrega = contract.deliveryDate ? formatDateDisplay(contract.deliveryDate) : 'na data de assinatura deste contrato';
-  y = drawSubClause('4.1.', `O veículo será entregue ao(à) COMPRADOR(A) em ${dataEntrega}, no estabelecimento do(a) VENDEDOR(A) ou em local previamente acordado.`);
+  // Calcula valor exigido para entrega: se parcelado = entrada, se à vista = 50%
+  const valorEntrega = contract.paymentType === 'parcelado' 
+    ? (contract.downPayment || 0) 
+    : contract.vehiclePrice * 0.5;
+  const valorEntregaExtenso = numberToWords(valorEntrega);
   
-  y = drawSubClause('4.2.', 'A partir da entrega do veículo, o(a) COMPRADOR(A) assume integral responsabilidade por multas de trânsito, infrações, acidentes, sinistros e quaisquer outros eventos relacionados ao uso do veículo.');
+  y = drawSubClause('4.1.', `O veículo será transferido ao(à) COMPRADOR(A) juntamente com a entrega das chaves, sendo realizada a entrega e transporte do veículo mediante o pagamento ${contract.paymentType === 'parcelado' ? 'do valor total da entrada de' : 'de 50% (cinquenta por cento) do valor do veículo, correspondente a'} ${formatCurrency(valorEntrega)} (${valorEntregaExtenso}), pelo(a) COMPRADOR(A) ao(à) VENDEDOR(A). As despesas referentes ao registro da documentação serão de responsabilidade do(a) COMPRADOR(A).`);
   
-  y = drawSubClause('4.3.', 'O veículo será entregue com tanque de combustível conforme acordado entre as partes, juntamente com todos os acessórios e equipamentos obrigatórios.');
+  y = drawSubClause('4.2.', `A transferência do veículo pelo(a) COMPRADOR(A) junto ao Departamento de Trânsito está condicionada ao pagamento do valor de ${formatCurrency(valorEntrega)} (${valorEntregaExtenso}) para que seja realizada a entrega efetiva do veículo. A inobservância da referida obrigação acarretará no dever de responder por encargos, multas e demais desdobramentos decorrentes desta omissão.`);
+  
+  y = drawSubClause('4.3.', 'A partir da entrega do veículo, o(a) COMPRADOR(A) assume integral responsabilidade por multas de trânsito, infrações, acidentes, sinistros e quaisquer outros eventos relacionados ao uso do veículo.');
+  
+  y = drawSubClause('4.4.', 'O veículo será entregue com tanque de combustível conforme acordado entre as partes, juntamente com todos os acessórios e equipamentos obrigatórios.');
   
   // ===== CLÁUSULA QUINTA - DAS OBRIGAÇÕES =====
   y = drawClauseTitle('CLÁUSULA QUINTA – DAS OBRIGAÇÕES DAS PARTES');
