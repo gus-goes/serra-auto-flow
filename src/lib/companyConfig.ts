@@ -9,6 +9,7 @@ export interface LegalRepresentative {
   occupation: string;
   rg: string;
   cpf: string;
+  signature?: string; // Assinatura/rubrica em base64
 }
 
 export interface CompanyConfig {
