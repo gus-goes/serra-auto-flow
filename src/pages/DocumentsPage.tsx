@@ -102,8 +102,10 @@ export default function DocumentsPage() {
       toast({ title: 'Campos obrigatórios', description: 'Selecione cliente e veículo.', variant: 'destructive' });
       return;
     }
+
+    // Avoid Radix Dialog focus-trap issues when opening a second dialog
     setIsContractOpen(false);
-    setIsContractPreviewOpen(true);
+    window.setTimeout(() => setIsContractPreviewOpen(true), 0);
   };
 
   // Handler for confirmed contract creation
@@ -120,6 +122,7 @@ export default function DocumentsPage() {
       installments: data.paymentType === 'parcelado' ? data.installments : undefined,
       installmentValue: data.paymentType === 'parcelado' ? data.installmentValue : undefined,
       dueDay: data.paymentType === 'parcelado' ? data.dueDay : undefined,
+      firstDueDate: data.paymentType === 'parcelado' ? data.firstDueDate : undefined,
       clientData: {
         name: data.clientName,
         cpf: data.clientCpf,

@@ -245,12 +245,18 @@ export function generateContractPDF(contract: Contract): void {
     const entradaExtenso = numberToWords(contract.downPayment || 0);
     const parcelaExtenso = numberToWords(contract.installmentValue || 0);
     const dueDay = contract.dueDay || 10;
+    const firstDue = contract.firstDueDate ? formatDateDisplay(contract.firstDueDate) : null;
     
     if (contract.downPayment && contract.downPayment > 0) {
       y = drawSubClause('2.2.', `Entrada no valor de ${formatCurrency(contract.downPayment)} (${entradaExtenso}), paga no ato da assinatura deste contrato.`);
     }
     
-    y = drawSubClause('2.3.', `O saldo remanescente será pago em ${contract.installments || 0} parcelas mensais e consecutivas no valor de ${formatCurrency(contract.installmentValue || 0)} (${parcelaExtenso}) cada, com vencimento todo dia ${dueDay} de cada mês, iniciando no mês subsequente à assinatura deste contrato.`);
+    y = drawSubClause(
+      '2.3.',
+      firstDue
+        ? `O saldo remanescente será pago em ${contract.installments || 0} parcelas mensais e consecutivas no valor de ${formatCurrency(contract.installmentValue || 0)} (${parcelaExtenso}) cada, vencendo-se a primeira em ${firstDue} e as demais todo dia ${dueDay} de cada mês.`
+        : `O saldo remanescente será pago em ${contract.installments || 0} parcelas mensais e consecutivas no valor de ${formatCurrency(contract.installmentValue || 0)} (${parcelaExtenso}) cada, com vencimento todo dia ${dueDay} de cada mês, iniciando no mês subsequente à assinatura deste contrato.`,
+    );
   }
   
   y = drawSubClause('2.4.', 'O(A) VENDEDOR(A) declara ter recebido o sinal/entrada ou pagamento conforme descrito acima, dando plena e irrevogável quitação do valor correspondente.');
