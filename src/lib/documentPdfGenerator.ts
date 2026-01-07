@@ -970,9 +970,8 @@ export function generateWithdrawalPDF(data: WithdrawalPDFData): void {
 // ===== RESERVATION PDF =====
 
 export function generateReservationPDF(data: ReservationPDFData): void {
-  const { reservation, client, vehicle, options } = data;
+  const { reservation, client, vehicle } = data;
   const company = getCompanyConfig();
-  const legalRepSig = options?.legalRepSignature || company.legalRepresentative?.signature;
   
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.getWidth();
@@ -1082,12 +1081,7 @@ export function generateReservationPDF(data: ReservationPDFData): void {
   doc.text('SOLICITANTE', leftX + sigWidth / 2, y + 30, { align: 'center' });
   doc.text(client.name, leftX + sigWidth / 2, y + 35, { align: 'center' });
   
-  // Store signature - use legal representative signature if available
-  if (legalRepSig) {
-    try {
-      doc.addImage(legalRepSig, 'PNG', rightX + 5, y, sigWidth - 10, 20);
-    } catch (e) {}
-  }
+  // Store signature area (no legal rep signature on reservations)
   doc.line(rightX, y + 25, rightX + sigWidth, y + 25);
   doc.text('LOJA', rightX + sigWidth / 2, y + 30, { align: 'center' });
   doc.text(company.fantasyName, rightX + sigWidth / 2, y + 35, { align: 'center' });

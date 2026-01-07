@@ -102,15 +102,16 @@ export default function ClienteDashboardPage() {
   const handleDownloadContract = async (contract: typeof contracts[0]) => {
     setDownloadingId(contract.id);
     try {
-      let vehicleData = null;
-      if (contract.vehicle_id) {
-        const { data } = await supabase
-          .from('vehicles')
-          .select('*')
-          .eq('id', contract.vehicle_id)
-          .single();
-        vehicleData = data;
-      }
+      // Fetch vehicle and legal representative signature in parallel
+      const [vehicleResult, legalRepResult] = await Promise.all([
+        contract.vehicle_id 
+          ? supabase.from('vehicles').select('*').eq('id', contract.vehicle_id).single()
+          : Promise.resolve({ data: null }),
+        supabase.from('company_settings').select('value').eq('key', 'legal_representative').maybeSingle()
+      ]);
+
+      const vehicleData = vehicleResult.data;
+      const legalRepSignature = (legalRepResult.data?.value as { signature?: string })?.signature || '';
 
       const mappedClient = clientRecord ? mapClientFromDB(clientRecord) : null;
       const mappedVehicle = vehicleData ? mapVehicleFromDB(vehicleData) : null;
@@ -124,6 +125,7 @@ export default function ClienteDashboardPage() {
         contract: mappedContract,
         client: mappedClient,
         vehicle: mappedVehicle,
+        options: { legalRepSignature },
       });
 
       toast({
@@ -220,11 +222,16 @@ export default function ClienteDashboardPage() {
   const handleDownloadTransferAuth = async (transfer: typeof transferAuths[0]) => {
     setDownloadingId(transfer.id);
     try {
-      let vehicleData = null;
-      if (transfer.vehicle_id) {
-        const { data } = await supabase.from('vehicles').select('*').eq('id', transfer.vehicle_id).single();
-        vehicleData = data;
-      }
+      // Fetch vehicle and legal representative signature in parallel
+      const [vehicleResult, legalRepResult] = await Promise.all([
+        transfer.vehicle_id 
+          ? supabase.from('vehicles').select('*').eq('id', transfer.vehicle_id).single()
+          : Promise.resolve({ data: null }),
+        supabase.from('company_settings').select('value').eq('key', 'legal_representative').maybeSingle()
+      ]);
+
+      const vehicleData = vehicleResult.data;
+      const legalRepSignature = (legalRepResult.data?.value as { signature?: string })?.signature || '';
 
       const mappedClient = clientRecord ? mapClientFromDB(clientRecord) : null;
       const mappedVehicle = vehicleData ? mapVehicleFromDB(vehicleData) : null;
@@ -232,7 +239,12 @@ export default function ClienteDashboardPage() {
 
       if (!mappedClient || !mappedVehicle) throw new Error('Dados incompletos');
 
-      generateTransferAuthPDF({ transfer: mappedTransfer, client: mappedClient, vehicle: mappedVehicle });
+      generateTransferAuthPDF({ 
+        transfer: mappedTransfer, 
+        client: mappedClient, 
+        vehicle: mappedVehicle,
+        options: { legalRepSignature },
+      });
       toast({ title: 'Download iniciado!', description: 'Sua ATPV está sendo baixada.' });
     } catch (error) {
       console.error('Error generating transfer auth PDF:', error);
