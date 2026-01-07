@@ -557,24 +557,45 @@ export function generateWarrantyPDF(warranty: Warranty): void {
   doc.setFontSize(9);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(30, 30, 30);
-  doc.text('CONDIÇÕES:', 20, y);
+  doc.text('TERMOS E CONDIÇÕES DA GARANTIA:', 20, y);
   y += 8;
   
-  const conditions = [
-    '1. A garantia cobre exclusivamente os itens especificados acima.',
-    '2. Não cobre peças de desgaste natural (freios, embreagem, pneus, bateria).',
-    '3. A garantia é anulada em caso de mau uso, negligência ou modificações.',
-    '4. Reparos devem ser realizados em oficina autorizada pela loja.',
-    '5. O cliente deve apresentar este termo para acionar a garantia.',
+  const warrantyTerms = [
+    {
+      num: '1.',
+      text: `A ${company.fantasyName} concede uma cobertura de garantia para os conjuntos de motor e câmbio, para o veículo identificado acima, pelo período de ${warranty.warrantyPeriod || '180 dias'} ou ${warranty.warrantyKm ? warranty.warrantyKm.toLocaleString('pt-BR') : '10.000'} km, a partir da data de entrega e quilometragem especificada, prevalecendo a condição que primeiro ocorrer.`
+    },
+    {
+      num: '2.',
+      text: 'A presente garantia se restringe a mão de obra e reposição de peças lubrificadas, dos conjuntos motor e câmbio, quando os referidos componentes apresentarem algum defeito.'
+    },
+    {
+      num: '3.',
+      text: 'A prestação de serviços e reposição de peças, objeto desta garantia, somente serão executados nas oficinas indicadas por esta empresa.'
+    },
+    {
+      num: '4.',
+      text: 'A presente garantia não cobre o pagamento ou outra forma de compensação, a qualquer título, de despesas ou danos, diretos ou indiretos, causados a pessoas ou bens em decorrência de defeito verificado no veículo.'
+    },
+    {
+      num: '5.',
+      text: 'Não estão incluídos na garantia quaisquer outros componentes que não os identificados no item acima, ficando assim expressamente excluídos: componentes de desgaste natural, sistema de arrefecimento, sistema de alimentação de combustível, sistemas eletrônicos, sistema de embreagem, sistema de sincronismo do motor, sistema de aspiração do motor, juntas homocinéticas, conjunto de suspensão, sistema de lubrificação e pressão de óleo, sistema de freio, coxins em geral, equipamentos e acessórios (rádios, compact disc, alarmes), sistema de ar-condicionado, direção hidráulica, rodas, pneus, conjunto de som e painel de instrumentos, carroceria e pintura em geral, bem como despesas de remoção.'
+    },
   ];
   
   doc.setFontSize(8);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(50, 50, 50);
   
-  conditions.forEach((cond) => {
-    doc.text(cond, 20, y);
-    y += 6;
+  const contentWidth = pageWidth - 40;
+  
+  warrantyTerms.forEach((term) => {
+    doc.setFont('helvetica', 'bold');
+    doc.text(term.num, 20, y);
+    doc.setFont('helvetica', 'normal');
+    const lines = doc.splitTextToSize(term.text, contentWidth - 10);
+    doc.text(lines, 28, y);
+    y += lines.length * 4 + 4;
   });
   
   y += 10;
