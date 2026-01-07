@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePrivacy } from '@/contexts/PrivacyContext';
 import { useClients, useCreateClient, useUpdateClient, useDeleteClient } from '@/hooks/useClients';
+import { supabase } from '@/integrations/supabase/client';
 import type { Database } from '@/integrations/supabase/types';
 import { formatCPF, formatPhone, formatDate, isValidCPF, cleanCPF, cleanPhone, isValidEmail, formatRG, cleanRG } from '@/lib/formatters';
 import { generateClientPDF } from '@/lib/pdfGenerator';
@@ -12,7 +13,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -28,7 +29,10 @@ import {
   Download,
   AlertCircle,
   FileText,
-  Loader2
+  Loader2,
+  Key,
+  Copy,
+  Check
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -90,6 +94,24 @@ export default function ClientsPage() {
   const [editingClient, setEditingClient] = useState<typeof clients[0] | null>(null);
   const [errors, setErrors] = useState<FormErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // Credentials dialog state
+  const [credentialsDialog, setCredentialsDialog] = useState<{
+    open: boolean;
+    client: typeof clients[0] | null;
+    step: 'form' | 'success';
+    password: string;
+    generatedCredentials: { email: string; password: string } | null;
+    isLoading: boolean;
+  }>({
+    open: false,
+    client: null,
+    step: 'form',
+    password: '',
+    generatedCredentials: null,
+    isLoading: false,
+  });
+  const [copiedField, setCopiedField] = useState<'email' | 'password' | null>(null);
 
   const [form, setForm] = useState({
     name: '',
@@ -282,6 +304,109 @@ export default function ClientsPage() {
       notes: '',
       funnelStage: 'atendimento',
     });
+  };
+
+  const handleOpenCredentialsDialog = (client: typeof clients[0]) => {
+    if (!client.email) {
+      toast({
+        variant: 'destructive',
+        title: 'E-mail obrigatório',
+        description: 'O cliente precisa ter um e-mail cadastrado para gerar credenciais.',
+      });
+      return;
+    }
+    setCredentialsDialog({
+      open: true,
+      client,
+      step: 'form',
+      password: '',
+      generatedCredentials: null,
+      isLoading: false,
+    });
+  };
+
+  const handleGenerateCredentials = async () => {
+    if (!credentialsDialog.client || !credentialsDialog.password) return;
+    
+    if (credentialsDialog.password.length < 6) {
+      toast({
+        variant: 'destructive',
+        title: 'Senha muito curta',
+        description: 'A senha deve ter pelo menos 6 caracteres.',
+      });
+      return;
+    }
+
+    setCredentialsDialog(prev => ({ ...prev, isLoading: true }));
+
+    try {
+      const response = await supabase.functions.invoke('create-user', {
+        body: {
+          email: credentialsDialog.client.email,
+          password: credentialsDialog.password,
+          name: credentialsDialog.client.name,
+          phone: credentialsDialog.client.phone || null,
+          role: 'cliente',
+        },
+      });
+
+      if (response.error) {
+        throw new Error(response.error.message || 'Erro ao criar credenciais');
+      }
+
+      if (response.data?.error) {
+        throw new Error(response.data.error);
+      }
+
+      setCredentialsDialog(prev => ({
+        ...prev,
+        step: 'success',
+        generatedCredentials: {
+          email: credentialsDialog.client!.email!,
+          password: credentialsDialog.password,
+        },
+        isLoading: false,
+      }));
+
+      toast({
+        title: 'Credenciais geradas',
+        description: 'O cliente agora pode acessar a área do cliente.',
+      });
+    } catch (error) {
+      console.error('Error generating credentials:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Erro ao gerar credenciais',
+        description: error instanceof Error ? error.message : 'Erro desconhecido',
+      });
+      setCredentialsDialog(prev => ({ ...prev, isLoading: false }));
+    }
+  };
+
+  const handleCopyToClipboard = async (text: string, field: 'email' | 'password') => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedField(field);
+      setTimeout(() => setCopiedField(null), 2000);
+    } catch (error) {
+      toast({
+        variant: 'destructive',
+        title: 'Erro ao copiar',
+        description: 'Não foi possível copiar para a área de transferência.',
+      });
+    }
+  };
+
+  const closeCredentialsDialog = () => {
+    setCredentialsDialog({
+      open: false,
+      client: null,
+      step: 'form',
+      password: '',
+      generatedCredentials: null,
+      isLoading: false,
+    });
+    setCopiedField(null);
   };
 
   const renderFieldError = (field: keyof FormErrors) => {
@@ -615,6 +740,15 @@ export default function ClientsPage() {
                           variant="ghost"
                           size="icon"
                           className="h-8 w-8"
+                          onClick={() => handleOpenCredentialsDialog(client)}
+                          title="Gerar credenciais de acesso"
+                        >
+                          <Key className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
                           onClick={() => handleGeneratePDF(client)}
                           title="Gerar PDF"
                         >
@@ -625,6 +759,7 @@ export default function ClientsPage() {
                           size="icon"
                           className="h-8 w-8"
                           onClick={() => handleEdit(client)}
+                          title="Editar"
                         >
                           <Edit2 className="h-4 w-4" />
                         </Button>
@@ -633,6 +768,7 @@ export default function ClientsPage() {
                           size="icon"
                           className="h-8 w-8 text-destructive hover:text-destructive"
                           onClick={() => handleDelete(client.id)}
+                          title="Excluir"
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -658,6 +794,112 @@ export default function ClientsPage() {
           </div>
         </Card>
       )}
+
+      {/* Credentials Dialog */}
+      <Dialog open={credentialsDialog.open} onOpenChange={(open) => { if (!open) closeCredentialsDialog(); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Key className="h-5 w-5" />
+              {credentialsDialog.step === 'form' ? 'Gerar Credenciais de Acesso' : 'Credenciais Geradas'}
+            </DialogTitle>
+            <DialogDescription>
+              {credentialsDialog.step === 'form' 
+                ? `Crie uma senha para ${credentialsDialog.client?.name} acessar a área do cliente.`
+                : 'Anote ou copie as credenciais abaixo. A senha não poderá ser recuperada.'
+              }
+            </DialogDescription>
+          </DialogHeader>
+
+          {credentialsDialog.step === 'form' ? (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>E-mail do Cliente</Label>
+                <Input
+                  value={credentialsDialog.client?.email || ''}
+                  disabled
+                  className="bg-muted"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="client-password">Senha de Acesso</Label>
+                <Input
+                  id="client-password"
+                  type="password"
+                  value={credentialsDialog.password}
+                  onChange={(e) => setCredentialsDialog(prev => ({ ...prev, password: e.target.value }))}
+                  placeholder="Mínimo 6 caracteres"
+                  minLength={6}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Defina uma senha para o cliente. Ele poderá alterá-la depois.
+                </p>
+              </div>
+
+              <div className="flex gap-3 justify-end pt-4">
+                <Button type="button" variant="outline" onClick={closeCredentialsDialog}>
+                  Cancelar
+                </Button>
+                <Button 
+                  onClick={handleGenerateCredentials}
+                  className="btn-primary"
+                  disabled={credentialsDialog.isLoading || !credentialsDialog.password}
+                >
+                  {credentialsDialog.isLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                  Gerar Credenciais
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="p-4 bg-muted rounded-lg space-y-3">
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">E-mail</Label>
+                  <div className="flex items-center gap-2">
+                    <code className="flex-1 text-sm font-mono bg-background px-3 py-2 rounded border">
+                      {credentialsDialog.generatedCredentials?.email}
+                    </code>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => handleCopyToClipboard(credentialsDialog.generatedCredentials?.email || '', 'email')}
+                    >
+                      {copiedField === 'email' ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
+                    </Button>
+                  </div>
+                </div>
+                
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Senha</Label>
+                  <div className="flex items-center gap-2">
+                    <code className="flex-1 text-sm font-mono bg-background px-3 py-2 rounded border">
+                      {credentialsDialog.generatedCredentials?.password}
+                    </code>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => handleCopyToClipboard(credentialsDialog.generatedCredentials?.password || '', 'password')}
+                    >
+                      {copiedField === 'password' ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              <p className="text-sm text-muted-foreground text-center">
+                O cliente pode acessar em <strong>/cliente</strong>
+              </p>
+
+              <div className="flex justify-center pt-2">
+                <Button onClick={closeCredentialsDialog}>
+                  Fechar
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
