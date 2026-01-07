@@ -273,7 +273,7 @@ export function generateContractPDF(contract: Contract): void {
   
   y = drawSubClause('3.1.', 'A transferência da propriedade do veículo junto ao órgão de trânsito competente (DETRAN) será realizada após a quitação integral do valor acordado.');
   
-  y = drawSubClause('3.2.', 'As despesas com a transferência de propriedade, incluindo taxas, emolumentos e despachante, serão de responsabilidade do(a) COMPRADOR(A), salvo disposição em contrário acordada entre as partes.');
+  y = drawSubClause('3.2.', 'As despesas com a transferência de propriedade, incluindo taxas, emolumentos e despachante, serão de responsabilidade do(a) VENDEDOR(A), salvo disposição em contrário acordada entre as partes.');
   
   y = drawSubClause('3.3.', 'O(A) VENDEDOR(A) compromete-se a entregar toda a documentação necessária para a transferência, incluindo CRV (Certificado de Registro de Veículo) devidamente preenchido e assinado.');
   

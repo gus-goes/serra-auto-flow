@@ -72,7 +72,7 @@ export interface Client {
   updatedAt: string;
 }
 
-export type FunnelStage = 'lead' | 'atendimento' | 'simulacao' | 'proposta' | 'vendido' | 'perdido';
+export type FunnelStage = 'atendimento' | 'simulacao' | 'proposta' | 'vendido' | 'perdido';
 
 export interface Bank {
   id: string;

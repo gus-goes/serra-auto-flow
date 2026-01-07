@@ -31,7 +31,6 @@ import {
 import { cn } from '@/lib/utils';
 
 const funnelLabels: Record<FunnelStage, string> = {
-  lead: 'Lead',
   atendimento: 'Atendimento',
   simulacao: 'Simulação',
   proposta: 'Proposta',
@@ -40,7 +39,6 @@ const funnelLabels: Record<FunnelStage, string> = {
 };
 
 const funnelColors: Record<FunnelStage, string> = {
-  lead: 'bg-muted text-muted-foreground',
   atendimento: 'bg-info/10 text-info border border-info/20',
   simulacao: 'bg-warning/10 text-warning border border-warning/20',
   proposta: 'bg-primary/10 text-primary border border-primary/20',
@@ -101,7 +99,7 @@ export default function ClientsPage() {
     deliveryState: '',
     deliveryZipCode: '',
     notes: '',
-    funnelStage: 'lead' as FunnelStage,
+    funnelStage: 'atendimento' as FunnelStage,
   });
 
   const filteredClients = clients.filter(c => {
@@ -315,7 +313,7 @@ export default function ClientsPage() {
       deliveryState: '',
       deliveryZipCode: '',
       notes: '',
-      funnelStage: 'lead',
+      funnelStage: 'atendimento',
     });
   };
 
