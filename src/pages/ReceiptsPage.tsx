@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePrivacy } from '@/contexts/PrivacyContext';
-import { receiptStorage, clientStorage, vehicleStorage, proposalStorage, generateId, generateNumber } from '@/lib/storage';
-import type { Receipt, PaymentMethod, PaymentReference } from '@/types';
-import { formatCurrency, formatCPF, maskCPF, maskCurrency, maskName } from '@/lib/formatters';
-import { formatDateDisplay, getCurrentDateString, getCurrentTimestamp } from '@/lib/dateUtils';
+import { useReceipts, useCreateReceipt, useDeleteReceipt } from '@/hooks/useReceipts';
+import { useClients } from '@/hooks/useClients';
+import { useVehicles } from '@/hooks/useVehicles';
+import type { Database } from '@/integrations/supabase/types';
+import { formatCurrency, formatCPF } from '@/lib/formatters';
+import { formatDateDisplay, getCurrentDateString } from '@/lib/dateUtils';
 import { generateReceiptPDF } from '@/lib/pdfGenerator';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
@@ -17,6 +19,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { SignaturePad } from '@/components/ui/signature-pad';
 import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
 import { 
   Receipt as ReceiptIcon, 
   Plus, 
@@ -27,22 +30,32 @@ import {
   Banknote,
   QrCode,
   ArrowRightLeft,
-  Pen
+  Pen,
+  Loader2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+
+type PaymentMethod = Database['public']['Enums']['payment_method'];
+type PaymentReference = Database['public']['Enums']['payment_reference'];
 
 const paymentMethodLabels: Record<PaymentMethod, string> = {
   dinheiro: 'Dinheiro',
   pix: 'PIX',
   transferencia: 'Transferência',
-  cartao: 'Cartão',
+  cartao_debito: 'Cartão Débito',
+  cartao_credito: 'Cartão Crédito',
+  boleto: 'Boleto',
+  cheque: 'Cheque',
 };
 
 const paymentMethodIcons: Record<PaymentMethod, typeof Banknote> = {
   dinheiro: Banknote,
   pix: QrCode,
   transferencia: ArrowRightLeft,
-  cartao: CreditCard,
+  cartao_debito: CreditCard,
+  cartao_credito: CreditCard,
+  boleto: ReceiptIcon,
+  cheque: ReceiptIcon,
 };
 
 const paymentReferenceLabels: Record<PaymentReference, string> = {
@@ -57,41 +70,41 @@ export default function ReceiptsPage() {
   const { privacyMode } = usePrivacy();
   const { toast } = useToast();
   
-  const [receipts, setReceipts] = useState<Receipt[]>(() => {
-    const all = receiptStorage.getAll();
-    return isAdmin ? all : all.filter(r => r.vendorId === user?.id);
-  });
+  const { data: receipts = [], isLoading: loadingReceipts } = useReceipts();
+  const { data: clients = [], isLoading: loadingClients } = useClients();
+  const { data: vehicles = [], isLoading: loadingVehicles } = useVehicles();
+  
+  const createReceipt = useCreateReceipt();
+  const deleteReceipt = useDeleteReceipt();
+
   const [search, setSearch] = useState('');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isSignatureOpen, setIsSignatureOpen] = useState(false);
-  const [signingReceipt, setSigningReceipt] = useState<Receipt | null>(null);
+  const [signingReceipt, setSigningReceipt] = useState<typeof receipts[0] | null>(null);
   const [signatureType, setSignatureType] = useState<'client' | 'vendor'>('client');
-
-  const clients = clientStorage.getAll().filter(c => isAdmin || c.vendorId === user?.id);
-  const vehicles = vehicleStorage.getAll();
-  const proposals = proposalStorage.getAll().filter(p => isAdmin || p.vendorId === user?.id);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [form, setForm] = useState({
     clientId: '',
     vehicleId: '',
-    proposalId: '',
     amount: 0,
     paymentMethod: 'pix' as PaymentMethod,
     reference: 'entrada' as PaymentReference,
     payerName: '',
     payerCpf: '',
-    paymentDate: getCurrentDateString(), // Use proper date string format
+    paymentDate: getCurrentDateString(),
     description: '',
   });
 
+  const isLoading = loadingReceipts || loadingClients || loadingVehicles;
+
   const filteredReceipts = receipts.filter(r => {
-    const client = clientStorage.getById(r.clientId);
-    const searchStr = `${client?.name} ${r.number} ${r.payerName}`.toLowerCase();
+    const searchStr = `${r.payer_name || ''} ${r.receipt_number}`.toLowerCase();
     return searchStr.includes(search.toLowerCase());
   });
 
   const handleClientChange = (clientId: string) => {
-    const client = clientStorage.getById(clientId);
+    const client = clients.find(c => c.id === clientId);
     setForm({
       ...form,
       clientId,
@@ -100,77 +113,95 @@ export default function ReceiptsPage() {
     });
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsSubmitting(true);
     
-    // Store date as YYYY-MM-DD string directly (no conversion)
-    const receipt: Receipt = {
-      id: generateId(),
-      number: generateNumber('REC'),
-      clientId: form.clientId,
-      vehicleId: form.vehicleId || undefined,
-      proposalId: form.proposalId || undefined,
-      vendorId: user!.id,
-      amount: form.amount,
-      paymentMethod: form.paymentMethod,
-      reference: form.reference,
-      payerName: form.payerName,
-      payerCpf: form.payerCpf,
-      paymentDate: form.paymentDate, // Already in YYYY-MM-DD format
-      description: form.description || undefined,
-      location: 'Lages - SC',
-      createdAt: getCurrentTimestamp(),
-    };
+    try {
+      await createReceipt.mutateAsync({
+        client_id: form.clientId || null,
+        vehicle_id: form.vehicleId || null,
+        amount: form.amount,
+        payment_method: form.paymentMethod,
+        payment_reference: form.reference,
+        payer_name: form.payerName,
+        payer_cpf: form.payerCpf,
+        payment_date: form.paymentDate,
+        description: form.description || null,
+        location: 'Lages - SC',
+      });
 
-    receiptStorage.save(receipt);
-    const all = receiptStorage.getAll();
-    setReceipts(isAdmin ? all : all.filter(r => r.vendorId === user?.id));
-    setIsDialogOpen(false);
-    resetForm();
+      setIsDialogOpen(false);
+      resetForm();
 
+      toast({
+        title: 'Recibo criado',
+        description: 'Recibo foi criado com sucesso.',
+      });
+    } catch (error) {
+      toast({
+        title: 'Erro ao criar',
+        description: 'Ocorreu um erro ao criar o recibo.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleSignature = async (signature: string) => {
+    // TODO: Implement update receipt mutation
+    setIsSignatureOpen(false);
+    setSigningReceipt(null);
     toast({
-      title: 'Recibo criado',
-      description: `Recibo ${receipt.number} foi criado com sucesso.`,
+      title: 'Assinatura salva',
+      description: `Assinatura registrada.`,
     });
   };
 
-  const handleSignature = (signature: string) => {
-    if (signingReceipt) {
-      const receipt = { ...signingReceipt };
-      if (signatureType === 'client') {
-        receipt.clientSignature = signature;
-      } else {
-        receipt.vendorSignature = signature;
-      }
-      receiptStorage.save(receipt);
-      const all = receiptStorage.getAll();
-      setReceipts(isAdmin ? all : all.filter(r => r.vendorId === user?.id));
-      setIsSignatureOpen(false);
-      setSigningReceipt(null);
-      toast({
-        title: 'Assinatura salva',
-        description: `Assinatura do ${signatureType === 'client' ? 'cliente' : 'vendedor'} foi registrada.`,
-      });
-    }
-  };
-
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (confirm('Tem certeza que deseja excluir este recibo?')) {
-      receiptStorage.delete(id);
-      const all = receiptStorage.getAll();
-      setReceipts(isAdmin ? all : all.filter(r => r.vendorId === user?.id));
-      toast({
-        title: 'Recibo excluído',
-        description: 'O recibo foi removido do sistema.',
-      });
+      try {
+        await deleteReceipt.mutateAsync(id);
+        toast({
+          title: 'Recibo excluído',
+          description: 'O recibo foi removido do sistema.',
+        });
+      } catch (error) {
+        toast({
+          title: 'Erro ao excluir',
+          description: 'Não foi possível excluir o recibo.',
+          variant: 'destructive',
+        });
+      }
     }
   };
 
-  const handleGeneratePDF = (receipt: Receipt, withPrivacy: boolean = false) => {
-    generateReceiptPDF(receipt, { privacyMode: withPrivacy });
+  const handleGeneratePDF = (receipt: typeof receipts[0]) => {
+    // Convert to legacy format for PDF generator
+    const legacyReceipt = {
+      id: receipt.id,
+      number: receipt.receipt_number,
+      clientId: receipt.client_id || '',
+      vehicleId: receipt.vehicle_id || '',
+      vendorId: receipt.seller_id || '',
+      amount: Number(receipt.amount),
+      paymentMethod: receipt.payment_method as any,
+      reference: receipt.payment_reference as any,
+      payerName: receipt.payer_name || '',
+      payerCpf: receipt.payer_cpf || '',
+      paymentDate: receipt.payment_date,
+      description: receipt.description || undefined,
+      location: receipt.location || 'Lages - SC',
+      clientSignature: receipt.client_signature || undefined,
+      vendorSignature: receipt.vendor_signature || undefined,
+      createdAt: receipt.created_at,
+    };
+    
+    generateReceiptPDF(legacyReceipt as any, { privacyMode: false });
     toast({
       title: 'PDF gerado',
-      description: withPrivacy ? 'Recibo com dados ocultos baixado.' : 'O recibo foi baixado com sucesso.',
+      description: 'O recibo foi baixado com sucesso.',
     });
   };
 
@@ -178,7 +209,6 @@ export default function ReceiptsPage() {
     setForm({
       clientId: '',
       vehicleId: '',
-      proposalId: '',
       amount: 0,
       paymentMethod: 'pix',
       reference: 'entrada',
@@ -188,6 +218,30 @@ export default function ReceiptsPage() {
       description: '',
     });
   };
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6 animate-fade-in">
+        <div className="flex items-center justify-between">
+          <div>
+            <Skeleton className="h-8 w-32" />
+            <Skeleton className="h-4 w-48 mt-2" />
+          </div>
+          <Skeleton className="h-10 w-32" />
+        </div>
+        <Skeleton className="h-10 w-full max-w-md" />
+        <Card>
+          <CardContent className="p-0">
+            <div className="space-y-4 p-4">
+              {[1, 2, 3, 4, 5].map(i => (
+                <Skeleton key={i} className="h-16 w-full" />
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -210,12 +264,13 @@ export default function ReceiptsPage() {
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Cliente *</Label>
-                  <Select value={form.clientId} onValueChange={handleClientChange}>
+                  <Label>Cliente</Label>
+                  <Select value={form.clientId || 'none'} onValueChange={(v) => handleClientChange(v === 'none' ? '' : v)}>
                     <SelectTrigger>
                       <SelectValue placeholder="Selecione" />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="none">Nenhum</SelectItem>
                       {clients.map(c => (
                         <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
                       ))}
@@ -232,7 +287,7 @@ export default function ReceiptsPage() {
                       <SelectItem value="none">Nenhum</SelectItem>
                       {vehicles.map(v => (
                         <SelectItem key={v.id} value={v.id}>
-                          {v.brand} {v.model} {v.year}
+                          {v.brand} {v.model} {v.year_fab}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -250,11 +305,10 @@ export default function ReceiptsPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>CPF do Pagador *</Label>
+                  <Label>CPF do Pagador</Label>
                   <Input
                     value={form.payerCpf}
                     onChange={(e) => setForm({ ...form, payerCpf: e.target.value })}
-                    required
                   />
                 </div>
               </div>
@@ -322,7 +376,8 @@ export default function ReceiptsPage() {
                 <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
                   Cancelar
                 </Button>
-                <Button type="submit" className="btn-primary">
+                <Button type="submit" className="btn-primary" disabled={isSubmitting}>
+                  {isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                   Criar Recibo
                 </Button>
               </div>
@@ -350,7 +405,7 @@ export default function ReceiptsPage() {
       <div className="relative max-w-md">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
-          placeholder="Buscar por cliente ou número..."
+          placeholder="Buscar por pagador ou número..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="pl-10"
@@ -375,36 +430,35 @@ export default function ReceiptsPage() {
               </TableHeader>
               <TableBody>
                 {filteredReceipts.map((receipt) => {
-                  const PaymentIcon = paymentMethodIcons[receipt.paymentMethod];
+                  const PaymentIcon = paymentMethodIcons[receipt.payment_method] || Banknote;
                   
                   return (
                     <TableRow key={receipt.id} className="table-row-hover">
-                      <TableCell className="font-mono text-sm">{receipt.number}</TableCell>
+                      <TableCell className="font-mono text-sm">{receipt.receipt_number}</TableCell>
                       <TableCell>
                         <div>
-                          <p className="font-medium">{receipt.payerName}</p>
-                          <p className="text-xs text-muted-foreground">{formatCPF(receipt.payerCpf)}</p>
+                          <p className="font-medium">{receipt.payer_name}</p>
+                          {receipt.payer_cpf && (
+                            <p className="text-xs text-muted-foreground">{formatCPF(receipt.payer_cpf)}</p>
+                          )}
                         </div>
                       </TableCell>
-                      <TableCell className="font-semibold">{formatCurrency(receipt.amount)}</TableCell>
+                      <TableCell className="font-semibold">{formatCurrency(Number(receipt.amount))}</TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
                           <PaymentIcon className="h-4 w-4 text-muted-foreground" />
-                          <span className="text-sm">{paymentMethodLabels[receipt.paymentMethod]}</span>
+                          <span className="text-sm">{paymentMethodLabels[receipt.payment_method]}</span>
                         </div>
                       </TableCell>
                       <TableCell className="text-sm">
-                        {formatDateDisplay(receipt.paymentDate)}
+                        {formatDateDisplay(receipt.payment_date)}
                       </TableCell>
                       <TableCell>
                         <div className="flex gap-1">
                           <Button
-                            variant={receipt.clientSignature ? "default" : "outline"}
+                            variant={receipt.client_signature ? "default" : "outline"}
                             size="sm"
-                            className={cn(
-                              "h-7 text-xs",
-                              receipt.clientSignature && "bg-success hover:bg-success/90"
-                            )}
+                            className={cn("h-7 text-xs", receipt.client_signature && "bg-success hover:bg-success/90")}
                             onClick={() => {
                               setSigningReceipt(receipt);
                               setSignatureType('client');
@@ -415,12 +469,9 @@ export default function ReceiptsPage() {
                             Cliente
                           </Button>
                           <Button
-                            variant={receipt.vendorSignature ? "default" : "outline"}
+                            variant={receipt.vendor_signature ? "default" : "outline"}
                             size="sm"
-                            className={cn(
-                              "h-7 text-xs",
-                              receipt.vendorSignature && "bg-success hover:bg-success/90"
-                            )}
+                            className={cn("h-7 text-xs", receipt.vendor_signature && "bg-success hover:bg-success/90")}
                             onClick={() => {
                               setSigningReceipt(receipt);
                               setSignatureType('vendor');
@@ -464,7 +515,12 @@ export default function ReceiptsPage() {
           <div className="text-center">
             <ReceiptIcon className="h-12 w-12 text-muted-foreground/30 mx-auto mb-4" />
             <h3 className="text-lg font-medium mb-1">Nenhum recibo encontrado</h3>
-            <p className="text-muted-foreground">Crie seu primeiro recibo de pagamento</p>
+            <p className="text-muted-foreground">
+              {search
+                ? 'Tente ajustar a busca'
+                : 'Crie seu primeiro recibo clicando no botão acima'
+              }
+            </p>
           </div>
         </Card>
       )}

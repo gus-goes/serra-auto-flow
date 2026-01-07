@@ -1,16 +1,14 @@
-import { useState, useMemo } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
-import { clientStorage } from '@/lib/storage';
-import type { Client, FunnelStage } from '@/types';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { useMemo } from 'react';
+import { useClients, useUpdateClient } from '@/hooks/useClients';
+import type { Database } from '@/integrations/supabase/types';
+import { Card, CardContent } from '@/components/ui/card';
 import { formatPhone } from '@/lib/formatters';
+import { Skeleton } from '@/components/ui/skeleton';
 import { 
   Users, 
   Phone,
   Mail,
   GripVertical,
-  UserPlus,
   Headphones,
   Calculator,
   FileText,
@@ -19,6 +17,8 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
+
+type FunnelStage = Database['public']['Enums']['funnel_stage'];
 
 const funnelStages: { key: FunnelStage; label: string; icon: typeof Users; color: string }[] = [
   { key: 'atendimento', label: 'Atendimento', icon: Headphones, color: 'bg-info/10 border-info/30' },
@@ -29,17 +29,14 @@ const funnelStages: { key: FunnelStage; label: string; icon: typeof Users; color
 ];
 
 export default function FunnelPage() {
-  const { user, isAdmin } = useAuth();
   const { toast } = useToast();
   
-  const [clients, setClients] = useState<Client[]>(() => {
-    const all = clientStorage.getAll();
-    return isAdmin ? all : all.filter(c => c.vendorId === user?.id);
-  });
-  const [draggedClient, setDraggedClient] = useState<Client | null>(null);
+  const { data: clients = [], isLoading } = useClients();
+  const updateClient = useUpdateClient();
 
   const clientsByStage = useMemo(() => {
-    const grouped: Record<FunnelStage, Client[]> = {
+    const grouped: Record<FunnelStage, typeof clients> = {
+      lead: [],
       atendimento: [],
       simulacao: [],
       proposta: [],
@@ -49,7 +46,7 @@ export default function FunnelPage() {
     
     clients.forEach(client => {
       // Migrate old 'lead' stage to 'atendimento' (for legacy data)
-      const stage = (client.funnelStage as string) === 'lead' ? 'atendimento' : client.funnelStage;
+      const stage = client.funnel_stage === 'lead' ? 'atendimento' : client.funnel_stage;
       if (grouped[stage]) {
         grouped[stage].push(client);
       }
@@ -58,8 +55,8 @@ export default function FunnelPage() {
     return grouped;
   }, [clients]);
 
-  const handleDragStart = (e: React.DragEvent, client: Client) => {
-    setDraggedClient(client);
+  const handleDragStart = (e: React.DragEvent, clientId: string) => {
+    e.dataTransfer.setData('clientId', clientId);
     e.dataTransfer.effectAllowed = 'move';
   };
 
@@ -68,33 +65,53 @@ export default function FunnelPage() {
     e.dataTransfer.dropEffect = 'move';
   };
 
-  const handleDrop = (e: React.DragEvent, targetStage: FunnelStage) => {
+  const handleDrop = async (e: React.DragEvent, targetStage: FunnelStage) => {
     e.preventDefault();
     
-    if (draggedClient && draggedClient.funnelStage !== targetStage) {
-      const updatedClient = {
-        ...draggedClient,
-        funnelStage: targetStage,
-        updatedAt: new Date().toISOString(),
-      };
-      
-      clientStorage.save(updatedClient);
-      
-      const all = clientStorage.getAll();
-      setClients(isAdmin ? all : all.filter(c => c.vendorId === user?.id));
-      
-      toast({
-        title: 'Cliente movido',
-        description: `${draggedClient.name} foi movido para ${funnelStages.find(s => s.key === targetStage)?.label}.`,
-      });
-    }
+    const clientId = e.dataTransfer.getData('clientId');
+    const client = clients.find(c => c.id === clientId);
     
-    setDraggedClient(null);
+    if (client && client.funnel_stage !== targetStage) {
+      try {
+        await updateClient.mutateAsync({
+          id: clientId,
+          funnel_stage: targetStage,
+        });
+        
+        toast({
+          title: 'Cliente movido',
+          description: `${client.name} foi movido para ${funnelStages.find(s => s.key === targetStage)?.label}.`,
+        });
+      } catch (error) {
+        toast({
+          title: 'Erro ao mover',
+          description: 'Não foi possível atualizar o cliente.',
+          variant: 'destructive',
+        });
+      }
+    }
   };
 
-  const handleDragEnd = () => {
-    setDraggedClient(null);
-  };
+  if (isLoading) {
+    return (
+      <div className="space-y-6 animate-fade-in">
+        <div>
+          <Skeleton className="h-8 w-48" />
+          <Skeleton className="h-4 w-64 mt-2" />
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+          {[1, 2, 3, 4, 5].map(i => (
+            <Skeleton key={i} className="h-24" />
+          ))}
+        </div>
+        <div className="flex gap-4 overflow-x-auto pb-4">
+          {[1, 2, 3, 4, 5].map(i => (
+            <Skeleton key={i} className="w-72 h-96 flex-shrink-0" />
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -104,7 +121,7 @@ export default function FunnelPage() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
         {funnelStages.map(stage => {
           const count = clientsByStage[stage.key].length;
           const Icon = stage.icon;
@@ -147,11 +164,9 @@ export default function FunnelPage() {
                     <div
                       key={client.id}
                       draggable
-                      onDragStart={(e) => handleDragStart(e, client)}
-                      onDragEnd={handleDragEnd}
+                      onDragStart={(e) => handleDragStart(e, client.id)}
                       className={cn(
-                        'kanban-card animate-slide-up',
-                        draggedClient?.id === client.id && 'opacity-50'
+                        'kanban-card animate-slide-up cursor-grab active:cursor-grabbing'
                       )}
                       style={{ animationDelay: `${index * 50}ms` }}
                     >
@@ -159,10 +174,12 @@ export default function FunnelPage() {
                         <GripVertical className="h-4 w-4 text-muted-foreground/50 mt-1 flex-shrink-0" />
                         <div className="flex-1 min-w-0">
                           <p className="font-medium truncate">{client.name}</p>
-                          <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
-                            <Phone className="h-3 w-3" />
-                            <span>{formatPhone(client.phone)}</span>
-                          </div>
+                          {client.phone && (
+                            <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
+                              <Phone className="h-3 w-3" />
+                              <span>{formatPhone(client.phone)}</span>
+                            </div>
+                          )}
                           {client.email && (
                             <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
                               <Mail className="h-3 w-3" />

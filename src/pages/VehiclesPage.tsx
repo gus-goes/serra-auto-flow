@@ -1,7 +1,6 @@
 import { useState, useRef } from 'react';
-import { vehicleStorage, generateId } from '@/lib/storage';
+import { useVehicles, useCreateVehicle, useUpdateVehicle, useDeleteVehicle, useUploadVehiclePhoto } from '@/hooks/useVehicles';
 import { usePrivacy } from '@/contexts/PrivacyContext';
-import type { Vehicle } from '@/types';
 import { formatCurrency, formatMileage } from '@/lib/formatters';
 import { useToast } from '@/hooks/use-toast';
 import { PrivacyMask } from '@/components/PrivacyMask';
@@ -12,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Skeleton } from '@/components/ui/skeleton';
 import { 
   Car, 
   Plus, 
@@ -25,54 +25,99 @@ import {
   DollarSign,
   ImagePlus,
   X,
-  Image
+  Image,
+  Loader2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import type { Database } from '@/integrations/supabase/types';
 
-const fuelTypes = ['Gasolina', 'Etanol', 'Flex', 'Diesel', 'Elétrico', 'Híbrido'] as const;
-const transmissionTypes = ['Manual', 'Automático', 'CVT', 'Automatizado'] as const;
-const statusTypes = ['disponivel', 'reservado', 'vendido'] as const;
+type FuelType = Database['public']['Enums']['fuel_type'];
+type TransmissionType = Database['public']['Enums']['transmission_type'];
+type VehicleStatus = Database['public']['Enums']['vehicle_status'];
 
-const statusLabels = {
-  disponivel: 'Disponível',
-  reservado: 'Reservado',
-  vendido: 'Vendido',
-};
+const fuelTypes: { value: FuelType; label: string }[] = [
+  { value: 'gasolina', label: 'Gasolina' },
+  { value: 'etanol', label: 'Etanol' },
+  { value: 'flex', label: 'Flex' },
+  { value: 'diesel', label: 'Diesel' },
+  { value: 'eletrico', label: 'Elétrico' },
+  { value: 'hibrido', label: 'Híbrido' },
+];
+
+const transmissionTypes: { value: TransmissionType; label: string }[] = [
+  { value: 'manual', label: 'Manual' },
+  { value: 'automatico', label: 'Automático' },
+  { value: 'cvt', label: 'CVT' },
+  { value: 'automatizado', label: 'Automatizado' },
+];
+
+const statusTypes: { value: VehicleStatus; label: string }[] = [
+  { value: 'disponivel', label: 'Disponível' },
+  { value: 'reservado', label: 'Reservado' },
+  { value: 'vendido', label: 'Vendido' },
+];
 
 const MAX_IMAGES = 5;
-const MAX_IMAGE_SIZE = 500 * 1024; // 500KB per image
+
+interface VehicleForm {
+  brand: string;
+  model: string;
+  version: string;
+  yearFab: number;
+  yearModel: number;
+  price: number;
+  mileage: number;
+  fuel: FuelType;
+  transmission: TransmissionType;
+  color: string;
+  plate: string;
+  chassi: string;
+  renavam: string;
+  crvNumber: string;
+  status: VehicleStatus;
+  description: string;
+}
 
 export default function VehiclesPage() {
   const { privacyMode } = usePrivacy();
-  const [vehicles, setVehicles] = useState<Vehicle[]>(vehicleStorage.getAll());
+  const { toast } = useToast();
+  
+  const { data: vehicles = [], isLoading } = useVehicles();
+  const createVehicle = useCreateVehicle();
+  const updateVehicle = useUpdateVehicle();
+  const deleteVehicle = useDeleteVehicle();
+  const uploadPhoto = useUploadVehiclePhoto();
+
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(null);
-  const [viewingImages, setViewingImages] = useState<Vehicle | null>(null);
+  const [editingVehicle, setEditingVehicle] = useState<typeof vehicles[0] | null>(null);
+  const [viewingImages, setViewingImages] = useState<typeof vehicles[0] | null>(null);
+  const [pendingImages, setPendingImages] = useState<File[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const imageInputRef = useRef<HTMLInputElement>(null);
-  const { toast } = useToast();
 
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<VehicleForm>({
     brand: '',
     model: '',
-    year: new Date().getFullYear(),
+    version: '',
+    yearFab: new Date().getFullYear(),
+    yearModel: new Date().getFullYear(),
     price: 0,
     mileage: 0,
-    fuel: 'Flex' as Vehicle['fuel'],
-    transmission: 'Manual' as Vehicle['transmission'],
+    fuel: 'flex',
+    transmission: 'manual',
     color: '',
     plate: '',
-    chassis: '',
+    chassi: '',
     renavam: '',
-    crv: '',
-    status: 'disponivel' as Vehicle['status'],
+    crvNumber: '',
+    status: 'disponivel',
     description: '',
-    images: [] as string[],
   });
 
   const filteredVehicles = vehicles.filter(v => {
-    const matchesSearch = `${v.brand} ${v.model} ${v.plate}`.toLowerCase().includes(search.toLowerCase());
+    const matchesSearch = `${v.brand} ${v.model} ${v.plate || ''}`.toLowerCase().includes(search.toLowerCase());
     const matchesStatus = statusFilter === 'all' || v.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
@@ -81,8 +126,8 @@ export default function VehiclesPage() {
     const files = e.target.files;
     if (!files) return;
 
-    const currentImages = form.images;
-    const remainingSlots = MAX_IMAGES - currentImages.length;
+    const currentCount = pendingImages.length + (editingVehicle?.photos?.length || 0);
+    const remainingSlots = MAX_IMAGES - currentCount;
 
     if (files.length > remainingSlots) {
       toast({
@@ -92,131 +137,158 @@ export default function VehiclesPage() {
       });
     }
 
-    const filesToProcess = Array.from(files).slice(0, remainingSlots);
-    
-    filesToProcess.forEach(file => {
-      if (file.size > MAX_IMAGE_SIZE) {
-        toast({
-          title: 'Imagem muito grande',
-          description: `A imagem ${file.name} excede 500KB. Por favor, use uma imagem menor.`,
-          variant: 'destructive',
-        });
-        return;
-      }
+    const filesToAdd = Array.from(files).slice(0, remainingSlots);
+    setPendingImages(prev => [...prev, ...filesToAdd]);
 
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const base64 = event.target?.result as string;
-        setForm(prev => ({
-          ...prev,
-          images: [...prev.images, base64].slice(0, MAX_IMAGES)
-        }));
-      };
-      reader.readAsDataURL(file);
-    });
-
-    // Clear input
     if (imageInputRef.current) {
       imageInputRef.current.value = '';
     }
   };
 
   const removeImage = (index: number) => {
-    setForm(prev => ({
-      ...prev,
-      images: prev.images.filter((_, i) => i !== index)
-    }));
+    setPendingImages(prev => prev.filter((_, i) => i !== index));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsSubmitting(true);
     
-    const now = new Date().toISOString();
-    const vehicle: Vehicle = {
-      id: editingVehicle?.id || generateId(),
-      brand: form.brand,
-      model: form.model,
-      year: form.year,
-      price: form.price,
-      mileage: form.mileage,
-      fuel: form.fuel,
-      transmission: form.transmission,
-      color: form.color,
-      plate: form.plate || undefined,
-      chassis: form.chassis || undefined,
-      renavam: form.renavam || undefined,
-      crv: form.crv || undefined,
-      status: form.status,
-      description: form.description || undefined,
-      images: form.images,
-      createdAt: editingVehicle?.createdAt || now,
-      updatedAt: now,
-    };
+    try {
+      const vehicleData = {
+        brand: form.brand,
+        model: form.model,
+        version: form.version || null,
+        year_fab: form.yearFab,
+        year_model: form.yearModel,
+        price: form.price,
+        mileage: form.mileage,
+        fuel: form.fuel,
+        transmission: form.transmission,
+        color: form.color,
+        plate: form.plate || null,
+        chassi: form.chassi || null,
+        renavam: form.renavam || null,
+        crv_number: form.crvNumber || null,
+        status: form.status,
+        description: form.description || null,
+      };
 
-    vehicleStorage.save(vehicle);
-    setVehicles(vehicleStorage.getAll());
-    setIsDialogOpen(false);
-    resetForm();
+      let vehicleId: string;
 
-    toast({
-      title: editingVehicle ? 'Veículo atualizado' : 'Veículo cadastrado',
-      description: `${vehicle.brand} ${vehicle.model} foi salvo com sucesso.`,
-    });
+      if (editingVehicle) {
+        await updateVehicle.mutateAsync({ id: editingVehicle.id, ...vehicleData });
+        vehicleId = editingVehicle.id;
+      } else {
+        const result = await createVehicle.mutateAsync(vehicleData);
+        vehicleId = result.id;
+      }
+
+      // Upload pending images
+      for (const file of pendingImages) {
+        await uploadPhoto.mutateAsync({ vehicleId, file });
+      }
+
+      setIsDialogOpen(false);
+      resetForm();
+
+      toast({
+        title: editingVehicle ? 'Veículo atualizado' : 'Veículo cadastrado',
+        description: `${form.brand} ${form.model} foi salvo com sucesso.`,
+      });
+    } catch (error) {
+      toast({
+        title: 'Erro ao salvar',
+        description: 'Ocorreu um erro ao salvar o veículo.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const handleEdit = (vehicle: Vehicle) => {
+  const handleEdit = (vehicle: typeof vehicles[0]) => {
     setEditingVehicle(vehicle);
     setForm({
       brand: vehicle.brand,
       model: vehicle.model,
-      year: vehicle.year,
-      price: vehicle.price,
-      mileage: vehicle.mileage,
+      version: vehicle.version || '',
+      yearFab: vehicle.year_fab,
+      yearModel: vehicle.year_model,
+      price: Number(vehicle.price),
+      mileage: vehicle.mileage || 0,
       fuel: vehicle.fuel,
       transmission: vehicle.transmission,
       color: vehicle.color,
       plate: vehicle.plate || '',
-      chassis: vehicle.chassis || '',
+      chassi: vehicle.chassi || '',
       renavam: vehicle.renavam || '',
-      crv: vehicle.crv || '',
+      crvNumber: vehicle.crv_number || '',
       status: vehicle.status,
       description: vehicle.description || '',
-      images: vehicle.images || [],
     });
+    setPendingImages([]);
     setIsDialogOpen(true);
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (confirm('Tem certeza que deseja excluir este veículo?')) {
-      vehicleStorage.delete(id);
-      setVehicles(vehicleStorage.getAll());
-      toast({
-        title: 'Veículo excluído',
-        description: 'O veículo foi removido do sistema.',
-      });
+      try {
+        await deleteVehicle.mutateAsync(id);
+        toast({
+          title: 'Veículo excluído',
+          description: 'O veículo foi removido do sistema.',
+        });
+      } catch (error) {
+        toast({
+          title: 'Erro ao excluir',
+          description: 'Ocorreu um erro ao excluir o veículo.',
+          variant: 'destructive',
+        });
+      }
     }
   };
 
   const resetForm = () => {
     setEditingVehicle(null);
+    setPendingImages([]);
     setForm({
       brand: '',
       model: '',
-      year: new Date().getFullYear(),
+      version: '',
+      yearFab: new Date().getFullYear(),
+      yearModel: new Date().getFullYear(),
       price: 0,
       mileage: 0,
-      fuel: 'Flex',
-      transmission: 'Manual',
+      fuel: 'flex',
+      transmission: 'manual',
       color: '',
       plate: '',
-      chassis: '',
+      chassi: '',
       renavam: '',
-      crv: '',
+      crvNumber: '',
       status: 'disponivel',
       description: '',
-      images: [],
     });
   };
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6 animate-fade-in">
+        <div className="flex items-center justify-between">
+          <div>
+            <Skeleton className="h-8 w-32" />
+            <Skeleton className="h-4 w-48 mt-2" />
+          </div>
+          <Skeleton className="h-10 w-32" />
+        </div>
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {[1, 2, 3, 4, 5, 6].map(i => (
+            <Skeleton key={i} className="h-64" />
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -262,16 +334,38 @@ export default function VehiclesPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="version">Versão</Label>
+                <Input
+                  id="version"
+                  value={form.version}
+                  onChange={(e) => setForm({ ...form, version: e.target.value })}
+                  placeholder="XEi 2.0"
+                />
+              </div>
+
+              <div className="grid grid-cols-4 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="year">Ano</Label>
+                  <Label htmlFor="yearFab">Ano Fab.</Label>
                   <Input
-                    id="year"
+                    id="yearFab"
                     type="number"
-                    value={form.year}
-                    onChange={(e) => setForm({ ...form, year: parseInt(e.target.value) })}
+                    value={form.yearFab}
+                    onChange={(e) => setForm({ ...form, yearFab: parseInt(e.target.value) })}
                     min={1900}
                     max={new Date().getFullYear() + 1}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="yearModel">Ano Mod.</Label>
+                  <Input
+                    id="yearModel"
+                    type="number"
+                    value={form.yearModel}
+                    onChange={(e) => setForm({ ...form, yearModel: parseInt(e.target.value) })}
+                    min={1900}
+                    max={new Date().getFullYear() + 2}
                     required
                   />
                 </div>
@@ -288,7 +382,7 @@ export default function VehiclesPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="mileage">Quilometragem</Label>
+                  <Label htmlFor="mileage">KM</Label>
                   <Input
                     id="mileage"
                     type="number"
@@ -303,39 +397,39 @@ export default function VehiclesPage() {
               <div className="grid grid-cols-3 gap-4">
                 <div className="space-y-2">
                   <Label>Combustível</Label>
-                  <Select value={form.fuel} onValueChange={(v) => setForm({ ...form, fuel: v as Vehicle['fuel'] })}>
+                  <Select value={form.fuel} onValueChange={(v) => setForm({ ...form, fuel: v as FuelType })}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
                       {fuelTypes.map((f) => (
-                        <SelectItem key={f} value={f}>{f}</SelectItem>
+                        <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-2">
                   <Label>Câmbio</Label>
-                  <Select value={form.transmission} onValueChange={(v) => setForm({ ...form, transmission: v as Vehicle['transmission'] })}>
+                  <Select value={form.transmission} onValueChange={(v) => setForm({ ...form, transmission: v as TransmissionType })}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
                       {transmissionTypes.map((t) => (
-                        <SelectItem key={t} value={t}>{t}</SelectItem>
+                        <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-2">
                   <Label>Status</Label>
-                  <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v as Vehicle['status'] })}>
+                  <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v as VehicleStatus })}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
                       {statusTypes.map((s) => (
-                        <SelectItem key={s} value={s}>{statusLabels[s]}</SelectItem>
+                        <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -364,20 +458,19 @@ export default function VehiclesPage() {
                 </div>
               </div>
 
-              {/* Documentação do Veículo */}
+              {/* Documentação */}
               <div className="space-y-2">
-                <Label className="text-sm font-medium text-muted-foreground">Documentação do Veículo</Label>
+                <Label className="text-sm font-medium text-muted-foreground">Documentação</Label>
                 <div className="grid grid-cols-3 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="chassis">Chassi</Label>
+                    <Label htmlFor="chassi">Chassi</Label>
                     <Input
-                      id="chassis"
-                      value={form.chassis}
-                      onChange={(e) => setForm({ ...form, chassis: e.target.value.toUpperCase().slice(0, 17) })}
+                      id="chassi"
+                      value={form.chassi}
+                      onChange={(e) => setForm({ ...form, chassi: e.target.value.toUpperCase().slice(0, 17) })}
                       placeholder="9BWZZZ377VT004251"
                       maxLength={17}
                     />
-                    <p className="text-xs text-muted-foreground">17 caracteres</p>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="renavam">Renavam</Label>
@@ -388,14 +481,13 @@ export default function VehiclesPage() {
                       placeholder="00123456789"
                       maxLength={11}
                     />
-                    <p className="text-xs text-muted-foreground">11 dígitos</p>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="crv">CRV</Label>
+                    <Label htmlFor="crvNumber">CRV</Label>
                     <Input
-                      id="crv"
-                      value={form.crv}
-                      onChange={(e) => setForm({ ...form, crv: e.target.value })}
+                      id="crvNumber"
+                      value={form.crvNumber}
+                      onChange={(e) => setForm({ ...form, crvNumber: e.target.value })}
                       placeholder="Nº do CRV"
                     />
                   </div>
@@ -406,7 +498,7 @@ export default function VehiclesPage() {
               <div className="space-y-2">
                 <Label className="flex items-center gap-2">
                   <ImagePlus className="h-4 w-4" />
-                  Fotos do Veículo ({form.images.length}/{MAX_IMAGES})
+                  Fotos ({(editingVehicle?.vehicle_photos?.length || 0) + pendingImages.length}/{MAX_IMAGES})
                 </Label>
                 <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-4">
                   <input
@@ -418,12 +510,28 @@ export default function VehiclesPage() {
                     className="hidden"
                   />
                   
-                  {form.images.length > 0 && (
+                  {/* Existing photos */}
+                  {editingVehicle?.photos && editingVehicle.photos.length > 0 && (
                     <div className="grid grid-cols-5 gap-2 mb-4">
-                      {form.images.map((img, idx) => (
+                      {editingVehicle.photos.map((photo) => (
+                        <div key={photo.id} className="relative">
+                          <img 
+                            src={photo.photo_url} 
+                            alt="Foto"
+                            className="h-16 w-full object-cover rounded border"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Pending photos */}
+                  {pendingImages.length > 0 && (
+                    <div className="grid grid-cols-5 gap-2 mb-4">
+                      {pendingImages.map((file, idx) => (
                         <div key={idx} className="relative group">
                           <img 
-                            src={img} 
+                            src={URL.createObjectURL(file)} 
                             alt={`Foto ${idx + 1}`} 
                             className="h-16 w-full object-cover rounded border"
                           />
@@ -444,15 +552,12 @@ export default function VehiclesPage() {
                     variant="outline"
                     size="sm"
                     onClick={() => imageInputRef.current?.click()}
-                    disabled={form.images.length >= MAX_IMAGES}
+                    disabled={(editingVehicle?.photos?.length || 0) + pendingImages.length >= MAX_IMAGES}
                     className="w-full"
                   >
                     <ImagePlus className="h-4 w-4 mr-2" />
-                    {form.images.length >= MAX_IMAGES ? 'Limite atingido' : 'Adicionar Fotos'}
+                    Adicionar Fotos
                   </Button>
-                  <p className="text-xs text-muted-foreground text-center mt-2">
-                    Máximo de {MAX_IMAGES} fotos, até 500KB cada
-                  </p>
                 </div>
               </div>
 
@@ -462,7 +567,7 @@ export default function VehiclesPage() {
                   id="description"
                   value={form.description}
                   onChange={(e) => setForm({ ...form, description: e.target.value })}
-                  placeholder="Detalhes adicionais do veículo..."
+                  placeholder="Detalhes adicionais..."
                   rows={3}
                 />
               </div>
@@ -471,7 +576,8 @@ export default function VehiclesPage() {
                 <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
                   Cancelar
                 </Button>
-                <Button type="submit" className="btn-primary">
+                <Button type="submit" className="btn-primary" disabled={isSubmitting}>
+                  {isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                   {editingVehicle ? 'Salvar Alterações' : 'Cadastrar Veículo'}
                 </Button>
               </div>
@@ -485,16 +591,16 @@ export default function VehiclesPage() {
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>
-              Fotos - {viewingImages?.brand} {viewingImages?.model}
+              {viewingImages && `${viewingImages.brand} ${viewingImages.model}`}
             </DialogTitle>
           </DialogHeader>
           <div className="grid grid-cols-2 gap-4">
-            {viewingImages?.images.map((img, idx) => (
-              <img 
-                key={idx} 
-                src={img} 
-                alt={`Foto ${idx + 1}`} 
-                className="w-full h-48 object-cover rounded-lg"
+            {viewingImages?.photos?.map((photo) => (
+              <img
+                key={photo.id}
+                src={photo.photo_url}
+                alt="Foto do veículo"
+                className="w-full rounded-lg object-cover aspect-video"
               />
             ))}
           </div>
@@ -502,8 +608,8 @@ export default function VehiclesPage() {
       </Dialog>
 
       {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-4">
-        <div className="relative flex-1">
+      <div className="flex gap-4 flex-wrap">
+        <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Buscar por marca, modelo ou placa..."
@@ -513,114 +619,125 @@ export default function VehiclesPage() {
           />
         </div>
         <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-full sm:w-48">
+          <SelectTrigger className="w-40">
             <Filter className="h-4 w-4 mr-2" />
-            <SelectValue placeholder="Filtrar por status" />
+            <SelectValue placeholder="Status" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Todos os status</SelectItem>
-            {statusTypes.map((s) => (
-              <SelectItem key={s} value={s}>{statusLabels[s]}</SelectItem>
+            <SelectItem value="all">Todos</SelectItem>
+            {statusTypes.map(s => (
+              <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
             ))}
           </SelectContent>
         </Select>
       </div>
 
-      {/* Vehicle Grid */}
+      {/* Vehicles Grid */}
       {filteredVehicles.length > 0 ? (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {filteredVehicles.map((vehicle, index) => (
-            <Card 
-              key={vehicle.id} 
-              className="overflow-hidden hover:shadow-lg transition-all duration-200 animate-slide-up"
-              style={{ animationDelay: `${index * 50}ms` }}
-            >
-              <div 
-                className="h-40 bg-gradient-to-br from-muted to-muted/50 flex items-center justify-center cursor-pointer relative group"
-                onClick={() => vehicle.images?.length > 0 && setViewingImages(vehicle)}
-              >
-                {vehicle.images && vehicle.images.length > 0 ? (
-                  <>
-                    <img 
-                      src={vehicle.images[0]} 
-                      alt={`${vehicle.brand} ${vehicle.model}`}
-                      className="h-full w-full object-cover"
-                    />
-                    {vehicle.images.length > 1 && (
-                      <div className="absolute bottom-2 right-2 bg-black/60 text-white text-xs px-2 py-1 rounded flex items-center gap-1">
-                        <Image className="h-3 w-3" />
-                        {vehicle.images.length}
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  <Car className="h-16 w-16 text-muted-foreground/30" />
+          {filteredVehicles.map((vehicle, index) => {
+            const mainImage = vehicle.photos?.[0]?.photo_url || null;
+            const fuelLabel = fuelTypes.find(f => f.value === vehicle.fuel)?.label || vehicle.fuel;
+            const statusLabel = statusTypes.find(s => s.value === vehicle.status)?.label || vehicle.status;
+            
+            return (
+              <Card 
+                key={vehicle.id} 
+                className={cn(
+                  'overflow-hidden card-hover animate-slide-up',
+                  vehicle.status === 'vendido' && 'opacity-60'
                 )}
-              </div>
-              <CardContent className="p-4">
-                <div className="flex items-start justify-between mb-3">
-                  <div>
-                    <h3 className="font-semibold">
-                      <PrivacyMask type="blur">{vehicle.brand} {vehicle.model}</PrivacyMask>
-                    </h3>
-                    <p className="text-sm text-muted-foreground">
-                      <PrivacyMask type="hide" placeholder="••••">{vehicle.year} • {vehicle.color}</PrivacyMask>
-                    </p>
-                  </div>
-                  <span className={cn('badge-status', `badge-${vehicle.status}`)}>
-                    {statusLabels[vehicle.status]}
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2 text-sm mb-4">
-                  <div className="flex items-center gap-2 text-muted-foreground">
-                    <DollarSign className="h-4 w-4" />
-                    <span className="font-medium text-foreground">
-                      <PrivacyMask type="hide" placeholder="R$ •••••">
-                        {formatCurrency(vehicle.price)}
-                      </PrivacyMask>
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2 text-muted-foreground">
-                    <Gauge className="h-4 w-4" />
-                    <span>
-                      <PrivacyMask type="hide" placeholder="••• km">
-                        {formatMileage(vehicle.mileage)}
-                      </PrivacyMask>
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2 text-muted-foreground">
-                    <Fuel className="h-4 w-4" />
-                    <span>{vehicle.fuel}</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-muted-foreground">
-                    <Calendar className="h-4 w-4" />
-                    <span>{vehicle.transmission}</span>
+                style={{ animationDelay: `${index * 50}ms` }}
+              >
+                {/* Image */}
+                <div 
+                  className="aspect-video bg-muted relative cursor-pointer"
+                  onClick={() => vehicle.photos?.length && setViewingImages(vehicle)}
+                >
+                  {mainImage ? (
+                    <img 
+                      src={mainImage} 
+                      alt={`${vehicle.brand} ${vehicle.model}`}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <Car className="h-12 w-12 text-muted-foreground/30" />
+                    </div>
+                  )}
+                  {vehicle.photos && vehicle.photos.length > 1 && (
+                    <div className="absolute bottom-2 right-2 bg-background/80 px-2 py-1 rounded-md text-xs flex items-center gap-1">
+                      <Image className="h-3 w-3" />
+                      {vehicle.photos.length}
+                    </div>
+                  )}
+                  <div className={cn(
+                    'absolute top-2 right-2 px-2 py-1 rounded-md text-xs font-medium',
+                    vehicle.status === 'disponivel' && 'bg-success/90 text-success-foreground',
+                    vehicle.status === 'reservado' && 'bg-warning/90 text-warning-foreground',
+                    vehicle.status === 'vendido' && 'bg-muted text-muted-foreground',
+                  )}>
+                    {statusLabel}
                   </div>
                 </div>
 
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="flex-1"
-                    onClick={() => handleEdit(vehicle)}
-                  >
-                    <Edit2 className="h-4 w-4 mr-1" />
-                    Editar
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="text-destructive hover:text-destructive"
-                    onClick={() => handleDelete(vehicle.id)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                <CardContent className="p-4">
+                  <div className="flex items-start justify-between mb-2">
+                    <div>
+                      <h3 className="font-semibold">{vehicle.brand} {vehicle.model}</h3>
+                      {vehicle.version && (
+                        <p className="text-xs text-muted-foreground">{vehicle.version}</p>
+                      )}
+                    </div>
+                    <PrivacyMask>
+                      <span className="text-lg font-bold text-primary">
+                        {formatCurrency(Number(vehicle.price))}
+                      </span>
+                    </PrivacyMask>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 text-sm text-muted-foreground mb-4">
+                    <div className="flex items-center gap-1">
+                      <Calendar className="h-3.5 w-3.5" />
+                      <span>{vehicle.year_fab}/{vehicle.year_model}</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Gauge className="h-3.5 w-3.5" />
+                      <span>{formatMileage(vehicle.mileage || 0)}</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Fuel className="h-3.5 w-3.5" />
+                      <span>{fuelLabel}</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Car className="h-3.5 w-3.5" />
+                      <span>{vehicle.color}</span>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="flex-1"
+                      onClick={() => handleEdit(vehicle)}
+                    >
+                      <Edit2 className="h-4 w-4 mr-1" />
+                      Editar
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="text-destructive hover:text-destructive"
+                      onClick={() => handleDelete(vehicle.id)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       ) : (
         <Card className="p-12">
@@ -629,8 +746,9 @@ export default function VehiclesPage() {
             <h3 className="text-lg font-medium mb-1">Nenhum veículo encontrado</h3>
             <p className="text-muted-foreground">
               {search || statusFilter !== 'all' 
-                ? 'Tente ajustar os filtros de busca' 
-                : 'Comece cadastrando seu primeiro veículo'}
+                ? 'Tente ajustar os filtros de busca'
+                : 'Cadastre seu primeiro veículo clicando no botão acima'
+              }
             </p>
           </div>
         </Card>
