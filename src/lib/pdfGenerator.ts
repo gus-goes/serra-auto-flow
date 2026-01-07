@@ -221,7 +221,7 @@ function drawSignatureSection(
   doc.setFontSize(10);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(60, 60, 60);
-  doc.text('ASSINATURAS', pageWidth / 2, y + 10, { align: 'center' });
+  doc.text('ASSINATURAS', pageWidth / 2, y + 14, { align: 'center' });
   y += 18;
   
   // Client signature box
@@ -585,7 +585,7 @@ export function generateProposalPDF(proposal: Proposal, options: PDFOptions = {}
   // Calculate signature position - lower position for better layout
   const pageBottom = pageHeight - 15;
   const signatureHeight = 55;
-  const minY = Math.max(y + 20, 200);
+  const minY = Math.max(y + 30, 220);
   const sigY = Math.min(minY, pageBottom - signatureHeight - 10);
   
   // Signatures
