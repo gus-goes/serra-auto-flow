@@ -1,9 +1,10 @@
 import { useAuth } from '@/contexts/AuthContext';
 import { usePrivacy } from '@/contexts/PrivacyContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { vehicleStorage, clientStorage, proposalStorage, receiptStorage, saleStorage, userStorage } from '@/lib/storage';
+import { useDashboardStats, useVehicleStatusChart, useSalesByVendor, useRecentProposals } from '@/hooks/useDashboardStats';
 import { formatCurrency } from '@/lib/formatters';
 import { PrivacyMask } from '@/components/PrivacyMask';
+import { Skeleton } from '@/components/ui/skeleton';
 import { 
   Car, 
   Users, 
@@ -18,92 +19,78 @@ import {
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 
 export default function DashboardPage() {
-  const { user, profile, isAdmin } = useAuth();
+  const { profile, isAdmin } = useAuth();
   const { privacyMode } = usePrivacy();
+  
+  const { data: stats, isLoading: statsLoading } = useDashboardStats();
+  const { data: vehicleStatusData } = useVehicleStatusChart();
+  const { data: salesByVendor } = useSalesByVendor();
+  const { data: recentProposals } = useRecentProposals();
 
-  // Get data based on role
-  const vehicles = vehicleStorage.getAll();
-  const allClients = clientStorage.getAll();
-  const allProposals = proposalStorage.getAll();
-  const allReceipts = receiptStorage.getAll();
-  const allSales = saleStorage.getAll();
-  const users = userStorage.getAll();
-
-  const clients = isAdmin ? allClients : allClients.filter(c => c.vendorId === user?.id);
-  const proposals = isAdmin ? allProposals : allProposals.filter(p => p.vendorId === user?.id);
-  const receipts = isAdmin ? allReceipts : allReceipts.filter(r => r.vendorId === user?.id);
-  const sales = isAdmin ? allSales : allSales.filter(s => s.vendorId === user?.id);
-
-  // Stats
-  const vehiclesAvailable = vehicles.filter(v => v.status === 'disponivel').length;
-  const vehiclesSold = vehicles.filter(v => v.status === 'vendido').length;
-  const proposalsPending = proposals.filter(p => ['negociacao', 'enviada'].includes(p.status)).length;
-  const proposalsApproved = proposals.filter(p => p.status === 'aprovada').length;
-  const totalSalesValue = sales.reduce((acc, s) => acc + s.totalValue, 0);
-  const totalCommissions = sales.reduce((acc, s) => acc + s.commission, 0);
-
-  // Vehicle status chart data
-  const vehicleStatusData = [
-    { name: 'Disponível', value: vehiclesAvailable, color: 'hsl(142, 76%, 36%)' },
-    { name: 'Reservado', value: vehicles.filter(v => v.status === 'reservado').length, color: 'hsl(38, 92%, 50%)' },
-    { name: 'Vendido', value: vehiclesSold, color: 'hsl(199, 89%, 48%)' },
-  ];
-
-  // Sales by vendor (admin only)
-  const salesByVendor = isAdmin
-    ? users
-        .filter(u => u.role === 'vendedor')
-        .map(vendor => ({
-          name: vendor.name.split(' ')[0],
-          vendas: allSales.filter(s => s.vendorId === vendor.id).length,
-          valor: allSales.filter(s => s.vendorId === vendor.id).reduce((acc, s) => acc + s.totalValue, 0) / 1000,
-        }))
-    : [];
-
-  const stats = [
+  const statCards = [
     {
       title: 'Veículos Disponíveis',
-      value: vehiclesAvailable,
+      value: stats?.vehiclesAvailable || 0,
       icon: Car,
       color: 'text-success',
       bg: 'bg-success/10',
     },
     {
       title: 'Clientes Ativos',
-      value: clients.length,
+      value: stats?.clientsCount || 0,
       icon: Users,
       color: 'text-info',
       bg: 'bg-info/10',
     },
     {
       title: 'Propostas Pendentes',
-      value: proposalsPending,
+      value: stats?.proposalsPending || 0,
       icon: Clock,
       color: 'text-warning',
       bg: 'bg-warning/10',
     },
     {
       title: 'Propostas Aprovadas',
-      value: proposalsApproved,
+      value: stats?.proposalsApproved || 0,
       icon: CheckCircle2,
       color: 'text-success',
       bg: 'bg-success/10',
     },
     {
       title: 'Total em Vendas',
-      value: formatCurrency(totalSalesValue),
+      value: formatCurrency(stats?.totalSalesValue || 0),
       icon: DollarSign,
       color: 'text-primary',
       bg: 'bg-primary/10',
     },
     {
       title: isAdmin ? 'Comissões Pagas' : 'Minhas Comissões',
-      value: formatCurrency(totalCommissions),
+      value: formatCurrency(stats?.totalCommissions || 0),
       icon: TrendingUp,
       color: 'text-chart-4',
       bg: 'bg-chart-4/10',
     },
   ];
+
+  if (statsLoading) {
+    return (
+      <div className="space-y-6 animate-fade-in">
+        <div>
+          <h1 className="text-2xl font-bold">Dashboard</h1>
+          <p className="text-muted-foreground">Carregando...</p>
+        </div>
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {[...Array(6)].map((_, i) => (
+            <Card key={i}>
+              <CardContent className="p-6">
+                <Skeleton className="h-16 w-full" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -116,7 +103,7 @@ export default function DashboardPage() {
 
       {/* Stats Grid */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {stats.map((stat, index) => (
+        {statCards.map((stat, index) => (
           <Card key={index} className="stat-card animate-slide-up" style={{ animationDelay: `${index * 50}ms` }}>
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
@@ -163,7 +150,7 @@ export default function DashboardPage() {
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
-                      data={vehicleStatusData}
+                      data={vehicleStatusData || []}
                       cx="50%"
                       cy="50%"
                       innerRadius={60}
@@ -171,7 +158,7 @@ export default function DashboardPage() {
                       paddingAngle={5}
                       dataKey="value"
                     >
-                      {vehicleStatusData.map((entry, index) => (
+                      {(vehicleStatusData || []).map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={entry.color} />
                       ))}
                     </Pie>
@@ -186,7 +173,7 @@ export default function DashboardPage() {
                 </ResponsiveContainer>
               </div>
               <div className="flex justify-center gap-6 mt-4">
-                {vehicleStatusData.map((item, index) => (
+                {(vehicleStatusData || []).map((item, index) => (
                   <div key={index} className="flex items-center gap-2">
                     <div className="h-3 w-3 rounded-full" style={{ backgroundColor: item.color }} />
                     <span className="text-sm text-muted-foreground">
@@ -198,76 +185,73 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
 
-        {/* Sales by Vendor (Admin) or Recent Activity */}
-        {isAdmin ? (
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <TrendingUp className="h-5 w-5 text-primary" />
-                Vendas por Vendedor
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="h-64">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={salesByVendor}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                    <XAxis dataKey="name" stroke="hsl(var(--muted-foreground))" fontSize={12} />
-                    <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: 'hsl(var(--card))',
-                        border: '1px solid hsl(var(--border))',
-                        borderRadius: '8px',
-                      }}
-                      formatter={(value: number, name: string) => [
-                        name === 'valor' ? formatCurrency(value * 1000) : value,
-                        name === 'valor' ? 'Valor' : 'Vendas'
-                      ]}
-                    />
-                    <Bar dataKey="vendas" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </CardContent>
-          </Card>
-        ) : (
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <FileText className="h-5 w-5 text-primary" />
-                Minhas Propostas Recentes
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {proposals.slice(0, 5).length > 0 ? (
-                <div className="space-y-3">
-                  {proposals.slice(0, 5).map((proposal) => {
-                    const client = clientStorage.getById(proposal.clientId);
-                    const vehicle = vehicleStorage.getById(proposal.vehicleId);
-                    return (
+          {/* Sales by Vendor (Admin) or Recent Activity */}
+          {isAdmin ? (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <TrendingUp className="h-5 w-5 text-primary" />
+                  Vendas por Vendedor
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={salesByVendor || []}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                      <XAxis dataKey="name" stroke="hsl(var(--muted-foreground))" fontSize={12} />
+                      <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: 'hsl(var(--card))',
+                          border: '1px solid hsl(var(--border))',
+                          borderRadius: '8px',
+                        }}
+                        formatter={(value: number, name: string) => [
+                          name === 'valor' ? formatCurrency(value * 1000) : value,
+                          name === 'valor' ? 'Valor' : 'Vendas'
+                        ]}
+                      />
+                      <Bar dataKey="vendas" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <FileText className="h-5 w-5 text-primary" />
+                  Minhas Propostas Recentes
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {(recentProposals || []).length > 0 ? (
+                  <div className="space-y-3">
+                    {(recentProposals || []).map((proposal) => (
                       <div key={proposal.id} className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
                         <div>
-                          <p className="font-medium text-sm">{client?.name}</p>
+                          <p className="font-medium text-sm">{proposal.client?.name || 'Cliente'}</p>
                           <p className="text-xs text-muted-foreground">
-                            {vehicle?.brand} {vehicle?.model}
+                            {proposal.vehicle?.brand} {proposal.vehicle?.model}
                           </p>
                         </div>
-                        <span className={`badge-status badge-${proposal.status === 'vendida' ? 'vendido' : proposal.status === 'aprovada' ? 'disponivel' : 'reservado'}`}>
+                        <span className={`badge-status badge-${proposal.status === 'aprovada' ? 'disponivel' : 'reservado'}`}>
                           {proposal.status}
                         </span>
                       </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <p className="text-center text-muted-foreground py-8">Nenhuma proposta ainda</p>
-              )}
-            </CardContent>
-          </Card>
-        )}
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-center text-muted-foreground py-8">Nenhuma proposta ainda</p>
+                )}
+              </CardContent>
+            </Card>
+          )}
         </div>
       )}
+
       {/* Quick Stats */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card className="bg-gradient-to-br from-primary/10 to-primary/5 border-primary/20">
@@ -277,7 +261,7 @@ export default function DashboardPage() {
             </div>
             <div>
               <p className="text-2xl font-bold">
-                <PrivacyMask type="hide" placeholder="•">{proposals.length}</PrivacyMask>
+                <PrivacyMask type="hide" placeholder="•">{stats?.proposalsCount || 0}</PrivacyMask>
               </p>
               <p className="text-xs text-muted-foreground">Total Propostas</p>
             </div>
@@ -291,7 +275,7 @@ export default function DashboardPage() {
             </div>
             <div>
               <p className="text-2xl font-bold">
-                <PrivacyMask type="hide" placeholder="•">{sales.length}</PrivacyMask>
+                <PrivacyMask type="hide" placeholder="•">{stats?.salesCount || 0}</PrivacyMask>
               </p>
               <p className="text-xs text-muted-foreground">Vendas Realizadas</p>
             </div>
@@ -305,7 +289,7 @@ export default function DashboardPage() {
             </div>
             <div>
               <p className="text-2xl font-bold">
-                <PrivacyMask type="hide" placeholder="•">{receipts.length}</PrivacyMask>
+                <PrivacyMask type="hide" placeholder="•">{stats?.receiptsCount || 0}</PrivacyMask>
               </p>
               <p className="text-xs text-muted-foreground">Recibos Emitidos</p>
             </div>
@@ -319,7 +303,7 @@ export default function DashboardPage() {
             </div>
             <div>
               <p className="text-2xl font-bold">
-                <PrivacyMask type="hide" placeholder="•">{vehiclesSold}</PrivacyMask>
+                <PrivacyMask type="hide" placeholder="•">{stats?.vehiclesSold || 0}</PrivacyMask>
               </p>
               <p className="text-xs text-muted-foreground">Veículos Vendidos</p>
             </div>

@@ -46,6 +46,7 @@ export type Database = {
       }
       banks: {
         Row: {
+          color_hex: string | null
           commission_rate: number | null
           created_at: string
           id: string
@@ -54,9 +55,12 @@ export type Database = {
           logo_url: string | null
           name: string
           primary_color: string | null
+          rates: Json | null
+          slug: string | null
           updated_at: string
         }
         Insert: {
+          color_hex?: string | null
           commission_rate?: number | null
           created_at?: string
           id?: string
@@ -65,9 +69,12 @@ export type Database = {
           logo_url?: string | null
           name: string
           primary_color?: string | null
+          rates?: Json | null
+          slug?: string | null
           updated_at?: string
         }
         Update: {
+          color_hex?: string | null
           commission_rate?: number | null
           created_at?: string
           id?: string
@@ -76,6 +83,8 @@ export type Database = {
           logo_url?: string | null
           name?: string
           primary_color?: string | null
+          rates?: Json | null
+          slug?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -145,49 +154,82 @@ export type Database = {
       }
       contracts: {
         Row: {
+          client_data: Json | null
           client_id: string | null
           client_signature: string | null
           contract_date: string
           contract_number: string
           created_at: string
           delivery_percentage: number | null
+          down_payment: number | null
+          due_day: number | null
           first_due_date: string | null
           id: string
+          installment_value: number | null
+          installments: number | null
+          payment_type: string | null
           proposal_id: string | null
           seller_id: string | null
           seller_signature: string | null
           signed_at: string | null
+          updated_at: string | null
+          vehicle_data: Json | null
           vehicle_id: string | null
+          vehicle_price: number | null
+          witness1: Json | null
+          witness2: Json | null
         }
         Insert: {
+          client_data?: Json | null
           client_id?: string | null
           client_signature?: string | null
           contract_date?: string
           contract_number: string
           created_at?: string
           delivery_percentage?: number | null
+          down_payment?: number | null
+          due_day?: number | null
           first_due_date?: string | null
           id?: string
+          installment_value?: number | null
+          installments?: number | null
+          payment_type?: string | null
           proposal_id?: string | null
           seller_id?: string | null
           seller_signature?: string | null
           signed_at?: string | null
+          updated_at?: string | null
+          vehicle_data?: Json | null
           vehicle_id?: string | null
+          vehicle_price?: number | null
+          witness1?: Json | null
+          witness2?: Json | null
         }
         Update: {
+          client_data?: Json | null
           client_id?: string | null
           client_signature?: string | null
           contract_date?: string
           contract_number?: string
           created_at?: string
           delivery_percentage?: number | null
+          down_payment?: number | null
+          due_day?: number | null
           first_due_date?: string | null
           id?: string
+          installment_value?: number | null
+          installments?: number | null
+          payment_type?: string | null
           proposal_id?: string | null
           seller_id?: string | null
           seller_signature?: string | null
           signed_at?: string | null
+          updated_at?: string | null
+          vehicle_data?: Json | null
           vehicle_id?: string | null
+          vehicle_price?: number | null
+          witness1?: Json | null
+          witness2?: Json | null
         }
         Relationships: [
           {
@@ -243,7 +285,9 @@ export type Database = {
       proposals: {
         Row: {
           bank_id: string | null
+          cash_price: number | null
           client_id: string | null
+          client_signature: string | null
           created_at: string
           down_payment: number | null
           financed_amount: number | null
@@ -252,6 +296,7 @@ export type Database = {
           installment_value: number | null
           installments: number | null
           interest_rate: number | null
+          is_own_financing: boolean | null
           notes: string | null
           proposal_number: string
           seller_id: string | null
@@ -261,10 +306,13 @@ export type Database = {
           updated_at: string
           vehicle_id: string | null
           vehicle_price: number
+          vendor_signature: string | null
         }
         Insert: {
           bank_id?: string | null
+          cash_price?: number | null
           client_id?: string | null
+          client_signature?: string | null
           created_at?: string
           down_payment?: number | null
           financed_amount?: number | null
@@ -273,6 +321,7 @@ export type Database = {
           installment_value?: number | null
           installments?: number | null
           interest_rate?: number | null
+          is_own_financing?: boolean | null
           notes?: string | null
           proposal_number: string
           seller_id?: string | null
@@ -282,10 +331,13 @@ export type Database = {
           updated_at?: string
           vehicle_id?: string | null
           vehicle_price: number
+          vendor_signature?: string | null
         }
         Update: {
           bank_id?: string | null
+          cash_price?: number | null
           client_id?: string | null
+          client_signature?: string | null
           created_at?: string
           down_payment?: number | null
           financed_amount?: number | null
@@ -294,6 +346,7 @@ export type Database = {
           installment_value?: number | null
           installments?: number | null
           interest_rate?: number | null
+          is_own_financing?: boolean | null
           notes?: string | null
           proposal_number?: string
           seller_id?: string | null
@@ -303,6 +356,7 @@ export type Database = {
           updated_at?: string
           vehicle_id?: string | null
           vehicle_price?: number
+          vendor_signature?: string | null
         }
         Relationships: [
           {
@@ -332,9 +386,14 @@ export type Database = {
         Row: {
           amount: number
           client_id: string | null
+          client_signature: string | null
           created_at: string
+          description: string | null
           id: string
+          location: string | null
           notes: string | null
+          payer_cpf: string | null
+          payer_name: string | null
           payment_date: string
           payment_method: Database["public"]["Enums"]["payment_method"]
           payment_reference: Database["public"]["Enums"]["payment_reference"]
@@ -342,13 +401,19 @@ export type Database = {
           receipt_number: string
           seller_id: string | null
           vehicle_id: string | null
+          vendor_signature: string | null
         }
         Insert: {
           amount: number
           client_id?: string | null
+          client_signature?: string | null
           created_at?: string
+          description?: string | null
           id?: string
+          location?: string | null
           notes?: string | null
+          payer_cpf?: string | null
+          payer_name?: string | null
           payment_date?: string
           payment_method: Database["public"]["Enums"]["payment_method"]
           payment_reference: Database["public"]["Enums"]["payment_reference"]
@@ -356,13 +421,19 @@ export type Database = {
           receipt_number: string
           seller_id?: string | null
           vehicle_id?: string | null
+          vendor_signature?: string | null
         }
         Update: {
           amount?: number
           client_id?: string | null
+          client_signature?: string | null
           created_at?: string
+          description?: string | null
           id?: string
+          location?: string | null
           notes?: string | null
+          payer_cpf?: string | null
+          payer_name?: string | null
           payment_date?: string
           payment_method?: Database["public"]["Enums"]["payment_method"]
           payment_reference?: Database["public"]["Enums"]["payment_reference"]
@@ -370,6 +441,7 @@ export type Database = {
           receipt_number?: string
           seller_id?: string | null
           vehicle_id?: string | null
+          vendor_signature?: string | null
         }
         Relationships: [
           {
@@ -398,41 +470,50 @@ export type Database = {
       reservations: {
         Row: {
           client_id: string | null
+          client_signature: string | null
           created_at: string
           deposit_amount: number | null
           expiry_date: string | null
           id: string
           notes: string | null
           reservation_date: string
+          reservation_number: string | null
           seller_id: string | null
           status: Database["public"]["Enums"]["reservation_status"]
           updated_at: string
+          valid_until: string | null
           vehicle_id: string | null
         }
         Insert: {
           client_id?: string | null
+          client_signature?: string | null
           created_at?: string
           deposit_amount?: number | null
           expiry_date?: string | null
           id?: string
           notes?: string | null
           reservation_date?: string
+          reservation_number?: string | null
           seller_id?: string | null
           status?: Database["public"]["Enums"]["reservation_status"]
           updated_at?: string
+          valid_until?: string | null
           vehicle_id?: string | null
         }
         Update: {
           client_id?: string | null
+          client_signature?: string | null
           created_at?: string
           deposit_amount?: number | null
           expiry_date?: string | null
           id?: string
           notes?: string | null
           reservation_date?: string
+          reservation_number?: string | null
           seller_id?: string | null
           status?: Database["public"]["Enums"]["reservation_status"]
           updated_at?: string
+          valid_until?: string | null
           vehicle_id?: string | null
         }
         Relationships: [
@@ -506,6 +587,145 @@ export type Database = {
           },
           {
             foreignKeyName: "sales_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "vehicles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      simulations: {
+        Row: {
+          bank_name: string | null
+          cet: number | null
+          client_id: string | null
+          created_at: string
+          down_payment: number
+          financed_amount: number
+          id: string
+          installment_value: number
+          installments: number
+          interest_rate: number
+          seller_id: string | null
+          store_margin: number | null
+          total_value: number
+          vehicle_id: string | null
+          vehicle_price: number
+          vendor_commission: number | null
+        }
+        Insert: {
+          bank_name?: string | null
+          cet?: number | null
+          client_id?: string | null
+          created_at?: string
+          down_payment?: number
+          financed_amount?: number
+          id?: string
+          installment_value?: number
+          installments?: number
+          interest_rate?: number
+          seller_id?: string | null
+          store_margin?: number | null
+          total_value?: number
+          vehicle_id?: string | null
+          vehicle_price?: number
+          vendor_commission?: number | null
+        }
+        Update: {
+          bank_name?: string | null
+          cet?: number | null
+          client_id?: string | null
+          created_at?: string
+          down_payment?: number
+          financed_amount?: number
+          id?: string
+          installment_value?: number
+          installments?: number
+          interest_rate?: number
+          seller_id?: string | null
+          store_margin?: number | null
+          total_value?: number
+          vehicle_id?: string | null
+          vehicle_price?: number
+          vendor_commission?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "simulations_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "simulations_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "vehicles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      transfer_authorizations: {
+        Row: {
+          authorization_number: string
+          client_id: string | null
+          client_signature: string | null
+          contract_id: string | null
+          created_at: string
+          id: string
+          location: string
+          seller_id: string | null
+          transfer_date: string
+          vehicle_id: string | null
+          vehicle_value: number
+          vendor_signature: string | null
+        }
+        Insert: {
+          authorization_number: string
+          client_id?: string | null
+          client_signature?: string | null
+          contract_id?: string | null
+          created_at?: string
+          id?: string
+          location?: string
+          seller_id?: string | null
+          transfer_date?: string
+          vehicle_id?: string | null
+          vehicle_value?: number
+          vendor_signature?: string | null
+        }
+        Update: {
+          authorization_number?: string
+          client_id?: string | null
+          client_signature?: string | null
+          contract_id?: string | null
+          created_at?: string
+          id?: string
+          location?: string
+          seller_id?: string | null
+          transfer_date?: string
+          vehicle_id?: string | null
+          vehicle_value?: number
+          vendor_signature?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transfer_authorizations_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transfer_authorizations_contract_id_fkey"
+            columns: ["contract_id"]
+            isOneToOne: false
+            referencedRelation: "contracts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transfer_authorizations_vehicle_id_fkey"
             columns: ["vehicle_id"]
             isOneToOne: false
             referencedRelation: "vehicles"
@@ -632,11 +852,130 @@ export type Database = {
         }
         Relationships: []
       }
+      warranties: {
+        Row: {
+          client_id: string | null
+          client_signature: string | null
+          conditions: string | null
+          contract_id: string | null
+          created_at: string
+          id: string
+          seller_id: string | null
+          vehicle_id: string | null
+          warranty_coverage: string
+          warranty_km: number | null
+          warranty_number: string
+          warranty_period: string
+        }
+        Insert: {
+          client_id?: string | null
+          client_signature?: string | null
+          conditions?: string | null
+          contract_id?: string | null
+          created_at?: string
+          id?: string
+          seller_id?: string | null
+          vehicle_id?: string | null
+          warranty_coverage?: string
+          warranty_km?: number | null
+          warranty_number: string
+          warranty_period?: string
+        }
+        Update: {
+          client_id?: string | null
+          client_signature?: string | null
+          conditions?: string | null
+          contract_id?: string | null
+          created_at?: string
+          id?: string
+          seller_id?: string | null
+          vehicle_id?: string | null
+          warranty_coverage?: string
+          warranty_km?: number | null
+          warranty_number?: string
+          warranty_period?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "warranties_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "warranties_contract_id_fkey"
+            columns: ["contract_id"]
+            isOneToOne: false
+            referencedRelation: "contracts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "warranties_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "vehicles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      withdrawal_declarations: {
+        Row: {
+          client_id: string | null
+          client_signature: string | null
+          created_at: string
+          declaration_date: string
+          declaration_number: string
+          id: string
+          reason: string | null
+          seller_id: string | null
+          vehicle_id: string | null
+        }
+        Insert: {
+          client_id?: string | null
+          client_signature?: string | null
+          created_at?: string
+          declaration_date?: string
+          declaration_number: string
+          id?: string
+          reason?: string | null
+          seller_id?: string | null
+          vehicle_id?: string | null
+        }
+        Update: {
+          client_id?: string | null
+          client_signature?: string | null
+          created_at?: string
+          declaration_date?: string
+          declaration_number?: string
+          id?: string
+          reason?: string | null
+          seller_id?: string | null
+          vehicle_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "withdrawal_declarations_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "withdrawal_declarations_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "vehicles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
+      generate_document_number: { Args: { prefix: string }; Returns: string }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
