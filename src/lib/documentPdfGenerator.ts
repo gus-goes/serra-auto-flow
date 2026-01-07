@@ -159,14 +159,37 @@ export function generateContractPDF(contract: Contract): void {
   doc.text(`Contrato Nº ${contract.number}`, pageWidth - marginRight, y, { align: 'right' });
   y += 10;
   
-  // ===== PREÂMBULO =====
+  // ===== QUALIFICAÇÃO DAS PARTES =====
   const clientAddress = client.address ? 
-    `${client.address.street}, nº ${client.address.number}${client.address.complement ? ', ' + client.address.complement : ''}, ${client.address.neighborhood}, ${client.address.city}/${client.address.state}, CEP ${client.address.zipCode}` : 
+    `${client.address.street}, ${client.address.number}${client.address.complement ? ', ' + client.address.complement : ''}, ${client.address.neighborhood}, ${client.address.city}, ${client.address.state} CEP ${client.address.zipCode}` : 
     'endereço não informado';
   
-  const preambulo = `Pelo presente instrumento particular de compra e venda de veículo automotor, que entre si fazem, de um lado, como VENDEDOR(A), ${company.fantasyName}, pessoa jurídica de direito privado, inscrita no CNPJ sob nº ${company.cnpj}, com sede em ${formatCompanyAddress()}, neste ato representada por seu(sua) responsável legal, e de outro lado, como COMPRADOR(A), ${client.name.toUpperCase()}, ${maritalStatusLabels[client.maritalStatus] || 'estado civil não informado'}, portador(a) da Cédula de Identidade RG nº ${formatRG(client.rg)}, inscrito(a) no CPF sob nº ${formatCPF(client.cpf)}, residente e domiciliado(a) em ${clientAddress}, têm entre si justo e contratado o seguinte:`;
+  // VENDEDOR(A)
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(30, 30, 30);
+  doc.text('VENDEDOR(A):', marginLeft, y);
+  y += 6;
   
-  y = drawParagraph(preambulo);
+  const vendedorTexto = `${company.fantasyName}, sociedade empresária inscrita no CNPJ sob o nº ${company.cnpj}, com sede na ${formatCompanyAddress()}${company.email ? `, e endereço eletrônico ${company.email}` : ''}, neste ato representado(a) por seu(sua) responsável legal.`;
+  y = drawParagraph(vendedorTexto);
+  y += 4;
+  
+  // COMPRADOR(A)
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(30, 30, 30);
+  doc.text('COMPRADOR(A):', marginLeft, y);
+  y += 6;
+  
+  const estadoCivil = maritalStatusLabels[client.maritalStatus] || 'estado civil não informado';
+  const compradorTexto = `${client.name}, Brasileiro(a), inscrito(a) no CPF Nº ${formatCPF(client.cpf)}, portador(a) do RG Nº ${formatRG(client.rg)}, estado civil ${estadoCivil.toLowerCase()}${client.occupation ? `, ${client.occupation}` : ''}, residente em ${clientAddress}${client.email ? ` e endereço eletrônico ${client.email}` : ''}.`;
+  y = drawParagraph(compradorTexto);
+  y += 6;
+  
+  // Texto de ligação
+  const textoLigacao = 'Têm entre si, justo e contratado, o seguinte:';
+  y = drawParagraph(textoLigacao);
   y += 5;
   
   // ===== CLÁUSULA PRIMEIRA - DO OBJETO =====
