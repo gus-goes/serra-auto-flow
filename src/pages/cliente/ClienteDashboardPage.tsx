@@ -34,6 +34,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useState } from 'react';
 import { PageTransition } from '@/components/PageTransition';
+import { motion } from 'framer-motion';
 
 const proposalStatusConfig: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline'; icon: typeof CheckCircle2; color: string }> = {
   pendente: { label: 'Em Análise', variant: 'secondary', icon: HourglassIcon, color: 'text-yellow-500' },
@@ -266,9 +267,28 @@ export default function ClienteDashboardPage() {
 
           {/* Stats Cards */}
           {hasClientRecord && (
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <motion.div 
+              className="grid grid-cols-2 lg:grid-cols-4 gap-4"
+              initial="hidden"
+              animate="visible"
+              variants={{
+                hidden: {},
+                visible: {
+                  transition: {
+                    staggerChildren: 0.1,
+                  },
+                },
+              }}
+            >
               {/* Contracts Card */}
-              <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-[hsl(220,20%,12%)] to-[hsl(220,20%,8%)] border border-[hsl(220,18%,18%)] p-5 hover:border-primary/50 transition-all duration-300">
+              <motion.div
+                variants={{
+                  hidden: { opacity: 0, y: 20, scale: 0.95 },
+                  visible: { opacity: 1, y: 0, scale: 1 },
+                }}
+                transition={{ type: 'spring', stiffness: 300, damping: 24 }}
+                className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-[hsl(220,20%,12%)] to-[hsl(220,20%,8%)] border border-[hsl(220,18%,18%)] p-5 hover:border-primary/50 transition-all duration-300"
+              >
                 <div className="absolute top-0 right-0 w-20 h-20 bg-primary/10 rounded-full blur-2xl group-hover:bg-primary/20 transition-colors" />
                 <div className="relative">
                   <div className="flex items-center justify-between mb-3">
@@ -279,10 +299,17 @@ export default function ClienteDashboardPage() {
                   </div>
                   <p className="text-3xl font-bold text-white">{totalContracts}</p>
                 </div>
-              </div>
+              </motion.div>
 
               {/* Proposals Card */}
-              <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-[hsl(220,20%,12%)] to-[hsl(220,20%,8%)] border border-[hsl(220,18%,18%)] p-5 hover:border-primary/50 transition-all duration-300">
+              <motion.div
+                variants={{
+                  hidden: { opacity: 0, y: 20, scale: 0.95 },
+                  visible: { opacity: 1, y: 0, scale: 1 },
+                }}
+                transition={{ type: 'spring', stiffness: 300, damping: 24 }}
+                className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-[hsl(220,20%,12%)] to-[hsl(220,20%,8%)] border border-[hsl(220,18%,18%)] p-5 hover:border-primary/50 transition-all duration-300"
+              >
                 <div className="absolute top-0 right-0 w-20 h-20 bg-blue-500/10 rounded-full blur-2xl group-hover:bg-blue-500/20 transition-colors" />
                 <div className="relative">
                   <div className="flex items-center justify-between mb-3">
@@ -299,10 +326,17 @@ export default function ClienteDashboardPage() {
                     </p>
                   )}
                 </div>
-              </div>
+              </motion.div>
 
               {/* Receipts Card */}
-              <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-[hsl(220,20%,12%)] to-[hsl(220,20%,8%)] border border-[hsl(220,18%,18%)] p-5 hover:border-primary/50 transition-all duration-300">
+              <motion.div
+                variants={{
+                  hidden: { opacity: 0, y: 20, scale: 0.95 },
+                  visible: { opacity: 1, y: 0, scale: 1 },
+                }}
+                transition={{ type: 'spring', stiffness: 300, damping: 24 }}
+                className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-[hsl(220,20%,12%)] to-[hsl(220,20%,8%)] border border-[hsl(220,18%,18%)] p-5 hover:border-primary/50 transition-all duration-300"
+              >
                 <div className="absolute top-0 right-0 w-20 h-20 bg-green-500/10 rounded-full blur-2xl group-hover:bg-green-500/20 transition-colors" />
                 <div className="relative">
                   <div className="flex items-center justify-between mb-3">
@@ -313,10 +347,17 @@ export default function ClienteDashboardPage() {
                   </div>
                   <p className="text-3xl font-bold text-white">{totalReceipts}</p>
                 </div>
-              </div>
+              </motion.div>
 
               {/* Total Paid Card */}
-              <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/20 to-[hsl(220,20%,8%)] border border-primary/30 p-5 hover:border-primary transition-all duration-300">
+              <motion.div
+                variants={{
+                  hidden: { opacity: 0, y: 20, scale: 0.95 },
+                  visible: { opacity: 1, y: 0, scale: 1 },
+                }}
+                transition={{ type: 'spring', stiffness: 300, damping: 24 }}
+                className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/20 to-[hsl(220,20%,8%)] border border-primary/30 p-5 hover:border-primary transition-all duration-300"
+              >
                 <div className="absolute top-0 right-0 w-20 h-20 bg-primary/20 rounded-full blur-2xl" />
                 <div className="relative">
                   <div className="flex items-center justify-between mb-3">
@@ -329,8 +370,8 @@ export default function ClienteDashboardPage() {
                     {formatCurrency(receipts.reduce((acc, r) => acc + r.amount, 0))}
                   </p>
                 </div>
-              </div>
-            </div>
+              </motion.div>
+            </motion.div>
           )}
 
           {/* Documents Tabs */}
