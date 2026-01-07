@@ -8,7 +8,6 @@ import { PrivacyProvider } from "@/contexts/PrivacyContext";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { MainLayout } from "@/components/layout/MainLayout";
 import LoginPage from "./pages/LoginPage";
-import ClienteLoginPage from "./pages/cliente/ClienteLoginPage";
 import ClienteDashboardPage from "./pages/cliente/ClienteDashboardPage";
 import DashboardPage from "./pages/DashboardPage";
 import VehiclesPage from "./pages/VehiclesPage";
@@ -35,7 +34,7 @@ const App = () => (
             <Routes>
               {/* Public routes */}
               <Route path="/login" element={<LoginPage />} />
-              <Route path="/cliente/login" element={<ClienteLoginPage />} />
+              <Route path="/cliente/login" element={<Navigate to="/login" replace />} />
               
               {/* Root redirect */}
               <Route path="/" element={<Navigate to="/dashboard" replace />} />
