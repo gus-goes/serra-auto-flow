@@ -393,9 +393,11 @@ export function generateContractPDF(contract: Contract): void {
   doc.setLineWidth(0.3);
   doc.rect(leftX, y, sigWidth, 25);
   
-  if (contract.vendorSignature) {
+  // Use vendor signature, or legal representative signature if available
+  const vendorSig = contract.vendorSignature || company.legalRepresentative?.signature;
+  if (vendorSig) {
     try {
-      doc.addImage(contract.vendorSignature, 'PNG', leftX + 5, y + 2, sigWidth - 10, 21);
+      doc.addImage(vendorSig, 'PNG', leftX + 5, y + 2, sigWidth - 10, 21);
     } catch (e) {}
   }
   
@@ -771,9 +773,11 @@ export function generateTransferAuthPDF(transfer: TransferAuthorization): void {
   y += 25;
   
   // Signature line
-  if (transfer.vendorSignature) {
+  // Use vendor signature, or legal representative signature if available
+  const vendorSig = transfer.vendorSignature || company.legalRepresentative?.signature;
+  if (vendorSig) {
     try {
-      doc.addImage(transfer.vendorSignature, 'PNG', pageWidth / 2 - 40, y - 20, 80, 18);
+      doc.addImage(vendorSig, 'PNG', pageWidth / 2 - 40, y - 20, 80, 18);
     } catch (e) {}
   }
   doc.setDrawColor(0, 0, 0);

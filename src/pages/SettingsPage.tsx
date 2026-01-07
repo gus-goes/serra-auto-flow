@@ -14,6 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { SignaturePad } from '@/components/ui/signature-pad';
 import { 
   Settings, 
   Building2, 
@@ -51,6 +52,7 @@ export default function SettingsPage() {
     occupation: '',
     rg: '',
     cpf: '',
+    signature: '',
   });
 
   const [form, setForm] = useState({
@@ -569,6 +571,24 @@ export default function SettingsPage() {
                   onChange={(e) => setLegalRep({ ...legalRep, cpf: e.target.value })}
                   placeholder="000.000.000-00"
                 />
+              </div>
+              <div className="space-y-2 md:col-span-2">
+                <Label>Rubrica/Assinatura</Label>
+                {legalRep.signature ? (
+                  <div className="flex items-center gap-4">
+                    <img src={legalRep.signature} alt="Rubrica" className="h-16 border rounded bg-white" />
+                    <Button variant="outline" size="sm" onClick={() => setLegalRep({ ...legalRep, signature: '' })}>
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Remover
+                    </Button>
+                  </div>
+                ) : (
+                  <SignaturePad
+                    onSave={(sig) => setLegalRep({ ...legalRep, signature: sig })}
+                    label="Desenhe a rubrica abaixo"
+                  />
+                )}
+                <p className="text-xs text-muted-foreground">Esta rubrica será usada nos Contratos e ATPVs</p>
               </div>
             </div>
             <div className="mt-4 flex justify-end">
