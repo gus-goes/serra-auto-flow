@@ -29,7 +29,10 @@ const paymentMethodLabels: Record<string, string> = {
   dinheiro: 'Dinheiro',
   pix: 'PIX',
   transferencia: 'Transferência Bancária',
-  cartao: 'Cartão',
+  cartao_debito: 'Cartão de Débito',
+  cartao_credito: 'Cartão de Crédito',
+  boleto: 'Boleto Bancário',
+  cheque: 'Cheque',
 };
 
 /**

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePrivacy } from '@/contexts/PrivacyContext';
-import { useReceipts, useCreateReceipt, useDeleteReceipt } from '@/hooks/useReceipts';
+import { useReceipts, useCreateReceipt, useDeleteReceipt, useUpdateReceiptSignature } from '@/hooks/useReceipts';
 import { useClients } from '@/hooks/useClients';
 import { useVehicles } from '@/hooks/useVehicles';
 import { useProfiles } from '@/hooks/useProfiles';
@@ -79,6 +79,7 @@ export default function ReceiptsPage() {
   
   const createReceipt = useCreateReceipt();
   const deleteReceipt = useDeleteReceipt();
+  const updateSignature = useUpdateReceiptSignature();
 
   const [search, setSearch] = useState('');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -153,13 +154,23 @@ export default function ReceiptsPage() {
   };
 
   const handleSignature = async (signature: string) => {
-    // TODO: Implement update receipt mutation
-    setIsSignatureOpen(false);
-    setSigningReceipt(null);
-    toast({
-      title: 'Assinatura salva',
-      description: `Assinatura registrada.`,
-    });
+    if (!signingReceipt) return;
+    
+    try {
+      await updateSignature.mutateAsync({
+        id: signingReceipt.id,
+        type: signatureType,
+        signature,
+      });
+      setIsSignatureOpen(false);
+      setSigningReceipt(null);
+    } catch (error) {
+      toast({
+        title: 'Erro ao salvar assinatura',
+        description: 'Não foi possível salvar a assinatura.',
+        variant: 'destructive',
+      });
+    }
   };
 
   const handleDelete = async (id: string) => {
