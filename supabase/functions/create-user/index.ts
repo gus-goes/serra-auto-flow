@@ -65,27 +65,31 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     )
 
-    // Verify the caller is an admin
+    // Verify the caller using getClaims (more reliable than getUser)
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_ANON_KEY')!,
       { global: { headers: { Authorization: authHeader } } }
     )
 
-    const { data: { user: callerUser } } = await supabaseClient.auth.getUser()
+    const token = authHeader.replace('Bearer ', '')
+    const { data: claimsData, error: claimsError } = await supabaseClient.auth.getClaims(token)
     
-    if (!callerUser) {
+    if (claimsError || !claimsData?.claims) {
+      console.error('Auth claims error:', claimsError?.message || 'No claims found')
       return new Response(
         JSON.stringify({ error: 'Usuário não autenticado' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
+    const callerUserId = claimsData.claims.sub as string
+
     // Check if caller is admin
     const { data: callerRoles } = await supabaseAdmin
       .from('user_roles')
       .select('role')
-      .eq('user_id', callerUser.id)
+      .eq('user_id', callerUserId)
       .single()
 
     if (!callerRoles || callerRoles.role !== 'admin') {
@@ -96,7 +100,7 @@ Deno.serve(async (req) => {
     }
 
     // Check rate limit
-    const rateLimit = checkRateLimit(callerUser.id)
+    const rateLimit = checkRateLimit(callerUserId)
     if (!rateLimit.allowed) {
       const resetMinutes = Math.ceil(rateLimit.resetIn / 60000)
       return new Response(
@@ -163,7 +167,7 @@ Deno.serve(async (req) => {
     const userRole = validRoles.includes(role) ? role : 'vendedor'
 
     // Log without exposing email (security best practice)
-    console.log(`Admin ${callerUser.id} creating new user with role: ${userRole}`)
+    console.log(`Admin ${callerUserId} creating new user with role: ${userRole}`)
 
     // Create user using admin API
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
