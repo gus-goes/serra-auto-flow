@@ -2,12 +2,20 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
+import { useLogActivity } from '@/hooks/useActivityLogs';
 import type { Tables, TablesInsert, TablesUpdate, Enums } from '@/integrations/supabase/types';
 
 export type Proposal = Tables<'proposals'>;
 export type ProposalInsert = TablesInsert<'proposals'>;
 export type ProposalUpdate = TablesUpdate<'proposals'>;
 export type ProposalStatus = Enums<'proposal_status'>;
+
+const statusLabels: Record<ProposalStatus, string> = {
+  pendente: 'Pendente',
+  aprovada: 'Aprovada',
+  recusada: 'Recusada',
+  cancelada: 'Cancelada',
+};
 
 export function useProposals(statusFilter?: string) {
   const { user } = useAuth();
@@ -52,6 +60,7 @@ export function useCreateProposal() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { user } = useAuth();
+  const logActivity = useLogActivity();
 
   return useMutation({
     mutationFn: async (proposal: Omit<ProposalInsert, 'seller_id' | 'proposal_number'>) => {
@@ -73,6 +82,15 @@ export function useCreateProposal() {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['proposals'] });
+      
+      // Log activity
+      logActivity.mutate({
+        action: 'create',
+        entityType: 'proposal',
+        entityId: data.id,
+        description: `Proposta ${data.proposal_number} criada`,
+      });
+      
       toast({
         title: 'Proposta criada',
         description: `Proposta ${data.proposal_number} foi criada com sucesso.`,
@@ -123,6 +141,7 @@ export function useUpdateProposal() {
 export function useUpdateProposalStatus() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const logActivity = useLogActivity();
 
   return useMutation({
     mutationFn: async ({ id, status }: { id: string; status: ProposalStatus }) => {
@@ -137,9 +156,23 @@ export function useUpdateProposalStatus() {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['proposals'] });
+      queryClient.invalidateQueries({ queryKey: ['activity-logs'] });
+      
+      // Log activity based on status
+      const action = data.status === 'aprovada' ? 'approve' : 
+                     data.status === 'recusada' ? 'reject' : 
+                     data.status === 'cancelada' ? 'cancel' : 'update';
+      
+      logActivity.mutate({
+        action,
+        entityType: 'proposal',
+        entityId: data.id,
+        description: `Proposta ${data.proposal_number} ${statusLabels[data.status as ProposalStatus] || data.status}`,
+      });
+      
       toast({
         title: 'Status atualizado',
-        description: `Proposta atualizada para ${data.status}.`,
+        description: `Proposta atualizada para ${statusLabels[data.status as ProposalStatus] || data.status}.`,
       });
     },
     onError: (error) => {

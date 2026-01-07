@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
+import { useLogActivity } from '@/hooks/useActivityLogs';
 import type { Tables, TablesInsert, TablesUpdate } from '@/integrations/supabase/types';
 
 export type Contract = Tables<'contracts'>;
@@ -46,6 +47,7 @@ export function useCreateContract() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { user } = useAuth();
+  const logActivity = useLogActivity();
 
   return useMutation({
     mutationFn: async (contract: Omit<ContractInsert, 'seller_id' | 'contract_number'>) => {
@@ -67,6 +69,15 @@ export function useCreateContract() {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['contracts'] });
+      
+      // Log activity
+      logActivity.mutate({
+        action: 'create',
+        entityType: 'contract',
+        entityId: data.id,
+        description: `Contrato ${data.contract_number} criado`,
+      });
+      
       toast({
         title: 'Contrato criado',
         description: `Contrato ${data.contract_number} foi criado com sucesso.`,
