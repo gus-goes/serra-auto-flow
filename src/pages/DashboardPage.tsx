@@ -15,8 +15,11 @@ import {
   DollarSign,
   Clock,
   CheckCircle2,
-  EyeOff
+  EyeOff,
+  Download,
+  Smartphone
 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 
 export default function DashboardPage() {
@@ -95,11 +98,27 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div>
-        <h1 className="text-2xl font-bold">Dashboard</h1>
-        <p className="text-muted-foreground">
-          Bem-vindo, {profile?.name?.split(' ')[0] || 'usuário'}! {isAdmin ? 'Visão geral do sistema.' : 'Aqui está seu resumo.'}
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold">Dashboard</h1>
+          <p className="text-muted-foreground">
+            Bem-vindo, {profile?.name?.split(' ')[0] || 'usuário'}! {isAdmin ? 'Visão geral do sistema.' : 'Aqui está seu resumo.'}
+          </p>
+        </div>
+        
+        <Button
+          asChild
+          className="bg-primary hover:bg-primary/90 gap-2"
+        >
+          <a 
+            href="https://yellow-finch-231976.hostingersite.com/painel/link.php?id=37" 
+            target="_blank" 
+            rel="noopener noreferrer"
+          >
+            <Smartphone className="h-4 w-4" />
+            Baixar Aplicativo
+          </a>
+        </Button>
       </div>
 
       {/* Stats Grid */}
