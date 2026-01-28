@@ -384,21 +384,6 @@ export default function ClienteDashboardPage() {
               <Button 
                 variant="ghost" 
                 size="icon"
-                asChild
-                className="sm:hidden h-8 w-8 text-primary hover:text-primary hover:bg-primary/10"
-                title="Baixar Aplicativo"
-              >
-                <a 
-                  href="https://yellow-finch-231976.hostingersite.com/painel/link.php?id=37" 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                >
-                  <Smartphone className="h-4 w-4" />
-                </a>
-              </Button>
-              <Button 
-                variant="ghost" 
-                size="icon"
                 onClick={() => navigate('/cliente/perfil')}
                 className="h-8 w-8 sm:h-10 sm:w-10 text-gray-400 hover:text-primary hover:bg-primary/10 transition-colors"
                 title="Meu Perfil"
@@ -1064,6 +1049,22 @@ export default function ClienteDashboardPage() {
           </div>
         </div>
       </footer>
+
+      {/* Floating App Download Button - Mobile Only */}
+      <motion.a
+        href="https://yellow-finch-231976.hostingersite.com/painel/link.php?id=37"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="sm:hidden fixed bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-3 bg-primary text-primary-foreground rounded-full shadow-lg shadow-primary/30 font-semibold text-sm"
+        initial={{ scale: 0, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        transition={{ delay: 0.5, type: "spring", stiffness: 200 }}
+        whileHover={{ scale: 1.05 }}
+        whileTap={{ scale: 0.95 }}
+      >
+        <Smartphone className="h-5 w-5" />
+        <span>Baixar App</span>
+      </motion.a>
     </div>
     </PageTransition>
   );
