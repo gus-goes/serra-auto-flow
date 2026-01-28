@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { useToast } from '@/hooks/use-toast';
 import { Switch } from '@/components/ui/switch';
 import logo from '@/assets/logo.png';
-import { Lock, Mail, AlertCircle, Loader2, Users, Briefcase } from 'lucide-react';
+import { Lock, Mail, AlertCircle, Loader2, Users, Briefcase, Smartphone } from 'lucide-react';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -167,6 +167,24 @@ export default function LoginPage() {
                 Suas credenciais foram fornecidas pela equipe da loja.
               </p>
             )}
+
+            {/* Link para download do aplicativo */}
+            <div className="pt-4 border-t border-border/50 mt-4">
+              <Button
+                variant="outline"
+                className="w-full gap-2"
+                asChild
+              >
+                <a 
+                  href="https://yellow-finch-231976.hostingersite.com/painel/link.php?id=37" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                >
+                  <Smartphone className="h-4 w-4" />
+                  Baixar Aplicativo
+                </a>
+              </Button>
+            </div>
           </form>
         </CardContent>
       </Card>
