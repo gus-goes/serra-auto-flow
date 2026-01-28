@@ -23,7 +23,8 @@ import {
   Shield,
   FileSignature,
   CalendarCheck,
-  Ban
+  Ban,
+  Smartphone
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -365,6 +366,36 @@ export default function ClienteDashboardPage() {
                 <p className="text-sm font-medium text-white">{profile?.name}</p>
                 <p className="text-xs text-gray-500">{profile?.email}</p>
               </div>
+              <Button 
+                variant="outline"
+                size="sm"
+                asChild
+                className="hidden sm:flex h-8 sm:h-9 gap-1.5 text-xs border-primary/50 text-primary hover:bg-primary/10 hover:text-primary"
+              >
+                <a 
+                  href="https://yellow-finch-231976.hostingersite.com/painel/link.php?id=37" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                >
+                  <Smartphone className="h-3.5 w-3.5" />
+                  Baixar App
+                </a>
+              </Button>
+              <Button 
+                variant="ghost" 
+                size="icon"
+                asChild
+                className="sm:hidden h-8 w-8 text-primary hover:text-primary hover:bg-primary/10"
+                title="Baixar Aplicativo"
+              >
+                <a 
+                  href="https://yellow-finch-231976.hostingersite.com/painel/link.php?id=37" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                >
+                  <Smartphone className="h-4 w-4" />
+                </a>
+              </Button>
               <Button 
                 variant="ghost" 
                 size="icon"
