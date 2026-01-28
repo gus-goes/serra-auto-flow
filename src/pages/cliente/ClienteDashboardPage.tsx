@@ -1055,11 +1055,11 @@ export default function ClienteDashboardPage() {
         href="https://yellow-finch-231976.hostingersite.com/painel/link.php?id=37"
         target="_blank"
         rel="noopener noreferrer"
-        className="sm:hidden fixed bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-3 bg-primary text-primary-foreground rounded-full shadow-lg shadow-primary/30 font-semibold text-sm"
+        className="sm:hidden fixed bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-3 bg-primary text-primary-foreground rounded-full shadow-lg shadow-primary/30 font-semibold text-sm animate-pulse-ring"
         initial={{ scale: 0, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         transition={{ delay: 0.5, type: "spring", stiffness: 200 }}
-        whileHover={{ scale: 1.05 }}
+        whileHover={{ scale: 1.1 }}
         whileTap={{ scale: 0.95 }}
       >
         <Smartphone className="h-5 w-5" />
