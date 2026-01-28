@@ -13,6 +13,11 @@ export interface LegalRepresentative {
   signature?: string;
 }
 
+export interface AppDownloadLinks {
+  androidUrl: string;
+  iosUrl: string;
+}
+
 const DEFAULT_LEGAL_REP: LegalRepresentative = {
   name: 'Jackson Delfes de Moraes',
   nationality: 'Brasileiro',
@@ -21,6 +26,11 @@ const DEFAULT_LEGAL_REP: LegalRepresentative = {
   rg: '4.663.620',
   cpf: '039.855.889-05',
   signature: '',
+};
+
+const DEFAULT_APP_LINKS: AppDownloadLinks = {
+  androidUrl: '',
+  iosUrl: '',
 };
 
 // Fetch legal representative from Supabase with aggressive caching
@@ -96,6 +106,87 @@ export function useUpdateLegalRepresentative() {
       toast({
         title: 'Representante salvo',
         description: 'Dados do representante legal atualizados.',
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: 'Erro ao salvar',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+}
+
+// Fetch app download links
+export function useAppDownloadLinks() {
+  return useQuery({
+    queryKey: ['company-settings', 'app_download_links'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('company_settings')
+        .select('value')
+        .eq('key', 'app_download_links')
+        .maybeSingle();
+      
+      if (error) throw error;
+      
+      if (data?.value) {
+        return data.value as unknown as AppDownloadLinks;
+      }
+      
+      return DEFAULT_APP_LINKS;
+    },
+    staleTime: 1000 * 60 * 30, // 30 minutes
+    gcTime: 1000 * 60 * 60, // 1 hour
+    refetchOnWindowFocus: false,
+  });
+}
+
+// Update app download links
+export function useUpdateAppDownloadLinks() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async (links: AppDownloadLinks) => {
+      const { data: existing } = await supabase
+        .from('company_settings')
+        .select('id')
+        .eq('key', 'app_download_links')
+        .maybeSingle();
+      
+      const jsonValue = links as unknown as Json;
+      
+      if (existing) {
+        const { data, error } = await supabase
+          .from('company_settings')
+          .update({ value: jsonValue })
+          .eq('key', 'app_download_links')
+          .select()
+          .single();
+        
+        if (error) throw error;
+        return data;
+      } else {
+        const { data, error } = await supabase
+          .from('company_settings')
+          .insert([{
+            key: 'app_download_links',
+            value: jsonValue,
+          }])
+          .select()
+          .single();
+        
+        if (error) throw error;
+        return data;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['company-settings', 'app_download_links'] });
+      toast({
+        title: 'Links salvos',
+        description: 'Links do aplicativo atualizados.',
       });
     },
     onError: (error) => {

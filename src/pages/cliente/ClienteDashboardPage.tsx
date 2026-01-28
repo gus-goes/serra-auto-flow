@@ -40,6 +40,7 @@ import {
   useClientReservations,
   useClientWithdrawals
 } from '@/hooks/useClientDocuments';
+import { useAppDownloadLinks } from '@/hooks/useCompanySettings';
 import { useAdminPhone } from '@/hooks/useAdminPhone';
 import { formatCurrency } from '@/lib/formatters';
 import { formatDateDisplay } from '@/lib/dateUtils';
@@ -84,7 +85,10 @@ export default function ClienteDashboardPage() {
   const { data: reservations = [], isLoading: isLoadingReservations } = useClientReservations();
   const { data: withdrawals = [], isLoading: isLoadingWithdrawals } = useClientWithdrawals();
   const { data: adminPhone } = useAdminPhone();
+  const { data: appLinks } = useAppDownloadLinks();
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+
+  const downloadUrl = appLinks?.androidUrl || appLinks?.iosUrl;
 
   // Format phone for WhatsApp link
   const whatsappPhone = adminPhone ? adminPhone.replace(/\D/g, '') : '5549999999999';
@@ -366,21 +370,23 @@ export default function ClienteDashboardPage() {
                 <p className="text-sm font-medium text-white">{profile?.name}</p>
                 <p className="text-xs text-gray-500">{profile?.email}</p>
               </div>
-              <Button 
-                variant="outline"
-                size="sm"
-                asChild
-                className="hidden sm:flex h-8 sm:h-9 gap-1.5 text-xs border-primary/50 text-primary hover:bg-primary/10 hover:text-primary"
-              >
-                <a 
-                  href="https://yellow-finch-231976.hostingersite.com/painel/link.php?id=37" 
-                  target="_blank" 
-                  rel="noopener noreferrer"
+              {downloadUrl && (
+                <Button 
+                  variant="outline"
+                  size="sm"
+                  asChild
+                  className="hidden sm:flex h-8 sm:h-9 gap-1.5 text-xs border-primary/50 text-primary hover:bg-primary/10 hover:text-primary"
                 >
-                  <Smartphone className="h-3.5 w-3.5" />
-                  Baixar App
-                </a>
-              </Button>
+                  <a 
+                    href={downloadUrl} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                  >
+                    <Smartphone className="h-3.5 w-3.5" />
+                    Baixar App
+                  </a>
+                </Button>
+              )}
               <Button 
                 variant="ghost" 
                 size="icon"
@@ -1051,20 +1057,22 @@ export default function ClienteDashboardPage() {
       </footer>
 
       {/* Floating App Download Button - Mobile Only */}
-      <motion.a
-        href="https://yellow-finch-231976.hostingersite.com/painel/link.php?id=37"
-        target="_blank"
-        rel="noopener noreferrer"
-        className="sm:hidden fixed bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-3 bg-primary text-primary-foreground rounded-full shadow-lg shadow-primary/30 font-semibold text-sm animate-pulse-ring"
-        initial={{ scale: 0, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        transition={{ delay: 0.5, type: "spring", stiffness: 200 }}
-        whileHover={{ scale: 1.1 }}
-        whileTap={{ scale: 0.95 }}
-      >
-        <Smartphone className="h-5 w-5" />
-        <span>Baixar App</span>
-      </motion.a>
+      {downloadUrl && (
+        <motion.a
+          href={downloadUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="sm:hidden fixed bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-3 bg-primary text-primary-foreground rounded-full shadow-lg shadow-primary/30 font-semibold text-sm animate-pulse-ring"
+          initial={{ scale: 0, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ delay: 0.5, type: "spring", stiffness: 200 }}
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.95 }}
+        >
+          <Smartphone className="h-5 w-5" />
+          <span>Baixar App</span>
+        </motion.a>
+      )}
     </div>
     </PageTransition>
   );

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { useAppDownloadLinks } from '@/hooks/useCompanySettings';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -18,9 +19,12 @@ export default function LoginPage() {
   const [isClientMode, setIsClientMode] = useState(false);
   
   const { login, user, role, isLoading } = useAuth();
+  const { data: appLinks } = useAppDownloadLinks();
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
+
+  const downloadUrl = appLinks?.androidUrl || appLinks?.iosUrl;
 
   // Redirect if already logged in
   useEffect(() => {
@@ -169,22 +173,24 @@ export default function LoginPage() {
             )}
 
             {/* Link para download do aplicativo */}
-            <div className="pt-4 border-t border-border/50 mt-4">
-              <Button
-                variant="outline"
-                className="w-full gap-2"
-                asChild
-              >
-                <a 
-                  href="https://yellow-finch-231976.hostingersite.com/painel/link.php?id=37" 
-                  target="_blank" 
-                  rel="noopener noreferrer"
+            {downloadUrl && (
+              <div className="pt-4 border-t border-border/50 mt-4">
+                <Button
+                  variant="outline"
+                  className="w-full gap-2"
+                  asChild
                 >
-                  <Smartphone className="h-4 w-4" />
-                  Baixar Aplicativo
-                </a>
-              </Button>
-            </div>
+                  <a 
+                    href={downloadUrl} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                  >
+                    <Smartphone className="h-4 w-4" />
+                    Baixar Aplicativo
+                  </a>
+                </Button>
+              </div>
+            )}
           </form>
         </CardContent>
       </Card>
