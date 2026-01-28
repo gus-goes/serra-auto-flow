@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useBanks, useCreateBank, useUpdateBank, useDeleteBank, useUploadBankLogo } from '@/hooks/useBanks';
-import { useLegalRepresentative, useUpdateLegalRepresentative, type LegalRepresentative } from '@/hooks/useCompanySettings';
+import { useLegalRepresentative, useUpdateLegalRepresentative, useAppDownloadLinks, useUpdateAppDownloadLinks, type LegalRepresentative, type AppDownloadLinks } from '@/hooks/useCompanySettings';
 import { formatPercent } from '@/lib/formatters';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
@@ -27,7 +27,9 @@ import {
   User,
   Save,
   Upload,
-  Loader2
+  Loader2,
+  Smartphone,
+  Link
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -44,6 +46,10 @@ export default function SettingsPage() {
   // Legal representative from Supabase
   const { data: legalRepData, isLoading: legalRepLoading } = useLegalRepresentative();
   const updateLegalRep = useUpdateLegalRepresentative();
+
+  // App download links from Supabase
+  const { data: appLinksData, isLoading: appLinksLoading } = useAppDownloadLinks();
+  const updateAppLinks = useUpdateAppDownloadLinks();
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingBank, setEditingBank] = useState<typeof banks[0] | null>(null);
@@ -62,6 +68,12 @@ export default function SettingsPage() {
     cpf: '',
     signature: '',
   });
+
+  // Local state for app links form
+  const [appLinks, setAppLinks] = useState<AppDownloadLinks>({
+    androidUrl: '',
+    iosUrl: '',
+  });
   
   // Sync legal rep data from Supabase
   useEffect(() => {
@@ -69,6 +81,13 @@ export default function SettingsPage() {
       setLegalRep(legalRepData);
     }
   }, [legalRepData]);
+
+  // Sync app links from Supabase
+  useEffect(() => {
+    if (appLinksData) {
+      setAppLinks(appLinksData);
+    }
+  }, [appLinksData]);
 
   const [form, setForm] = useState({
     name: '',
@@ -306,7 +325,7 @@ export default function SettingsPage() {
     </Table>
   );
 
-  if (banksLoading || legalRepLoading) {
+  if (banksLoading || legalRepLoading || appLinksLoading) {
     return (
       <div className="space-y-6 animate-fade-in">
         <div>
@@ -630,6 +649,65 @@ export default function SettingsPage() {
                 <Save className="h-4 w-4 mr-2" />
               )}
               Salvar Representante
+            </Button>
+          </CardContent>
+        </Card>
+
+        {/* App Download Links */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Smartphone className="h-5 w-5 text-primary" />
+              Links do Aplicativo
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Configure os links de download do aplicativo móvel que serão exibidos na página de login e no portal do cliente.
+            </p>
+            
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  <Link className="h-4 w-4" />
+                  Link Android / Principal
+                </Label>
+                <Input
+                  value={appLinks.androidUrl}
+                  onChange={(e) => setAppLinks({ ...appLinks, androidUrl: e.target.value })}
+                  placeholder="https://exemplo.com/download-android"
+                  type="url"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Este link será usado como principal para o botão "Baixar Aplicativo"
+                </p>
+              </div>
+              
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  <Link className="h-4 w-4" />
+                  Link iOS (opcional)
+                </Label>
+                <Input
+                  value={appLinks.iosUrl}
+                  onChange={(e) => setAppLinks({ ...appLinks, iosUrl: e.target.value })}
+                  placeholder="https://apps.apple.com/..."
+                  type="url"
+                />
+              </div>
+            </div>
+
+            <Button 
+              className="w-full btn-primary"
+              onClick={() => updateAppLinks.mutate(appLinks)}
+              disabled={updateAppLinks.isPending}
+            >
+              {updateAppLinks.isPending ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Save className="h-4 w-4 mr-2" />
+              )}
+              Salvar Links
             </Button>
           </CardContent>
         </Card>
