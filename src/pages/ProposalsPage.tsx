@@ -17,6 +17,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -91,6 +92,8 @@ export default function ProposalsPage() {
   const [signatureType, setSignatureType] = useState<'client' | 'vendor'>('client');
   const [proposalType, setProposalType] = useState<ProposalType>('financiamento_bancario');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [isDeletingBulk, setIsDeletingBulk] = useState(false);
 
   const activeBanks = banks.filter(b => b.is_active && !b.slug?.includes('proprio'));
 
@@ -261,6 +264,40 @@ export default function ProposalsPage() {
         });
       }
     }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0) return;
+    if (!confirm(`Tem certeza que deseja excluir ${selectedIds.size} proposta(s)?`)) return;
+    setIsDeletingBulk(true);
+    try {
+      for (const id of selectedIds) {
+        await deleteProposal.mutateAsync(id);
+      }
+      setSelectedIds(new Set());
+      toast({ title: 'Propostas excluídas', description: `${selectedIds.size} proposta(s) removida(s).` });
+    } catch {
+      toast({ title: 'Erro ao excluir', description: 'Algumas propostas podem não ter sido excluídas.', variant: 'destructive' });
+    } finally {
+      setIsDeletingBulk(false);
+    }
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === filteredProposals.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filteredProposals.map(p => p.id)));
+    }
+  };
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   };
 
   const handleGeneratePDF = (proposal: typeof proposals[0]) => {
@@ -623,7 +660,7 @@ export default function ProposalsPage() {
       </Dialog>
 
       {/* Filters */}
-      <div className="flex gap-4 flex-wrap">
+      <div className="flex gap-4 flex-wrap items-center">
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
@@ -644,6 +681,17 @@ export default function ProposalsPage() {
             ))}
           </SelectContent>
         </Select>
+        {selectedIds.size > 0 && (
+          <Button
+            variant="destructive"
+            size="sm"
+            onClick={handleBulkDelete}
+            disabled={isDeletingBulk}
+          >
+            {isDeletingBulk ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Trash2 className="h-4 w-4 mr-2" />}
+            Excluir {selectedIds.size} selecionada(s)
+          </Button>
+        )}
       </div>
 
       {/* Proposals Table */}
@@ -653,6 +701,12 @@ export default function ProposalsPage() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-10">
+                    <Checkbox
+                      checked={selectedIds.size === filteredProposals.length && filteredProposals.length > 0}
+                      onCheckedChange={toggleSelectAll}
+                    />
+                  </TableHead>
                   <TableHead>Número</TableHead>
                   <TableHead>Cliente</TableHead>
                   <TableHead>Veículo</TableHead>
@@ -669,6 +723,12 @@ export default function ProposalsPage() {
                   
                   return (
                     <TableRow key={proposal.id} className="table-row-hover" style={getTypeColorStyle(proposal)}>
+                      <TableCell>
+                        <Checkbox
+                          checked={selectedIds.has(proposal.id)}
+                          onCheckedChange={() => toggleSelect(proposal.id)}
+                        />
+                      </TableCell>
                       <TableCell className="font-mono text-sm">{proposal.proposal_number}</TableCell>
                       <TableCell>
                         <p className="font-medium">{client?.name || '-'}</p>

@@ -1,12 +1,17 @@
 import { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useVehicles } from '@/hooks/useVehicles';
 import { useBanks } from '@/hooks/useBanks';
+import { useClients } from '@/hooks/useClients';
+import { useCreateProposal } from '@/hooks/useProposals';
 import { formatCurrency, formatPercent } from '@/lib/formatters';
 import { useToast } from '@/hooks/use-toast';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Slider } from '@/components/ui/slider';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -17,16 +22,21 @@ import {
   Building2,
   TrendingUp,
   DollarSign,
-  Store
+  Store,
+  FileText,
+  Loader2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export default function SimulatorPage() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   const { data: allVehicles = [], isLoading: loadingVehicles } = useVehicles();
   const { data: allBanks = [], isLoading: loadingBanks } = useBanks();
+  const { data: clients = [] } = useClients();
+  const createProposal = useCreateProposal();
 
   const vehicles = allVehicles.filter(v => v.status === 'disponivel');
   const banks = allBanks.filter(b => b.is_active);
@@ -41,6 +51,27 @@ export default function SimulatorPage() {
   const [ownInstallments, setOwnInstallments] = useState<number>(12);
   const [ownInstallmentsStr, setOwnInstallmentsStr] = useState('12');
   const [activeTab, setActiveTab] = useState('bancario');
+
+  // Proposal dialog state
+  const [proposalDialog, setProposalDialog] = useState<{
+    open: boolean;
+    type: 'financiamento_bancario' | 'financiamento_direto';
+    bankId?: string;
+    bankName?: string;
+    installmentValue: number;
+    totalValue: number;
+    installments: number;
+    clientId: string;
+    isSubmitting: boolean;
+  }>({
+    open: false,
+    type: 'financiamento_bancario',
+    installmentValue: 0,
+    totalValue: 0,
+    installments: 0,
+    clientId: '',
+    isSubmitting: false,
+  });
 
   const vehicle = vehicles.find(v => v.id === selectedVehicle);
   const vehicleLabel = vehicle ? `${vehicle.brand} ${vehicle.model} ${vehicle.year_fab}/${vehicle.year_model}` : null;
@@ -62,7 +93,6 @@ export default function SimulatorPage() {
     }
   };
 
-  // Calculate simulations for bank financing
   const bankSimulations = useMemo(() => {
     if (financedAmount <= 0 || installments <= 0) return [];
 
@@ -97,7 +127,6 @@ export default function SimulatorPage() {
     }).sort((a, b) => a.installmentValue - b.installmentValue);
   }, [banks, financedAmount, installments, vehiclePrice]);
 
-  // Calculate own financing (no interest)
   const ownSimulation = useMemo(() => {
     if (financedAmount <= 0) return null;
 
@@ -110,6 +139,59 @@ export default function SimulatorPage() {
       installments: ownInstallments,
     };
   }, [financedAmount, ownInstallments]);
+
+  const openProposalDialog = (type: 'financiamento_bancario' | 'financiamento_direto', data: {
+    bankId?: string;
+    bankName?: string;
+    installmentValue: number;
+    totalValue: number;
+    installments: number;
+  }) => {
+    if (!selectedVehicle) {
+      toast({ title: 'Selecione um veículo', description: 'É necessário selecionar um veículo antes de gerar a proposta.', variant: 'destructive' });
+      return;
+    }
+    setProposalDialog({
+      open: true,
+      type,
+      bankId: data.bankId,
+      bankName: data.bankName,
+      installmentValue: data.installmentValue,
+      totalValue: data.totalValue,
+      installments: data.installments,
+      clientId: '',
+      isSubmitting: false,
+    });
+  };
+
+  const handleCreateProposal = async () => {
+    if (!proposalDialog.clientId) {
+      toast({ title: 'Selecione um cliente', variant: 'destructive' });
+      return;
+    }
+    setProposalDialog(prev => ({ ...prev, isSubmitting: true }));
+    try {
+      await createProposal.mutateAsync({
+        client_id: proposalDialog.clientId,
+        vehicle_id: selectedVehicle,
+        bank_id: proposalDialog.type === 'financiamento_bancario' ? (proposalDialog.bankId || null) : null,
+        type: proposalDialog.type,
+        vehicle_price: vehiclePrice,
+        down_payment: downPayment,
+        financed_amount: financedAmount,
+        installments: proposalDialog.installments,
+        installment_value: proposalDialog.installmentValue,
+        total_amount: proposalDialog.totalValue,
+        is_own_financing: proposalDialog.type === 'financiamento_direto',
+      });
+      setProposalDialog(prev => ({ ...prev, open: false }));
+      toast({ title: 'Proposta criada!', description: 'A proposta foi gerada com sucesso.' });
+    } catch {
+      // error handled by hook
+    } finally {
+      setProposalDialog(prev => ({ ...prev, isSubmitting: false }));
+    }
+  };
 
   if (isLoading) {
     return (
@@ -127,7 +209,6 @@ export default function SimulatorPage() {
     );
   }
 
-  // Inline input section to avoid re-mount
   const renderInputSection = (
     currentInstallmentsStr: string,
     onInstallmentsStrChange: (str: string) => void,
@@ -341,6 +422,22 @@ export default function SimulatorPage() {
                               <span className="font-medium">{formatCurrency(sim.storeMargin)}</span>
                             </div>
                           </div>
+
+                          <Button
+                            size="sm"
+                            className="w-full mt-2"
+                            variant="outline"
+                            onClick={() => openProposalDialog('financiamento_bancario', {
+                              bankId: sim.bank.id,
+                              bankName: sim.bank.name,
+                              installmentValue: sim.installmentValue,
+                              totalValue: sim.totalValue,
+                              installments,
+                            })}
+                          >
+                            <FileText className="h-4 w-4 mr-2" />
+                            Gerar Proposta
+                          </Button>
                         </div>
                       </CardContent>
                     </Card>
@@ -436,6 +533,19 @@ export default function SimulatorPage() {
                         <span>Total a pagar:</span>
                         <span className="font-bold text-success">{formatCurrency(ownSimulation.totalValue)}</span>
                       </div>
+
+                      <Button
+                        className="w-full"
+                        variant="outline"
+                        onClick={() => openProposalDialog('financiamento_direto', {
+                          installmentValue: ownSimulation.installmentValue,
+                          totalValue: ownSimulation.totalValue,
+                          installments: ownSimulation.installments,
+                        })}
+                      >
+                        <FileText className="h-4 w-4 mr-2" />
+                        Gerar Proposta
+                      </Button>
                     </div>
                   </CardContent>
                 </Card>
@@ -454,6 +564,78 @@ export default function SimulatorPage() {
           </div>
         </TabsContent>
       </Tabs>
+
+      {/* Proposal Dialog */}
+      <Dialog open={proposalDialog.open} onOpenChange={(open) => setProposalDialog(prev => ({ ...prev, open }))}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5" />
+              Gerar Proposta
+            </DialogTitle>
+            <DialogDescription>
+              Selecione o cliente para criar a proposta a partir da simulação.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="bg-muted/50 rounded-lg p-4 space-y-2 text-sm">
+              {vehicleLabel && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Veículo:</span>
+                  <span className="font-medium">{vehicleLabel}</span>
+                </div>
+              )}
+              {proposalDialog.bankName && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Banco:</span>
+                  <span className="font-medium">{proposalDialog.bankName}</span>
+                </div>
+              )}
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Entrada:</span>
+                <span className="font-medium">{formatCurrency(downPayment)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Parcelas:</span>
+                <span className="font-medium">{proposalDialog.installments}x de {formatCurrency(proposalDialog.installmentValue)}</span>
+              </div>
+              <div className="flex justify-between font-semibold pt-2 border-t">
+                <span>Total:</span>
+                <span>{formatCurrency(proposalDialog.totalValue)}</span>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Cliente *</Label>
+              <Select value={proposalDialog.clientId} onValueChange={(v) => setProposalDialog(prev => ({ ...prev, clientId: v }))}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o cliente" />
+                </SelectTrigger>
+                <SelectContent>
+                  {clients.map(c => (
+                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex gap-3 justify-end pt-4">
+              <Button variant="outline" onClick={() => setProposalDialog(prev => ({ ...prev, open: false }))}>
+                Cancelar
+              </Button>
+              <Button
+                className="btn-primary"
+                onClick={handleCreateProposal}
+                disabled={proposalDialog.isSubmitting || !proposalDialog.clientId}
+              >
+                {proposalDialog.isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                Criar Proposta
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
