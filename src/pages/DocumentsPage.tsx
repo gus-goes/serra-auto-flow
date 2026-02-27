@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useContracts, useCreateContract, useDeleteContract } from '@/hooks/useContracts';
 import { useReservations, useCreateReservation, useDeleteReservation } from '@/hooks/useReservations';
-import { useWarranties, useTransferAuthorizations, useWithdrawalDeclarations, useCreateWarranty, useCreateTransferAuthorization, useCreateWithdrawalDeclaration } from '@/hooks/useDocuments';
+import { useWarranties, useTransferAuthorizations, useWithdrawalDeclarations, useCreateWarranty, useCreateTransferAuthorization, useCreateWithdrawalDeclaration, useDeleteWarranty, useDeleteTransferAuthorization, useDeleteWithdrawalDeclaration } from '@/hooks/useDocuments';
 import { useClients } from '@/hooks/useClients';
 import { useVehicles, useUpdateVehicle } from '@/hooks/useVehicles';
 import { useProfiles } from '@/hooks/useProfiles';
@@ -29,6 +29,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Checkbox } from '@/components/ui/checkbox';
 import { ContractPreviewDialog, type ContractData } from '@/components/ContractPreviewDialog';
 import { 
   FileText, Plus, Search, Download, Trash2, 
@@ -65,8 +66,11 @@ export default function DocumentsPage() {
   const createReservation = useCreateReservation();
   const deleteReservation = useDeleteReservation();
   const createWarranty = useCreateWarranty();
+  const deleteWarranty = useDeleteWarranty();
   const createTransfer = useCreateTransferAuthorization();
+  const deleteTransfer = useDeleteTransferAuthorization();
   const createWithdrawal = useCreateWithdrawalDeclaration();
+  const deleteWithdrawal = useDeleteWithdrawalDeclaration();
   const updateVehicle = useUpdateVehicle();
 
   const [isContractOpen, setIsContractOpen] = useState(false);
@@ -76,6 +80,46 @@ export default function DocumentsPage() {
   const [isWithdrawalOpen, setIsWithdrawalOpen] = useState(false);
   const [isReservationOpen, setIsReservationOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Selection state for bulk delete
+  const [selectedContracts, setSelectedContracts] = useState<Set<string>>(new Set());
+  const [selectedWarranties, setSelectedWarranties] = useState<Set<string>>(new Set());
+  const [selectedTransfers, setSelectedTransfers] = useState<Set<string>>(new Set());
+  const [selectedWithdrawals, setSelectedWithdrawals] = useState<Set<string>>(new Set());
+  const [selectedReservations, setSelectedReservations] = useState<Set<string>>(new Set());
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false);
+
+  const toggleSelection = (set: Set<string>, setFn: React.Dispatch<React.SetStateAction<Set<string>>>, id: string) => {
+    const next = new Set(set);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    setFn(next);
+  };
+
+  const toggleAll = (ids: string[], set: Set<string>, setFn: React.Dispatch<React.SetStateAction<Set<string>>>) => {
+    if (set.size === ids.length) setFn(new Set());
+    else setFn(new Set(ids));
+  };
+
+  const handleBulkDelete = async (
+    type: string,
+    selected: Set<string>,
+    setSelected: React.Dispatch<React.SetStateAction<Set<string>>>,
+    deleteFn: { mutateAsync: (id: string) => Promise<unknown> }
+  ) => {
+    if (selected.size === 0) return;
+    if (!confirm(`Tem certeza que deseja excluir ${selected.size} ${type}? Esta ação não pode ser desfeita.`)) return;
+    
+    setIsBulkDeleting(true);
+    try {
+      await Promise.all(Array.from(selected).map(id => deleteFn.mutateAsync(id)));
+      setSelected(new Set());
+      toast({ title: 'Exclusão concluída', description: `${selected.size} ${type} excluído(s) com sucesso.` });
+    } catch (error) {
+      toast({ title: 'Erro', description: 'Alguns itens não puderam ser excluídos.', variant: 'destructive' });
+    } finally {
+      setIsBulkDeleting(false);
+    }
+  };
 
   // Form states
   const [contractForm, setContractForm] = useState({
@@ -508,11 +552,27 @@ export default function DocumentsPage() {
             />
           </div>
 
+          {selectedContracts.size > 0 && (
+            <div className="flex items-center gap-2 p-2 bg-destructive/10 rounded-lg">
+              <span className="text-sm font-medium">{selectedContracts.size} selecionado(s)</span>
+              <Button variant="destructive" size="sm" disabled={isBulkDeleting} onClick={() => handleBulkDelete('contratos', selectedContracts, setSelectedContracts, deleteContract)}>
+                {isBulkDeleting ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Trash2 className="h-4 w-4 mr-1" />}
+                Excluir selecionados
+              </Button>
+            </div>
+          )}
+
           <Card>
             <CardContent className="p-0">
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-10">
+                      <Checkbox
+                        checked={contracts.length > 0 && selectedContracts.size === contracts.length}
+                        onCheckedChange={() => toggleAll(contracts.map(c => c.id), selectedContracts, setSelectedContracts)}
+                      />
+                    </TableHead>
                     <TableHead>Número</TableHead>
                     <TableHead>Cliente</TableHead>
                     <TableHead>Veículo</TableHead>
@@ -523,7 +583,13 @@ export default function DocumentsPage() {
                 </TableHeader>
                 <TableBody>
                   {contracts.length > 0 ? contracts.map((contract) => (
-                    <TableRow key={contract.id}>
+                    <TableRow key={contract.id} className={cn(selectedContracts.has(contract.id) && "bg-muted/50")}>
+                      <TableCell>
+                        <Checkbox
+                          checked={selectedContracts.has(contract.id)}
+                          onCheckedChange={() => toggleSelection(selectedContracts, setSelectedContracts, contract.id)}
+                        />
+                      </TableCell>
                       <TableCell className="font-mono text-sm">{contract.contract_number}</TableCell>
                       <TableCell>{getClientName(contract.client_id)}</TableCell>
                       <TableCell>{getVehicleInfo(contract.vehicle_id)}</TableCell>
@@ -531,20 +597,10 @@ export default function DocumentsPage() {
                       <TableCell>{formatDateDisplay(contract.contract_date)}</TableCell>
                       <TableCell>
                         <div className="flex gap-1">
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="h-8 w-8"
-                            onClick={() => handleDownloadContract(contract.id)}
-                          >
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDownloadContract(contract.id)}>
                             <Download className="h-4 w-4" />
                           </Button>
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="h-8 w-8 text-destructive"
-                            onClick={() => deleteContract.mutate(contract.id)}
-                          >
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => deleteContract.mutate(contract.id)}>
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
@@ -552,7 +608,7 @@ export default function DocumentsPage() {
                     </TableRow>
                   )) : (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                         Nenhum contrato encontrado
                       </TableCell>
                     </TableRow>
@@ -619,41 +675,55 @@ export default function DocumentsPage() {
             </Dialog>
           </div>
 
+          {selectedWarranties.size > 0 && (
+            <div className="flex items-center gap-2 p-2 bg-destructive/10 rounded-lg">
+              <span className="text-sm font-medium">{selectedWarranties.size} selecionado(s)</span>
+              <Button variant="destructive" size="sm" disabled={isBulkDeleting} onClick={() => handleBulkDelete('garantias', selectedWarranties, setSelectedWarranties, deleteWarranty)}>
+                {isBulkDeleting ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Trash2 className="h-4 w-4 mr-1" />}
+                Excluir selecionados
+              </Button>
+            </div>
+          )}
+
           <Card>
             <CardContent className="p-0">
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-10">
+                      <Checkbox checked={warranties.length > 0 && selectedWarranties.size === warranties.length} onCheckedChange={() => toggleAll(warranties.map(w => w.id), selectedWarranties, setSelectedWarranties)} />
+                    </TableHead>
                     <TableHead>Número</TableHead>
                     <TableHead>Cliente</TableHead>
                     <TableHead>Veículo</TableHead>
                     <TableHead>Período</TableHead>
                     <TableHead>Data</TableHead>
-                    <TableHead className="w-16">Ações</TableHead>
+                    <TableHead className="w-24">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {warranties.length > 0 ? warranties.map((warranty) => (
-                    <TableRow key={warranty.id}>
+                    <TableRow key={warranty.id} className={cn(selectedWarranties.has(warranty.id) && "bg-muted/50")}>
+                      <TableCell><Checkbox checked={selectedWarranties.has(warranty.id)} onCheckedChange={() => toggleSelection(selectedWarranties, setSelectedWarranties, warranty.id)} /></TableCell>
                       <TableCell className="font-mono text-sm">{warranty.warranty_number}</TableCell>
                       <TableCell>{getClientName(warranty.client_id)}</TableCell>
                       <TableCell>{getVehicleInfo(warranty.vehicle_id)}</TableCell>
                       <TableCell>{warranty.warranty_period}</TableCell>
                       <TableCell>{formatDateDisplay(warranty.created_at)}</TableCell>
                       <TableCell>
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          className="h-8 w-8"
-                          onClick={() => handleDownloadWarranty(warranty.id)}
-                        >
-                          <Download className="h-4 w-4" />
-                        </Button>
+                        <div className="flex gap-1">
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDownloadWarranty(warranty.id)}>
+                            <Download className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => deleteWarranty.mutate(warranty.id)}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   )) : (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                         Nenhuma garantia encontrada
                       </TableCell>
                     </TableRow>
@@ -712,41 +782,55 @@ export default function DocumentsPage() {
             </Dialog>
           </div>
 
+          {selectedTransfers.size > 0 && (
+            <div className="flex items-center gap-2 p-2 bg-destructive/10 rounded-lg">
+              <span className="text-sm font-medium">{selectedTransfers.size} selecionado(s)</span>
+              <Button variant="destructive" size="sm" disabled={isBulkDeleting} onClick={() => handleBulkDelete('ATPVs', selectedTransfers, setSelectedTransfers, deleteTransfer)}>
+                {isBulkDeleting ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Trash2 className="h-4 w-4 mr-1" />}
+                Excluir selecionados
+              </Button>
+            </div>
+          )}
+
           <Card>
             <CardContent className="p-0">
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-10">
+                      <Checkbox checked={transfers.length > 0 && selectedTransfers.size === transfers.length} onCheckedChange={() => toggleAll(transfers.map(t => t.id), selectedTransfers, setSelectedTransfers)} />
+                    </TableHead>
                     <TableHead>Número</TableHead>
                     <TableHead>Cliente</TableHead>
                     <TableHead>Veículo</TableHead>
                     <TableHead>Valor</TableHead>
                     <TableHead>Data</TableHead>
-                    <TableHead className="w-16">Ações</TableHead>
+                    <TableHead className="w-24">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {transfers.length > 0 ? transfers.map((transfer) => (
-                    <TableRow key={transfer.id}>
+                    <TableRow key={transfer.id} className={cn(selectedTransfers.has(transfer.id) && "bg-muted/50")}>
+                      <TableCell><Checkbox checked={selectedTransfers.has(transfer.id)} onCheckedChange={() => toggleSelection(selectedTransfers, setSelectedTransfers, transfer.id)} /></TableCell>
                       <TableCell className="font-mono text-sm">{transfer.authorization_number}</TableCell>
                       <TableCell>{getClientName(transfer.client_id)}</TableCell>
                       <TableCell>{getVehicleInfo(transfer.vehicle_id)}</TableCell>
                       <TableCell>{formatCurrency(Number(transfer.vehicle_value))}</TableCell>
                       <TableCell>{formatDateDisplay(transfer.transfer_date)}</TableCell>
                       <TableCell>
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          className="h-8 w-8"
-                          onClick={() => handleDownloadTransfer(transfer.id)}
-                        >
-                          <Download className="h-4 w-4" />
-                        </Button>
+                        <div className="flex gap-1">
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDownloadTransfer(transfer.id)}>
+                            <Download className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => deleteTransfer.mutate(transfer.id)}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   )) : (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                         Nenhuma ATPV encontrada
                       </TableCell>
                     </TableRow>
@@ -796,39 +880,53 @@ export default function DocumentsPage() {
             </Dialog>
           </div>
 
+          {selectedWithdrawals.size > 0 && (
+            <div className="flex items-center gap-2 p-2 bg-destructive/10 rounded-lg">
+              <span className="text-sm font-medium">{selectedWithdrawals.size} selecionado(s)</span>
+              <Button variant="destructive" size="sm" disabled={isBulkDeleting} onClick={() => handleBulkDelete('desistências', selectedWithdrawals, setSelectedWithdrawals, deleteWithdrawal)}>
+                {isBulkDeleting ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Trash2 className="h-4 w-4 mr-1" />}
+                Excluir selecionados
+              </Button>
+            </div>
+          )}
+
           <Card>
             <CardContent className="p-0">
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-10">
+                      <Checkbox checked={withdrawals.length > 0 && selectedWithdrawals.size === withdrawals.length} onCheckedChange={() => toggleAll(withdrawals.map(w => w.id), selectedWithdrawals, setSelectedWithdrawals)} />
+                    </TableHead>
                     <TableHead>Número</TableHead>
                     <TableHead>Cliente</TableHead>
                     <TableHead>Veículo</TableHead>
                     <TableHead>Data</TableHead>
-                    <TableHead className="w-16">Ações</TableHead>
+                    <TableHead className="w-24">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {withdrawals.length > 0 ? withdrawals.map((withdrawal) => (
-                    <TableRow key={withdrawal.id}>
+                    <TableRow key={withdrawal.id} className={cn(selectedWithdrawals.has(withdrawal.id) && "bg-muted/50")}>
+                      <TableCell><Checkbox checked={selectedWithdrawals.has(withdrawal.id)} onCheckedChange={() => toggleSelection(selectedWithdrawals, setSelectedWithdrawals, withdrawal.id)} /></TableCell>
                       <TableCell className="font-mono text-sm">{withdrawal.declaration_number}</TableCell>
                       <TableCell>{getClientName(withdrawal.client_id)}</TableCell>
                       <TableCell>{getVehicleInfo(withdrawal.vehicle_id)}</TableCell>
                       <TableCell>{formatDateDisplay(withdrawal.declaration_date)}</TableCell>
                       <TableCell>
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          className="h-8 w-8"
-                          onClick={() => handleDownloadWithdrawal(withdrawal.id)}
-                        >
-                          <Download className="h-4 w-4" />
-                        </Button>
+                        <div className="flex gap-1">
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDownloadWithdrawal(withdrawal.id)}>
+                            <Download className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => deleteWithdrawal.mutate(withdrawal.id)}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   )) : (
                     <TableRow>
-                      <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                         Nenhuma desistência encontrada
                       </TableCell>
                     </TableRow>
@@ -882,23 +980,49 @@ export default function DocumentsPage() {
             </Dialog>
           </div>
 
+          {selectedReservations.size > 0 && (
+            <div className="flex items-center gap-2 p-2 bg-destructive/10 rounded-lg">
+              <span className="text-sm font-medium">{selectedReservations.size} selecionado(s)</span>
+              <Button variant="destructive" size="sm" disabled={isBulkDeleting} onClick={async () => {
+                if (!confirm(`Tem certeza que deseja excluir ${selectedReservations.size} reservas? Esta ação não pode ser desfeita.`)) return;
+                setIsBulkDeleting(true);
+                try {
+                  await Promise.all(Array.from(selectedReservations).map(id => {
+                    const res = reservations.find(r => r.id === id);
+                    return deleteReservation.mutateAsync({ id, vehicleId: res?.vehicle_id || undefined });
+                  }));
+                  setSelectedReservations(new Set());
+                  toast({ title: 'Exclusão concluída', description: `${selectedReservations.size} reservas excluídas com sucesso.` });
+                } catch { toast({ title: 'Erro', description: 'Alguns itens não puderam ser excluídos.', variant: 'destructive' }); }
+                finally { setIsBulkDeleting(false); }
+              }}>
+                {isBulkDeleting ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Trash2 className="h-4 w-4 mr-1" />}
+                Excluir selecionados
+              </Button>
+            </div>
+          )}
+
           <Card>
             <CardContent className="p-0">
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-10">
+                      <Checkbox checked={reservations.length > 0 && selectedReservations.size === reservations.length} onCheckedChange={() => toggleAll(reservations.map(r => r.id), selectedReservations, setSelectedReservations)} />
+                    </TableHead>
                     <TableHead>Número</TableHead>
                     <TableHead>Cliente</TableHead>
                     <TableHead>Veículo</TableHead>
                     <TableHead>Sinal</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Válido até</TableHead>
-                    <TableHead className="w-16">Ações</TableHead>
+                    <TableHead className="w-24">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {reservations.length > 0 ? reservations.map((reservation) => (
-                    <TableRow key={reservation.id}>
+                    <TableRow key={reservation.id} className={cn(selectedReservations.has(reservation.id) && "bg-muted/50")}>
+                      <TableCell><Checkbox checked={selectedReservations.has(reservation.id)} onCheckedChange={() => toggleSelection(selectedReservations, setSelectedReservations, reservation.id)} /></TableCell>
                       <TableCell className="font-mono text-sm">{reservation.reservation_number}</TableCell>
                       <TableCell>{getClientName(reservation.client_id)}</TableCell>
                       <TableCell>{getVehicleInfo(reservation.vehicle_id)}</TableCell>
@@ -910,19 +1034,19 @@ export default function DocumentsPage() {
                       </TableCell>
                       <TableCell>{reservation.valid_until ? formatDateDisplay(reservation.valid_until) : '-'}</TableCell>
                       <TableCell>
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          className="h-8 w-8"
-                          onClick={() => handleDownloadReservation(reservation.id)}
-                        >
-                          <Download className="h-4 w-4" />
-                        </Button>
+                        <div className="flex gap-1">
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDownloadReservation(reservation.id)}>
+                            <Download className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => deleteReservation.mutate({ id: reservation.id, vehicleId: reservation.vehicle_id || undefined })}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   )) : (
                     <TableRow>
-                      <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                         Nenhuma reserva encontrada
                       </TableCell>
                     </TableRow>
