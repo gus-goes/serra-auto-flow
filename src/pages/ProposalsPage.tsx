@@ -77,6 +77,7 @@ export default function ProposalsPage() {
   const { data: banks = [], isLoading: loadingBanks } = useBanks();
   const { data: profiles = [] } = useProfiles();
   const { data: legalRep } = useLegalRepresentative();
+  const { data: currentUserSignature } = useCurrentUserSignature(user?.id);
   
   const createProposal = useCreateProposal();
   const updateProposal = useUpdateProposal();
