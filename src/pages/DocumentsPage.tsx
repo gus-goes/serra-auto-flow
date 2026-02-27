@@ -983,7 +983,19 @@ export default function DocumentsPage() {
           {selectedReservations.size > 0 && (
             <div className="flex items-center gap-2 p-2 bg-destructive/10 rounded-lg">
               <span className="text-sm font-medium">{selectedReservations.size} selecionado(s)</span>
-              <Button variant="destructive" size="sm" disabled={isBulkDeleting} onClick={() => handleBulkDelete('reservas', selectedReservations, setSelectedReservations, deleteReservation)}>
+              <Button variant="destructive" size="sm" disabled={isBulkDeleting} onClick={async () => {
+                if (!confirm(`Tem certeza que deseja excluir ${selectedReservations.size} reservas? Esta ação não pode ser desfeita.`)) return;
+                setIsBulkDeleting(true);
+                try {
+                  await Promise.all(Array.from(selectedReservations).map(id => {
+                    const res = reservations.find(r => r.id === id);
+                    return deleteReservation.mutateAsync({ id, vehicleId: res?.vehicle_id || undefined });
+                  }));
+                  setSelectedReservations(new Set());
+                  toast({ title: 'Exclusão concluída', description: `${selectedReservations.size} reservas excluídas com sucesso.` });
+                } catch { toast({ title: 'Erro', description: 'Alguns itens não puderam ser excluídos.', variant: 'destructive' }); }
+                finally { setIsBulkDeleting(false); }
+              }}>
                 {isBulkDeleting ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Trash2 className="h-4 w-4 mr-1" />}
                 Excluir selecionados
               </Button>
