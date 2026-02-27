@@ -825,6 +825,11 @@ export default function ClientsPage() {
                       </span>
                     </TableCell>
                     <TableCell>
+                      <span className="text-xs text-muted-foreground">
+                        {formatDateDisplay(client.created_at)}
+                      </span>
+                    </TableCell>
+                    <TableCell>
                       <div className="flex gap-1">
                         <Button
                           variant="ghost"

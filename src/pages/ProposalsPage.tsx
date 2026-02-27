@@ -741,6 +741,11 @@ export default function ProposalsPage() {
                         {formatCurrency(Number(proposal.total_amount))}
                       </TableCell>
                       <TableCell>
+                        <span className="text-xs text-muted-foreground">
+                          {formatDateDisplay(proposal.created_at)}
+                        </span>
+                      </TableCell>
+                      <TableCell>
                         <Select value={proposal.status} onValueChange={(v) => handleStatusChange(proposal.id, v as ProposalStatus)}>
                           <SelectTrigger className={cn('h-8 text-xs w-28', statusColors[proposal.status])}>
                             <SelectValue />
