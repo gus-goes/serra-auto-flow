@@ -76,6 +76,7 @@ export default function ProposalsPage() {
   const { data: clients = [], isLoading: loadingClients } = useClients();
   const { data: banks = [], isLoading: loadingBanks } = useBanks();
   const { data: profiles = [] } = useProfiles();
+  const { data: legalRep } = useLegalRepresentative();
   
   const createProposal = useCreateProposal();
   const updateProposal = useUpdateProposal();
