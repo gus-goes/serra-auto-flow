@@ -175,6 +175,32 @@ export default function ReceiptsPage() {
     }
   };
 
+  const handleVendorSignature = async (receipt: typeof receipts[0]) => {
+    if (legalRep?.signature) {
+      try {
+        await updateSignature.mutateAsync({
+          id: receipt.id,
+          type: 'vendor',
+          signature: legalRep.signature,
+        });
+        toast({
+          title: 'Assinatura do vendedor aplicada',
+          description: 'Assinatura do representante legal foi registrada automaticamente.',
+        });
+      } catch (error) {
+        toast({
+          title: 'Erro',
+          description: 'Não foi possível aplicar a assinatura.',
+          variant: 'destructive',
+        });
+      }
+    } else {
+      setSigningReceipt(receipt);
+      setSignatureType('vendor');
+      setIsSignatureOpen(true);
+    }
+  };
+
   const handleDelete = async (id: string) => {
     if (confirm('Tem certeza que deseja excluir este recibo?')) {
       try {
