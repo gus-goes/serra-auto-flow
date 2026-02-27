@@ -266,6 +266,40 @@ export default function ProposalsPage() {
     }
   };
 
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0) return;
+    if (!confirm(`Tem certeza que deseja excluir ${selectedIds.size} proposta(s)?`)) return;
+    setIsDeletingBulk(true);
+    try {
+      for (const id of selectedIds) {
+        await deleteProposal.mutateAsync(id);
+      }
+      setSelectedIds(new Set());
+      toast({ title: 'Propostas excluídas', description: `${selectedIds.size} proposta(s) removida(s).` });
+    } catch {
+      toast({ title: 'Erro ao excluir', description: 'Algumas propostas podem não ter sido excluídas.', variant: 'destructive' });
+    } finally {
+      setIsDeletingBulk(false);
+    }
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === filteredProposals.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filteredProposals.map(p => p.id)));
+    }
+  };
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
   const handleGeneratePDF = (proposal: typeof proposals[0]) => {
     const clientData = clients.find(c => c.id === proposal.client_id);
     const vehicleData = vehicles.find(v => v.id === proposal.vehicle_id);
