@@ -552,11 +552,27 @@ export default function DocumentsPage() {
             />
           </div>
 
+          {selectedContracts.size > 0 && (
+            <div className="flex items-center gap-2 p-2 bg-destructive/10 rounded-lg">
+              <span className="text-sm font-medium">{selectedContracts.size} selecionado(s)</span>
+              <Button variant="destructive" size="sm" disabled={isBulkDeleting} onClick={() => handleBulkDelete('contratos', selectedContracts, setSelectedContracts, deleteContract)}>
+                {isBulkDeleting ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Trash2 className="h-4 w-4 mr-1" />}
+                Excluir selecionados
+              </Button>
+            </div>
+          )}
+
           <Card>
             <CardContent className="p-0">
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-10">
+                      <Checkbox
+                        checked={contracts.length > 0 && selectedContracts.size === contracts.length}
+                        onCheckedChange={() => toggleAll(contracts.map(c => c.id), selectedContracts, setSelectedContracts)}
+                      />
+                    </TableHead>
                     <TableHead>Número</TableHead>
                     <TableHead>Cliente</TableHead>
                     <TableHead>Veículo</TableHead>
@@ -567,7 +583,13 @@ export default function DocumentsPage() {
                 </TableHeader>
                 <TableBody>
                   {contracts.length > 0 ? contracts.map((contract) => (
-                    <TableRow key={contract.id}>
+                    <TableRow key={contract.id} className={cn(selectedContracts.has(contract.id) && "bg-muted/50")}>
+                      <TableCell>
+                        <Checkbox
+                          checked={selectedContracts.has(contract.id)}
+                          onCheckedChange={() => toggleSelection(selectedContracts, setSelectedContracts, contract.id)}
+                        />
+                      </TableCell>
                       <TableCell className="font-mono text-sm">{contract.contract_number}</TableCell>
                       <TableCell>{getClientName(contract.client_id)}</TableCell>
                       <TableCell>{getVehicleInfo(contract.vehicle_id)}</TableCell>
@@ -575,20 +597,10 @@ export default function DocumentsPage() {
                       <TableCell>{formatDateDisplay(contract.contract_date)}</TableCell>
                       <TableCell>
                         <div className="flex gap-1">
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="h-8 w-8"
-                            onClick={() => handleDownloadContract(contract.id)}
-                          >
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDownloadContract(contract.id)}>
                             <Download className="h-4 w-4" />
                           </Button>
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="h-8 w-8 text-destructive"
-                            onClick={() => deleteContract.mutate(contract.id)}
-                          >
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => deleteContract.mutate(contract.id)}>
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
@@ -596,7 +608,7 @@ export default function DocumentsPage() {
                     </TableRow>
                   )) : (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                         Nenhum contrato encontrado
                       </TableCell>
                     </TableRow>
