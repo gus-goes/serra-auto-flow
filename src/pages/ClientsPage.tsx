@@ -94,6 +94,8 @@ export default function ClientsPage() {
   const [editingClient, setEditingClient] = useState<typeof clients[0] | null>(null);
   const [errors, setErrors] = useState<FormErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [isDeletingBulk, setIsDeletingBulk] = useState(false);
   
   // Credentials dialog state
   const [credentialsDialog, setCredentialsDialog] = useState<{

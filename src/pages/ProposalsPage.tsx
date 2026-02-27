@@ -91,6 +91,8 @@ export default function ProposalsPage() {
   const [signatureType, setSignatureType] = useState<'client' | 'vendor'>('client');
   const [proposalType, setProposalType] = useState<ProposalType>('financiamento_bancario');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [isDeletingBulk, setIsDeletingBulk] = useState(false);
 
   const activeBanks = banks.filter(b => b.is_active && !b.slug?.includes('proprio'));
 
