@@ -81,6 +81,46 @@ export default function DocumentsPage() {
   const [isReservationOpen, setIsReservationOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Selection state for bulk delete
+  const [selectedContracts, setSelectedContracts] = useState<Set<string>>(new Set());
+  const [selectedWarranties, setSelectedWarranties] = useState<Set<string>>(new Set());
+  const [selectedTransfers, setSelectedTransfers] = useState<Set<string>>(new Set());
+  const [selectedWithdrawals, setSelectedWithdrawals] = useState<Set<string>>(new Set());
+  const [selectedReservations, setSelectedReservations] = useState<Set<string>>(new Set());
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false);
+
+  const toggleSelection = (set: Set<string>, setFn: React.Dispatch<React.SetStateAction<Set<string>>>, id: string) => {
+    const next = new Set(set);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    setFn(next);
+  };
+
+  const toggleAll = (ids: string[], set: Set<string>, setFn: React.Dispatch<React.SetStateAction<Set<string>>>) => {
+    if (set.size === ids.length) setFn(new Set());
+    else setFn(new Set(ids));
+  };
+
+  const handleBulkDelete = async (
+    type: string,
+    selected: Set<string>,
+    setSelected: React.Dispatch<React.SetStateAction<Set<string>>>,
+    deleteFn: { mutateAsync: (id: string) => Promise<unknown> }
+  ) => {
+    if (selected.size === 0) return;
+    if (!confirm(`Tem certeza que deseja excluir ${selected.size} ${type}? Esta ação não pode ser desfeita.`)) return;
+    
+    setIsBulkDeleting(true);
+    try {
+      await Promise.all(Array.from(selected).map(id => deleteFn.mutateAsync(id)));
+      setSelected(new Set());
+      toast({ title: 'Exclusão concluída', description: `${selected.size} ${type} excluído(s) com sucesso.` });
+    } catch (error) {
+      toast({ title: 'Erro', description: 'Alguns itens não puderam ser excluídos.', variant: 'destructive' });
+    } finally {
+      setIsBulkDeleting(false);
+    }
+  };
+
   // Form states
   const [contractForm, setContractForm] = useState({
     clientId: '', vehicleId: '', vehiclePrice: 0, paymentType: 'avista' as 'avista' | 'parcelado',
