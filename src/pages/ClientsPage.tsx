@@ -261,6 +261,40 @@ export default function ClientsPage() {
     }
   };
 
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0) return;
+    if (!confirm(`Tem certeza que deseja excluir ${selectedIds.size} cliente(s)?`)) return;
+    setIsDeletingBulk(true);
+    try {
+      for (const id of selectedIds) {
+        await deleteClient.mutateAsync(id);
+      }
+      setSelectedIds(new Set());
+      toast({ title: 'Clientes excluídos', description: `${selectedIds.size} cliente(s) removido(s).` });
+    } catch {
+      toast({ title: 'Erro ao excluir', description: 'Alguns clientes podem não ter sido excluídos.', variant: 'destructive' });
+    } finally {
+      setIsDeletingBulk(false);
+    }
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === filteredClients.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filteredClients.map(c => c.id)));
+    }
+  };
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
   const handleGeneratePDF = (client: typeof clients[0]) => {
     // Convert to legacy format for PDF generator
     const legacyClient = {
