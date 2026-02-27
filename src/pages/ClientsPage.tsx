@@ -881,27 +881,68 @@ export default function ClientsPage() {
             </div>
           ) : (
             <div className="space-y-4">
-              <div className="space-y-2">
-                <Label className="text-xs text-muted-foreground">Mensagem para enviar ao cliente</Label>
-                <Textarea
-                  readOnly
-                  rows={8}
-                  className="font-mono text-sm resize-none"
-                  value={`Olá ${credentialsDialog.client?.name}! Suas credenciais de acesso ao portal da Autos da Serra foram criadas.\n\nAcesse: https://sistemaautosdaserra.netlify.app/cliente\n\nLogin: ${credentialsDialog.generatedCredentials?.email}\nSenha: ${credentialsDialog.generatedCredentials?.password}\n\nQualquer dúvida, estamos à disposição!`}
-                />
+              <div className="bg-muted/50 rounded-lg p-4 space-y-3">
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">E-mail</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      readOnly
+                      value={credentialsDialog.generatedCredentials?.email || ''}
+                      className="bg-background"
+                    />
+                    <Button
+                      size="icon"
+                      variant="outline"
+                      onClick={() => handleCopyToClipboard(credentialsDialog.generatedCredentials?.email || '', 'email')}
+                    >
+                      {copiedField === 'email' ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Senha</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      readOnly
+                      value={credentialsDialog.generatedCredentials?.password || ''}
+                      className="bg-background"
+                    />
+                    <Button
+                      size="icon"
+                      variant="outline"
+                      onClick={() => handleCopyToClipboard(credentialsDialog.generatedCredentials?.password || '', 'password')}
+                    >
+                      {copiedField === 'password' ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
+                    </Button>
+                  </div>
+                </div>
               </div>
 
-              <Button
-                className="w-full"
-                variant="outline"
-                onClick={() => handleCopyToClipboard(
-                  `Olá ${credentialsDialog.client?.name}! Suas credenciais de acesso ao portal da Autos da Serra foram criadas.\n\nAcesse: https://sistemaautosdaserra.netlify.app/cliente\n\nLogin: ${credentialsDialog.generatedCredentials?.email}\nSenha: ${credentialsDialog.generatedCredentials?.password}\n\nQualquer dúvida, estamos à disposição!`,
-                  'message'
-                )}
-              >
-                {copiedField === 'message' ? <Check className="h-4 w-4 mr-2 text-green-600" /> : <Copy className="h-4 w-4 mr-2" />}
-                {copiedField === 'message' ? 'Copiado!' : 'Copiar mensagem'}
-              </Button>
+              <p className="text-sm text-center text-muted-foreground">
+                O cliente pode acessar em <strong>/cliente</strong>
+              </p>
+
+              <div className="space-y-2">
+                <Label className="text-xs text-muted-foreground">Mensagem pronta para enviar</Label>
+                <Textarea
+                  readOnly
+                  rows={7}
+                  className="font-mono text-sm resize-none"
+                  value={`Olá ${credentialsDialog.client?.name}! Suas credenciais de acesso ao portal da Autos da Serra foram criadas.\n\nAcesse: https://sistemaautosdaserra.netlify.app\n\nLogin: ${credentialsDialog.generatedCredentials?.email}\nSenha: ${credentialsDialog.generatedCredentials?.password}\n\nQualquer dúvida, estamos à disposição!`}
+                />
+                <Button
+                  className="w-full"
+                  variant="outline"
+                  onClick={() => handleCopyToClipboard(
+                    `Olá ${credentialsDialog.client?.name}! Suas credenciais de acesso ao portal da Autos da Serra foram criadas.\n\nAcesse: https://sistemaautosdaserra.netlify.app\n\nLogin: ${credentialsDialog.generatedCredentials?.email}\nSenha: ${credentialsDialog.generatedCredentials?.password}\n\nQualquer dúvida, estamos à disposição!`,
+                    'message'
+                  )}
+                >
+                  {copiedField === 'message' ? <Check className="h-4 w-4 mr-2 text-green-600" /> : <Copy className="h-4 w-4 mr-2" />}
+                  {copiedField === 'message' ? 'Copiado!' : 'Copiar mensagem'}
+                </Button>
+              </div>
 
               <div className="flex justify-center pt-2">
                 <Button onClick={closeCredentialsDialog}>
