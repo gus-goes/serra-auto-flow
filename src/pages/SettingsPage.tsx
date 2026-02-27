@@ -30,7 +30,8 @@ import {
   Upload,
   Loader2,
   Smartphone,
-  Link
+  Link,
+  Pen
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
