@@ -111,7 +111,7 @@ export default function ClientsPage() {
     generatedCredentials: null,
     isLoading: false,
   });
-  const [copiedField, setCopiedField] = useState<'email' | 'password' | null>(null);
+  const [copiedField, setCopiedField] = useState<'email' | 'password' | 'message' | null>(null);
 
   const [form, setForm] = useState({
     name: '',
