@@ -711,6 +711,7 @@ export default function ProposalsPage() {
                   <TableHead>Cliente</TableHead>
                   <TableHead>Veículo</TableHead>
                   <TableHead>Valor</TableHead>
+                  <TableHead>Data</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Assinaturas</TableHead>
                   <TableHead className="w-32">Ações</TableHead>
@@ -738,6 +739,11 @@ export default function ProposalsPage() {
                       </TableCell>
                       <TableCell className="font-semibold">
                         {formatCurrency(Number(proposal.total_amount))}
+                      </TableCell>
+                      <TableCell>
+                        <span className="text-xs text-muted-foreground">
+                          {formatDateDisplay(proposal.created_at)}
+                        </span>
                       </TableCell>
                       <TableCell>
                         <Select value={proposal.status} onValueChange={(v) => handleStatusChange(proposal.id, v as ProposalStatus)}>

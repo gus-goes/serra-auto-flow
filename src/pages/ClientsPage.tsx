@@ -5,6 +5,7 @@ import { useClients, useCreateClient, useUpdateClient, useDeleteClient } from '@
 import { supabase } from '@/integrations/supabase/client';
 import type { Database } from '@/integrations/supabase/types';
 import { formatCPF, formatPhone, formatDate, isValidCPF, cleanCPF, cleanPhone, isValidEmail, formatRG, cleanRG } from '@/lib/formatters';
+import { formatDateDisplay } from '@/lib/dateUtils';
 import { generateClientPDF } from '@/lib/pdfGenerator';
 import { useToast } from '@/hooks/use-toast';
 import { PrivacyMask } from '@/components/PrivacyMask';
@@ -775,6 +776,7 @@ export default function ClientsPage() {
                   <TableHead>Nome</TableHead>
                   <TableHead>Contato</TableHead>
                   <TableHead>Etapa</TableHead>
+                  <TableHead>Cadastro</TableHead>
                   <TableHead className="w-32">Ações</TableHead>
                 </TableRow>
               </TableHeader>
@@ -820,6 +822,11 @@ export default function ClientsPage() {
                     <TableCell>
                       <span className={cn('px-2 py-1 rounded-full text-xs font-medium', funnelColors[client.funnel_stage])}>
                         {funnelLabels[client.funnel_stage]}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      <span className="text-xs text-muted-foreground">
+                        {formatDateDisplay(client.created_at)}
                       </span>
                     </TableCell>
                     <TableCell>
