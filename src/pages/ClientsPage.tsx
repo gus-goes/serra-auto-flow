@@ -776,6 +776,7 @@ export default function ClientsPage() {
                   <TableHead>Nome</TableHead>
                   <TableHead>Contato</TableHead>
                   <TableHead>Etapa</TableHead>
+                  <TableHead>Cadastro</TableHead>
                   <TableHead className="w-32">Ações</TableHead>
                 </TableRow>
               </TableHeader>

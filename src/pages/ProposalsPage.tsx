@@ -711,6 +711,7 @@ export default function ProposalsPage() {
                   <TableHead>Cliente</TableHead>
                   <TableHead>Veículo</TableHead>
                   <TableHead>Valor</TableHead>
+                  <TableHead>Data</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Assinaturas</TableHead>
                   <TableHead className="w-32">Ações</TableHead>
