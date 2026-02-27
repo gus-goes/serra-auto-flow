@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useBanks, useCreateBank, useUpdateBank, useDeleteBank, useUploadBankLogo } from '@/hooks/useBanks';
 import { useLegalRepresentative, useUpdateLegalRepresentative, useAppDownloadLinks, useUpdateAppDownloadLinks, type LegalRepresentative, type AppDownloadLinks } from '@/hooks/useCompanySettings';
+import { useCurrentUserSignature, useUpdateUserSignature } from '@/hooks/useProfiles';
 import { formatPercent } from '@/lib/formatters';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
