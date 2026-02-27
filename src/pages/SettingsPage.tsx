@@ -37,6 +37,8 @@ import { cn } from '@/lib/utils';
 
 export default function SettingsPage() {
   const { user, isAdmin } = useAuth();
+  const { data: mySignature, isLoading: sigLoading } = useCurrentUserSignature(user?.id);
+  const updateMySignature = useUpdateUserSignature();
   const { toast } = useToast();
   
   const { data: banks = [], isLoading: banksLoading } = useBanks();
