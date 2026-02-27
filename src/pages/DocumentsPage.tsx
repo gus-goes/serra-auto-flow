@@ -980,23 +980,37 @@ export default function DocumentsPage() {
             </Dialog>
           </div>
 
+          {selectedReservations.size > 0 && (
+            <div className="flex items-center gap-2 p-2 bg-destructive/10 rounded-lg">
+              <span className="text-sm font-medium">{selectedReservations.size} selecionado(s)</span>
+              <Button variant="destructive" size="sm" disabled={isBulkDeleting} onClick={() => handleBulkDelete('reservas', selectedReservations, setSelectedReservations, deleteReservation)}>
+                {isBulkDeleting ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Trash2 className="h-4 w-4 mr-1" />}
+                Excluir selecionados
+              </Button>
+            </div>
+          )}
+
           <Card>
             <CardContent className="p-0">
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-10">
+                      <Checkbox checked={reservations.length > 0 && selectedReservations.size === reservations.length} onCheckedChange={() => toggleAll(reservations.map(r => r.id), selectedReservations, setSelectedReservations)} />
+                    </TableHead>
                     <TableHead>Número</TableHead>
                     <TableHead>Cliente</TableHead>
                     <TableHead>Veículo</TableHead>
                     <TableHead>Sinal</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Válido até</TableHead>
-                    <TableHead className="w-16">Ações</TableHead>
+                    <TableHead className="w-24">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {reservations.length > 0 ? reservations.map((reservation) => (
-                    <TableRow key={reservation.id}>
+                    <TableRow key={reservation.id} className={cn(selectedReservations.has(reservation.id) && "bg-muted/50")}>
+                      <TableCell><Checkbox checked={selectedReservations.has(reservation.id)} onCheckedChange={() => toggleSelection(selectedReservations, setSelectedReservations, reservation.id)} /></TableCell>
                       <TableCell className="font-mono text-sm">{reservation.reservation_number}</TableCell>
                       <TableCell>{getClientName(reservation.client_id)}</TableCell>
                       <TableCell>{getVehicleInfo(reservation.vehicle_id)}</TableCell>
@@ -1008,19 +1022,19 @@ export default function DocumentsPage() {
                       </TableCell>
                       <TableCell>{reservation.valid_until ? formatDateDisplay(reservation.valid_until) : '-'}</TableCell>
                       <TableCell>
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          className="h-8 w-8"
-                          onClick={() => handleDownloadReservation(reservation.id)}
-                        >
-                          <Download className="h-4 w-4" />
-                        </Button>
+                        <div className="flex gap-1">
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDownloadReservation(reservation.id)}>
+                            <Download className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => deleteReservation.mutate(reservation.id)}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   )) : (
                     <TableRow>
-                      <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                         Nenhuma reserva encontrada
                       </TableCell>
                     </TableRow>
