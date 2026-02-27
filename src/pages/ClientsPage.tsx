@@ -391,7 +391,7 @@ export default function ClientsPage() {
     }
   };
 
-  const handleCopyToClipboard = async (text: string, field: 'email' | 'password') => {
+  const handleCopyToClipboard = async (text: string, field: 'email' | 'password' | 'message') => {
     try {
       await navigator.clipboard.writeText(text);
       setCopiedField(field);
