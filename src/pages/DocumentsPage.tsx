@@ -675,41 +675,55 @@ export default function DocumentsPage() {
             </Dialog>
           </div>
 
+          {selectedWarranties.size > 0 && (
+            <div className="flex items-center gap-2 p-2 bg-destructive/10 rounded-lg">
+              <span className="text-sm font-medium">{selectedWarranties.size} selecionado(s)</span>
+              <Button variant="destructive" size="sm" disabled={isBulkDeleting} onClick={() => handleBulkDelete('garantias', selectedWarranties, setSelectedWarranties, deleteWarranty)}>
+                {isBulkDeleting ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Trash2 className="h-4 w-4 mr-1" />}
+                Excluir selecionados
+              </Button>
+            </div>
+          )}
+
           <Card>
             <CardContent className="p-0">
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-10">
+                      <Checkbox checked={warranties.length > 0 && selectedWarranties.size === warranties.length} onCheckedChange={() => toggleAll(warranties.map(w => w.id), selectedWarranties, setSelectedWarranties)} />
+                    </TableHead>
                     <TableHead>Número</TableHead>
                     <TableHead>Cliente</TableHead>
                     <TableHead>Veículo</TableHead>
                     <TableHead>Período</TableHead>
                     <TableHead>Data</TableHead>
-                    <TableHead className="w-16">Ações</TableHead>
+                    <TableHead className="w-24">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {warranties.length > 0 ? warranties.map((warranty) => (
-                    <TableRow key={warranty.id}>
+                    <TableRow key={warranty.id} className={cn(selectedWarranties.has(warranty.id) && "bg-muted/50")}>
+                      <TableCell><Checkbox checked={selectedWarranties.has(warranty.id)} onCheckedChange={() => toggleSelection(selectedWarranties, setSelectedWarranties, warranty.id)} /></TableCell>
                       <TableCell className="font-mono text-sm">{warranty.warranty_number}</TableCell>
                       <TableCell>{getClientName(warranty.client_id)}</TableCell>
                       <TableCell>{getVehicleInfo(warranty.vehicle_id)}</TableCell>
                       <TableCell>{warranty.warranty_period}</TableCell>
                       <TableCell>{formatDateDisplay(warranty.created_at)}</TableCell>
                       <TableCell>
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          className="h-8 w-8"
-                          onClick={() => handleDownloadWarranty(warranty.id)}
-                        >
-                          <Download className="h-4 w-4" />
-                        </Button>
+                        <div className="flex gap-1">
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDownloadWarranty(warranty.id)}>
+                            <Download className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => deleteWarranty.mutate(warranty.id)}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   )) : (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                         Nenhuma garantia encontrada
                       </TableCell>
                     </TableRow>
