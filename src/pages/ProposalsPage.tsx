@@ -707,11 +707,7 @@ export default function ProposalsPage() {
                             variant={proposal.vendor_signature ? "default" : "outline"}
                             size="sm"
                             className={cn("h-7 text-xs", proposal.vendor_signature && "bg-success hover:bg-success/90")}
-                            onClick={() => {
-                              setSigningProposal(proposal);
-                              setSignatureType('vendor');
-                              setIsSignatureOpen(true);
-                            }}
+                            onClick={() => handleVendorSignature(proposal)}
                           >
                             <Pen className="h-3 w-3 mr-1" />
                             Vendedor
