@@ -723,6 +723,12 @@ export default function ProposalsPage() {
                   
                   return (
                     <TableRow key={proposal.id} className="table-row-hover" style={getTypeColorStyle(proposal)}>
+                      <TableCell>
+                        <Checkbox
+                          checked={selectedIds.has(proposal.id)}
+                          onCheckedChange={() => toggleSelect(proposal.id)}
+                        />
+                      </TableCell>
                       <TableCell className="font-mono text-sm">{proposal.proposal_number}</TableCell>
                       <TableCell>
                         <p className="font-medium">{client?.name || '-'}</p>
