@@ -4,7 +4,7 @@ import { useProposals, useCreateProposal, useUpdateProposal, useDeleteProposal }
 import { useVehicles } from '@/hooks/useVehicles';
 import { useClients } from '@/hooks/useClients';
 import { useBanks } from '@/hooks/useBanks';
-import { useProfiles } from '@/hooks/useProfiles';
+import { useProfiles, useCurrentUserSignature } from '@/hooks/useProfiles';
 import { useLegalRepresentative } from '@/hooks/useCompanySettings';
 import type { Database } from '@/integrations/supabase/types';
 import { formatCurrency } from '@/lib/formatters';
