@@ -510,11 +510,7 @@ export default function ReceiptsPage() {
                             variant={receipt.vendor_signature ? "default" : "outline"}
                             size="sm"
                             className={cn("h-7 text-xs", receipt.vendor_signature && "bg-success hover:bg-success/90")}
-                            onClick={() => {
-                              setSigningReceipt(receipt);
-                              setSignatureType('vendor');
-                              setIsSignatureOpen(true);
-                            }}
+                            onClick={() => handleVendorSignature(receipt)}
                           >
                             <Pen className="h-3 w-3 mr-1" />
                             Vendedor
