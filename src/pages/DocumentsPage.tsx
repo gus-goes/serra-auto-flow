@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useContracts, useCreateContract, useDeleteContract } from '@/hooks/useContracts';
 import { useReservations, useCreateReservation, useDeleteReservation } from '@/hooks/useReservations';
-import { useWarranties, useTransferAuthorizations, useWithdrawalDeclarations, useCreateWarranty, useCreateTransferAuthorization, useCreateWithdrawalDeclaration } from '@/hooks/useDocuments';
+import { useWarranties, useTransferAuthorizations, useWithdrawalDeclarations, useCreateWarranty, useCreateTransferAuthorization, useCreateWithdrawalDeclaration, useDeleteWarranty, useDeleteTransferAuthorization, useDeleteWithdrawalDeclaration } from '@/hooks/useDocuments';
 import { useClients } from '@/hooks/useClients';
 import { useVehicles, useUpdateVehicle } from '@/hooks/useVehicles';
 import { useProfiles } from '@/hooks/useProfiles';
