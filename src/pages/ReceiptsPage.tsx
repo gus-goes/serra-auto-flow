@@ -5,6 +5,7 @@ import { useReceipts, useCreateReceipt, useDeleteReceipt, useUpdateReceiptSignat
 import { useClients } from '@/hooks/useClients';
 import { useVehicles } from '@/hooks/useVehicles';
 import { useProfiles } from '@/hooks/useProfiles';
+import { useLegalRepresentative } from '@/hooks/useCompanySettings';
 import type { Database } from '@/integrations/supabase/types';
 import { formatCurrency, formatCPF } from '@/lib/formatters';
 import { formatDateDisplay, getCurrentDateString } from '@/lib/dateUtils';
@@ -76,6 +77,7 @@ export default function ReceiptsPage() {
   const { data: clients = [], isLoading: loadingClients } = useClients();
   const { data: vehicles = [], isLoading: loadingVehicles } = useVehicles();
   const { data: profiles = [] } = useProfiles();
+  const { data: legalRep } = useLegalRepresentative();
   
   const createReceipt = useCreateReceipt();
   const deleteReceipt = useDeleteReceipt();
@@ -170,6 +172,32 @@ export default function ReceiptsPage() {
         description: 'Não foi possível salvar a assinatura.',
         variant: 'destructive',
       });
+    }
+  };
+
+  const handleVendorSignature = async (receipt: typeof receipts[0]) => {
+    if (legalRep?.signature) {
+      try {
+        await updateSignature.mutateAsync({
+          id: receipt.id,
+          type: 'vendor',
+          signature: legalRep.signature,
+        });
+        toast({
+          title: 'Assinatura do vendedor aplicada',
+          description: 'Assinatura do representante legal foi registrada automaticamente.',
+        });
+      } catch (error) {
+        toast({
+          title: 'Erro',
+          description: 'Não foi possível aplicar a assinatura.',
+          variant: 'destructive',
+        });
+      }
+    } else {
+      setSigningReceipt(receipt);
+      setSignatureType('vendor');
+      setIsSignatureOpen(true);
     }
   };
 
@@ -482,11 +510,7 @@ export default function ReceiptsPage() {
                             variant={receipt.vendor_signature ? "default" : "outline"}
                             size="sm"
                             className={cn("h-7 text-xs", receipt.vendor_signature && "bg-success hover:bg-success/90")}
-                            onClick={() => {
-                              setSigningReceipt(receipt);
-                              setSignatureType('vendor');
-                              setIsSignatureOpen(true);
-                            }}
+                            onClick={() => handleVendorSignature(receipt)}
                           >
                             <Pen className="h-3 w-3 mr-1" />
                             Vendedor

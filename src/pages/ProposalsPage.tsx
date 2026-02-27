@@ -5,6 +5,7 @@ import { useVehicles } from '@/hooks/useVehicles';
 import { useClients } from '@/hooks/useClients';
 import { useBanks } from '@/hooks/useBanks';
 import { useProfiles } from '@/hooks/useProfiles';
+import { useLegalRepresentative } from '@/hooks/useCompanySettings';
 import type { Database } from '@/integrations/supabase/types';
 import { formatCurrency } from '@/lib/formatters';
 import { formatDateDisplay } from '@/lib/dateUtils';
@@ -75,6 +76,7 @@ export default function ProposalsPage() {
   const { data: clients = [], isLoading: loadingClients } = useClients();
   const { data: banks = [], isLoading: loadingBanks } = useBanks();
   const { data: profiles = [] } = useProfiles();
+  const { data: legalRep } = useLegalRepresentative();
   
   const createProposal = useCreateProposal();
   const updateProposal = useUpdateProposal();
@@ -214,6 +216,29 @@ export default function ProposalsPage() {
           variant: 'destructive',
         });
       }
+    }
+  };
+
+  const handleVendorSignature = async (proposal: typeof proposals[0]) => {
+    if (legalRep?.signature) {
+      try {
+        await updateProposal.mutateAsync({ id: proposal.id, vendor_signature: legalRep.signature });
+        toast({
+          title: 'Assinatura do vendedor aplicada',
+          description: 'Assinatura do representante legal foi registrada automaticamente.',
+        });
+      } catch (error) {
+        toast({
+          title: 'Erro',
+          description: 'Não foi possível aplicar a assinatura.',
+          variant: 'destructive',
+        });
+      }
+    } else {
+      // Fallback: open signature pad if no legal rep signature
+      setSigningProposal(proposal);
+      setSignatureType('vendor');
+      setIsSignatureOpen(true);
     }
   };
 
@@ -682,11 +707,7 @@ export default function ProposalsPage() {
                             variant={proposal.vendor_signature ? "default" : "outline"}
                             size="sm"
                             className={cn("h-7 text-xs", proposal.vendor_signature && "bg-success hover:bg-success/90")}
-                            onClick={() => {
-                              setSigningProposal(proposal);
-                              setSignatureType('vendor');
-                              setIsSignatureOpen(true);
-                            }}
+                            onClick={() => handleVendorSignature(proposal)}
                           >
                             <Pen className="h-3 w-3 mr-1" />
                             Vendedor
