@@ -111,7 +111,7 @@ export default function ClientsPage() {
     generatedCredentials: null,
     isLoading: false,
   });
-  const [copiedField, setCopiedField] = useState<'email' | 'password' | null>(null);
+  const [copiedField, setCopiedField] = useState<'email' | 'password' | 'message' | null>(null);
 
   const [form, setForm] = useState({
     name: '',
@@ -391,7 +391,7 @@ export default function ClientsPage() {
     }
   };
 
-  const handleCopyToClipboard = async (text: string, field: 'email' | 'password') => {
+  const handleCopyToClipboard = async (text: string, field: 'email' | 'password' | 'message') => {
     try {
       await navigator.clipboard.writeText(text);
       setCopiedField(field);
@@ -881,43 +881,27 @@ export default function ClientsPage() {
             </div>
           ) : (
             <div className="space-y-4">
-              <div className="p-4 bg-muted rounded-lg space-y-3">
-                <div className="space-y-1">
-                  <Label className="text-xs text-muted-foreground">E-mail</Label>
-                  <div className="flex items-center gap-2">
-                    <code className="flex-1 text-sm font-mono bg-background px-3 py-2 rounded border">
-                      {credentialsDialog.generatedCredentials?.email}
-                    </code>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      onClick={() => handleCopyToClipboard(credentialsDialog.generatedCredentials?.email || '', 'email')}
-                    >
-                      {copiedField === 'email' ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
-                    </Button>
-                  </div>
-                </div>
-                
-                <div className="space-y-1">
-                  <Label className="text-xs text-muted-foreground">Senha</Label>
-                  <div className="flex items-center gap-2">
-                    <code className="flex-1 text-sm font-mono bg-background px-3 py-2 rounded border">
-                      {credentialsDialog.generatedCredentials?.password}
-                    </code>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      onClick={() => handleCopyToClipboard(credentialsDialog.generatedCredentials?.password || '', 'password')}
-                    >
-                      {copiedField === 'password' ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
-                    </Button>
-                  </div>
-                </div>
+              <div className="space-y-2">
+                <Label className="text-xs text-muted-foreground">Mensagem para enviar ao cliente</Label>
+                <Textarea
+                  readOnly
+                  rows={8}
+                  className="font-mono text-sm resize-none"
+                  value={`Olá ${credentialsDialog.client?.name}! Suas credenciais de acesso ao portal da Autos da Serra foram criadas.\n\nAcesse: https://sistemaautosdaserra.netlify.app/cliente\n\nLogin: ${credentialsDialog.generatedCredentials?.email}\nSenha: ${credentialsDialog.generatedCredentials?.password}\n\nQualquer dúvida, estamos à disposição!`}
+                />
               </div>
 
-              <p className="text-sm text-muted-foreground text-center">
-                O cliente pode acessar em <strong>/cliente</strong>
-              </p>
+              <Button
+                className="w-full"
+                variant="outline"
+                onClick={() => handleCopyToClipboard(
+                  `Olá ${credentialsDialog.client?.name}! Suas credenciais de acesso ao portal da Autos da Serra foram criadas.\n\nAcesse: https://sistemaautosdaserra.netlify.app/cliente\n\nLogin: ${credentialsDialog.generatedCredentials?.email}\nSenha: ${credentialsDialog.generatedCredentials?.password}\n\nQualquer dúvida, estamos à disposição!`,
+                  'message'
+                )}
+              >
+                {copiedField === 'message' ? <Check className="h-4 w-4 mr-2 text-green-600" /> : <Copy className="h-4 w-4 mr-2" />}
+                {copiedField === 'message' ? 'Copiado!' : 'Copiar mensagem'}
+              </Button>
 
               <div className="flex justify-center pt-2">
                 <Button onClick={closeCredentialsDialog}>

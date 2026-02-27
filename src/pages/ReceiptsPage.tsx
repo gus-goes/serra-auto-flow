@@ -4,7 +4,7 @@ import { usePrivacy } from '@/contexts/PrivacyContext';
 import { useReceipts, useCreateReceipt, useDeleteReceipt, useUpdateReceiptSignature } from '@/hooks/useReceipts';
 import { useClients } from '@/hooks/useClients';
 import { useVehicles } from '@/hooks/useVehicles';
-import { useProfiles } from '@/hooks/useProfiles';
+import { useProfiles, useCurrentUserSignature } from '@/hooks/useProfiles';
 import { useLegalRepresentative } from '@/hooks/useCompanySettings';
 import type { Database } from '@/integrations/supabase/types';
 import { formatCurrency, formatCPF } from '@/lib/formatters';
@@ -78,6 +78,7 @@ export default function ReceiptsPage() {
   const { data: vehicles = [], isLoading: loadingVehicles } = useVehicles();
   const { data: profiles = [] } = useProfiles();
   const { data: legalRep } = useLegalRepresentative();
+  const { data: currentUserSignature } = useCurrentUserSignature(user?.id);
   
   const createReceipt = useCreateReceipt();
   const deleteReceipt = useDeleteReceipt();
@@ -176,16 +177,17 @@ export default function ReceiptsPage() {
   };
 
   const handleVendorSignature = async (receipt: typeof receipts[0]) => {
-    if (legalRep?.signature) {
+    const signatureToUse = currentUserSignature;
+    if (signatureToUse) {
       try {
         await updateSignature.mutateAsync({
           id: receipt.id,
           type: 'vendor',
-          signature: legalRep.signature,
+          signature: signatureToUse,
         });
         toast({
           title: 'Assinatura do vendedor aplicada',
-          description: 'Assinatura do representante legal foi registrada automaticamente.',
+          description: 'Sua assinatura pessoal foi registrada automaticamente.',
         });
       } catch (error) {
         toast({

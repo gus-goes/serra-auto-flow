@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useBanks, useCreateBank, useUpdateBank, useDeleteBank, useUploadBankLogo } from '@/hooks/useBanks';
 import { useLegalRepresentative, useUpdateLegalRepresentative, useAppDownloadLinks, useUpdateAppDownloadLinks, type LegalRepresentative, type AppDownloadLinks } from '@/hooks/useCompanySettings';
+import { useCurrentUserSignature, useUpdateUserSignature } from '@/hooks/useProfiles';
 import { formatPercent } from '@/lib/formatters';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
@@ -29,12 +30,15 @@ import {
   Upload,
   Loader2,
   Smartphone,
-  Link
+  Link,
+  Pen
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export default function SettingsPage() {
   const { user, isAdmin } = useAuth();
+  const { data: mySignature, isLoading: sigLoading } = useCurrentUserSignature(user?.id);
+  const updateMySignature = useUpdateUserSignature();
   const { toast } = useToast();
   
   const { data: banks = [], isLoading: banksLoading } = useBanks();
@@ -650,6 +654,53 @@ export default function SettingsPage() {
               )}
               Salvar Representante
             </Button>
+          </CardContent>
+        </Card>
+
+        {/* Minha Assinatura */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Pen className="h-5 w-5 text-primary" />
+              Minha Assinatura
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Sua assinatura pessoal será usada automaticamente ao assinar propostas e recibos.
+            </p>
+            {mySignature ? (
+              <div className="space-y-2">
+                <div className="border border-input rounded-lg p-4 bg-muted/30">
+                  <img 
+                    src={mySignature} 
+                    alt="Minha assinatura" 
+                    className="max-h-24 mx-auto"
+                  />
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    if (user?.id) {
+                      updateMySignature.mutate({ userId: user.id, signature: '' });
+                    }
+                  }}
+                >
+                  Alterar Assinatura
+                </Button>
+              </div>
+            ) : (
+              <SignaturePad
+                label="Desenhe sua assinatura"
+                onSave={(sig) => {
+                  if (user?.id) {
+                    updateMySignature.mutate({ userId: user.id, signature: sig });
+                  }
+                }}
+              />
+            )}
           </CardContent>
         </Card>
 
