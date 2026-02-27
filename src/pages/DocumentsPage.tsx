@@ -1038,7 +1038,7 @@ export default function DocumentsPage() {
                           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDownloadReservation(reservation.id)}>
                             <Download className="h-4 w-4" />
                           </Button>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => deleteReservation.mutate(reservation.id)}>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => deleteReservation.mutate({ id: reservation.id, vehicleId: reservation.vehicle_id || undefined })}>
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
