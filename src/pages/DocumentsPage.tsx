@@ -66,8 +66,11 @@ export default function DocumentsPage() {
   const createReservation = useCreateReservation();
   const deleteReservation = useDeleteReservation();
   const createWarranty = useCreateWarranty();
+  const deleteWarranty = useDeleteWarranty();
   const createTransfer = useCreateTransferAuthorization();
+  const deleteTransfer = useDeleteTransferAuthorization();
   const createWithdrawal = useCreateWithdrawalDeclaration();
+  const deleteWithdrawal = useDeleteWithdrawalDeclaration();
   const updateVehicle = useUpdateVehicle();
 
   const [isContractOpen, setIsContractOpen] = useState(false);
