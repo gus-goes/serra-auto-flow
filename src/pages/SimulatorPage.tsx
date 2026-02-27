@@ -43,12 +43,12 @@ export default function SimulatorPage() {
   const [activeTab, setActiveTab] = useState('bancario');
 
   const vehicle = vehicles.find(v => v.id === selectedVehicle);
+  const vehicleLabel = vehicle ? `${vehicle.brand} ${vehicle.model} ${vehicle.year_fab}/${vehicle.year_model}` : null;
   const financedAmount = vehiclePrice - downPayment;
   const downPaymentPercent = vehiclePrice > 0 ? (downPayment / vehiclePrice) * 100 : 0;
 
   const isLoading = loadingVehicles || loadingBanks;
 
-  // Update price when vehicle changes
   const handleVehicleChange = (vehicleId: string) => {
     setSelectedVehicle(vehicleId);
     const v = vehicles.find(veh => veh.id === vehicleId);
@@ -111,13 +111,29 @@ export default function SimulatorPage() {
     };
   }, [financedAmount, ownInstallments]);
 
-  // Input section component (shared between tabs)
-  const InputSection = ({ currentInstallments, currentInstallmentsStr, onInstallmentsChange, isOwnFinancing = false }: {
-    currentInstallments: number;
-    currentInstallmentsStr: string;
-    onInstallmentsChange: (value: number, str: string) => void;
-    isOwnFinancing?: boolean;
-  }) => (
+  if (isLoading) {
+    return (
+      <div className="space-y-6 animate-fade-in">
+        <div>
+          <Skeleton className="h-8 w-64" />
+          <Skeleton className="h-4 w-96 mt-2" />
+        </div>
+        <Skeleton className="h-10 w-64" />
+        <div className="grid gap-6 lg:grid-cols-3">
+          <Skeleton className="h-96" />
+          <Skeleton className="h-96 lg:col-span-2" />
+        </div>
+      </div>
+    );
+  }
+
+  // Inline input section to avoid re-mount
+  const renderInputSection = (
+    currentInstallmentsStr: string,
+    onInstallmentsStrChange: (str: string) => void,
+    onInstallmentsBlur: () => void,
+    isOwnFinancing = false
+  ) => (
     <Card className="lg:col-span-1">
       <CardHeader>
         <CardTitle className="text-lg">Dados da Simulação</CardTitle>
@@ -199,11 +215,8 @@ export default function SimulatorPage() {
             type="text"
             inputMode="numeric"
             value={currentInstallmentsStr}
-            onChange={(e) => onInstallmentsChange(currentInstallments, e.target.value)}
-            onBlur={() => {
-              const val = Math.max(1, Math.min(120, parseInt(currentInstallmentsStr) || 1));
-              onInstallmentsChange(val, String(val));
-            }}
+            onChange={(e) => onInstallmentsStrChange(e.target.value)}
+            onBlur={onInstallmentsBlur}
             placeholder="Digite o número de parcelas"
           />
           <p className="text-xs text-muted-foreground">
@@ -220,22 +233,6 @@ export default function SimulatorPage() {
       </CardContent>
     </Card>
   );
-
-  if (isLoading) {
-    return (
-      <div className="space-y-6 animate-fade-in">
-        <div>
-          <Skeleton className="h-8 w-64" />
-          <Skeleton className="h-4 w-96 mt-2" />
-        </div>
-        <Skeleton className="h-10 w-64" />
-        <div className="grid gap-6 lg:grid-cols-3">
-          <Skeleton className="h-96" />
-          <Skeleton className="h-96 lg:col-span-2" />
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -262,20 +259,29 @@ export default function SimulatorPage() {
         {/* Bank Financing Tab */}
         <TabsContent value="bancario" className="space-y-6">
           <div className="grid gap-6 lg:grid-cols-3">
-            <InputSection 
-              currentInstallments={installments}
-              currentInstallmentsStr={installmentsStr}
-              onInstallmentsChange={(val, str) => {
+            {renderInputSection(
+              installmentsStr,
+              (str) => {
                 setInstallmentsStr(str);
                 const parsed = parseInt(str);
                 if (!isNaN(parsed) && parsed >= 1) setInstallments(parsed);
-              }}
-            />
+              },
+              () => {
+                const val = Math.max(1, Math.min(120, parseInt(installmentsStr) || 1));
+                setInstallments(val);
+                setInstallmentsStr(String(val));
+              }
+            )}
 
             <div className="lg:col-span-2 space-y-4">
               <h3 className="font-semibold flex items-center gap-2">
                 <Building2 className="h-5 w-5 text-primary" />
                 Comparativo de Bancos
+                {vehicleLabel && (
+                  <span className="text-sm font-normal text-muted-foreground ml-1">
+                    — {vehicleLabel}
+                  </span>
+                )}
               </h3>
 
               {financedAmount > 0 && bankSimulations.length > 0 ? (
@@ -358,21 +364,30 @@ export default function SimulatorPage() {
         {/* Own Financing Tab */}
         <TabsContent value="proprio" className="space-y-6">
           <div className="grid gap-6 lg:grid-cols-3">
-            <InputSection 
-              currentInstallments={ownInstallments}
-              currentInstallmentsStr={ownInstallmentsStr}
-              onInstallmentsChange={(val, str) => {
+            {renderInputSection(
+              ownInstallmentsStr,
+              (str) => {
                 setOwnInstallmentsStr(str);
                 const parsed = parseInt(str);
                 if (!isNaN(parsed) && parsed >= 1) setOwnInstallments(parsed);
-              }}
-              isOwnFinancing
-            />
+              },
+              () => {
+                const val = Math.max(1, Math.min(120, parseInt(ownInstallmentsStr) || 1));
+                setOwnInstallments(val);
+                setOwnInstallmentsStr(String(val));
+              },
+              true
+            )}
 
             <div className="lg:col-span-2 space-y-4">
               <h3 className="font-semibold flex items-center gap-2">
                 <Store className="h-5 w-5 text-primary" />
                 Financiamento Direto (Sem Juros)
+                {vehicleLabel && (
+                  <span className="text-sm font-normal text-muted-foreground ml-1">
+                    — {vehicleLabel}
+                  </span>
+                )}
               </h3>
 
               {financedAmount > 0 && ownSimulation ? (
@@ -391,6 +406,13 @@ export default function SimulatorPage() {
                       </div>
                     </div>
                     
+                    {vehicleLabel && (
+                      <div className="flex items-center gap-2 mb-4 p-3 bg-muted/50 rounded-lg">
+                        <Car className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-sm font-medium">{vehicleLabel}</span>
+                      </div>
+                    )}
+
                     <div className="space-y-4">
                       <div className="flex justify-between items-center p-4 bg-primary/5 rounded-lg">
                         <span className="text-muted-foreground">Parcela:</span>
@@ -423,7 +445,7 @@ export default function SimulatorPage() {
                     <Calculator className="h-12 w-12 text-muted-foreground/30 mx-auto mb-4" />
                     <h3 className="text-lg font-medium mb-1">Configure a simulação</h3>
                     <p className="text-muted-foreground">
-                      Selecione um veículo e ajuste os valores para ver a simulação
+                      Selecione um veículo e ajuste os valores para ver o parcelamento direto
                     </p>
                   </div>
                 </Card>
