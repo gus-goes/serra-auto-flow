@@ -5,6 +5,7 @@ import { useReceipts, useCreateReceipt, useDeleteReceipt, useUpdateReceiptSignat
 import { useClients } from '@/hooks/useClients';
 import { useVehicles } from '@/hooks/useVehicles';
 import { useProfiles } from '@/hooks/useProfiles';
+import { useLegalRepresentative } from '@/hooks/useCompanySettings';
 import type { Database } from '@/integrations/supabase/types';
 import { formatCurrency, formatCPF } from '@/lib/formatters';
 import { formatDateDisplay, getCurrentDateString } from '@/lib/dateUtils';
