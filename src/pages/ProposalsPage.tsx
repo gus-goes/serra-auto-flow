@@ -221,12 +221,14 @@ export default function ProposalsPage() {
   };
 
   const handleVendorSignature = async (proposal: typeof proposals[0]) => {
-    if (legalRep?.signature) {
+    // Prioridade: assinatura pessoal do vendedor logado
+    const signatureToUse = currentUserSignature;
+    if (signatureToUse) {
       try {
-        await updateProposal.mutateAsync({ id: proposal.id, vendor_signature: legalRep.signature });
+        await updateProposal.mutateAsync({ id: proposal.id, vendor_signature: signatureToUse });
         toast({
           title: 'Assinatura do vendedor aplicada',
-          description: 'Assinatura do representante legal foi registrada automaticamente.',
+          description: 'Sua assinatura pessoal foi registrada automaticamente.',
         });
       } catch (error) {
         toast({
@@ -236,7 +238,7 @@ export default function ProposalsPage() {
         });
       }
     } else {
-      // Fallback: open signature pad if no legal rep signature
+      // Fallback: open signature pad if no personal signature saved
       setSigningProposal(proposal);
       setSignatureType('vendor');
       setIsSignatureOpen(true);

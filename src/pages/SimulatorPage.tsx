@@ -1,11 +1,9 @@
 import { useState, useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useVehicles } from '@/hooks/useVehicles';
-import { useClients } from '@/hooks/useClients';
 import { useBanks } from '@/hooks/useBanks';
 import { formatCurrency, formatPercent } from '@/lib/formatters';
 import { useToast } from '@/hooks/use-toast';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -16,11 +14,9 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { 
   Calculator, 
   Car, 
-  Users,
   Building2,
   TrendingUp,
   DollarSign,
-  Save,
   Store
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -30,34 +26,39 @@ export default function SimulatorPage() {
   const { toast } = useToast();
 
   const { data: allVehicles = [], isLoading: loadingVehicles } = useVehicles();
-  const { data: allClients = [], isLoading: loadingClients } = useClients();
   const { data: allBanks = [], isLoading: loadingBanks } = useBanks();
 
   const vehicles = allVehicles.filter(v => v.status === 'disponivel');
-  const clients = allClients;
   const banks = allBanks.filter(b => b.is_active);
 
   const [selectedVehicle, setSelectedVehicle] = useState('');
-  const [selectedClient, setSelectedClient] = useState('');
   const [vehiclePrice, setVehiclePrice] = useState(0);
+  const [vehiclePriceStr, setVehiclePriceStr] = useState('0');
   const [downPayment, setDownPayment] = useState(0);
+  const [downPaymentStr, setDownPaymentStr] = useState('0');
   const [installments, setInstallments] = useState<number>(48);
+  const [installmentsStr, setInstallmentsStr] = useState('48');
   const [ownInstallments, setOwnInstallments] = useState<number>(12);
+  const [ownInstallmentsStr, setOwnInstallmentsStr] = useState('12');
   const [activeTab, setActiveTab] = useState('bancario');
 
   const vehicle = vehicles.find(v => v.id === selectedVehicle);
   const financedAmount = vehiclePrice - downPayment;
   const downPaymentPercent = vehiclePrice > 0 ? (downPayment / vehiclePrice) * 100 : 0;
 
-  const isLoading = loadingVehicles || loadingClients || loadingBanks;
+  const isLoading = loadingVehicles || loadingBanks;
 
   // Update price when vehicle changes
   const handleVehicleChange = (vehicleId: string) => {
     setSelectedVehicle(vehicleId);
     const v = vehicles.find(veh => veh.id === vehicleId);
     if (v) {
-      setVehiclePrice(Number(v.price));
-      setDownPayment(Math.round(Number(v.price) * 0.2));
+      const price = Number(v.price);
+      const dp = Math.round(price * 0.2);
+      setVehiclePrice(price);
+      setVehiclePriceStr(String(price));
+      setDownPayment(dp);
+      setDownPaymentStr(String(dp));
     }
   };
 
@@ -67,7 +68,6 @@ export default function SimulatorPage() {
 
     return banks.map(bank => {
       const rates = (bank.rates || {}) as Record<string, number>;
-      // Get the closest rate available for the installment count
       const availableRates = [12, 24, 36, 48, 60] as const;
       const closestRate = availableRates.reduce((prev, curr) => 
         Math.abs(curr - installments) < Math.abs(prev - installments) ? curr : prev
@@ -111,44 +111,11 @@ export default function SimulatorPage() {
     };
   }, [financedAmount, ownInstallments]);
 
-  const handleSaveSimulation = (bankName: string, sim: typeof bankSimulations[0]) => {
-    if (!selectedClient) {
-      toast({
-        title: 'Cliente não selecionado',
-        description: 'Selecione um cliente para salvar a simulação.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    // TODO: Save simulation to database
-    toast({
-      title: 'Simulação salva',
-      description: `Simulação com ${bankName} foi salva com sucesso.`,
-    });
-  };
-
-  const handleSaveOwnSimulation = () => {
-    if (!selectedClient) {
-      toast({
-        title: 'Cliente não selecionado',
-        description: 'Selecione um cliente para salvar a simulação.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    // TODO: Save simulation to database
-    toast({
-      title: 'Simulação salva',
-      description: 'Simulação de financiamento próprio foi salva com sucesso.',
-    });
-  };
-
   // Input section component (shared between tabs)
-  const InputSection = ({ currentInstallments, onInstallmentsChange, isOwnFinancing = false }: {
+  const InputSection = ({ currentInstallments, currentInstallmentsStr, onInstallmentsChange, isOwnFinancing = false }: {
     currentInstallments: number;
-    onInstallmentsChange: (value: number) => void;
+    currentInstallmentsStr: string;
+    onInstallmentsChange: (value: number, str: string) => void;
     isOwnFinancing?: boolean;
   }) => (
     <Card className="lg:col-span-1">
@@ -177,34 +144,19 @@ export default function SimulatorPage() {
 
         <div className="space-y-2">
           <Label className="flex items-center gap-2">
-            <Users className="h-4 w-4 text-muted-foreground" />
-            Cliente
-          </Label>
-          <Select value={selectedClient} onValueChange={setSelectedClient}>
-            <SelectTrigger>
-              <SelectValue placeholder="Selecione o cliente" />
-            </SelectTrigger>
-            <SelectContent>
-              {clients.map(c => (
-                <SelectItem key={c.id} value={c.id}>
-                  {c.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="space-y-2">
-          <Label className="flex items-center gap-2">
             <DollarSign className="h-4 w-4 text-muted-foreground" />
             Valor do Veículo
           </Label>
           <Input
-            type="number"
-            value={vehiclePrice}
-            onChange={(e) => setVehiclePrice(parseFloat(e.target.value) || 0)}
-            min={0}
-            step={100}
+            type="text"
+            inputMode="numeric"
+            value={vehiclePriceStr}
+            onChange={(e) => setVehiclePriceStr(e.target.value)}
+            onBlur={() => {
+              const val = parseFloat(vehiclePriceStr) || 0;
+              setVehiclePrice(val);
+              setVehiclePriceStr(String(val));
+            }}
           />
         </div>
 
@@ -220,32 +172,38 @@ export default function SimulatorPage() {
           </div>
           <Slider
             value={[downPayment]}
-            onValueChange={([value]) => setDownPayment(value)}
+            onValueChange={([value]) => {
+              setDownPayment(value);
+              setDownPaymentStr(String(value));
+            }}
             max={vehiclePrice}
             step={100}
             className="my-2"
           />
           <Input
-            type="number"
-            value={downPayment}
-            onChange={(e) => setDownPayment(parseFloat(e.target.value) || 0)}
-            min={0}
-            max={vehiclePrice}
-            step={100}
+            type="text"
+            inputMode="numeric"
+            value={downPaymentStr}
+            onChange={(e) => setDownPaymentStr(e.target.value)}
+            onBlur={() => {
+              const val = Math.min(parseFloat(downPaymentStr) || 0, vehiclePrice);
+              setDownPayment(val);
+              setDownPaymentStr(String(val));
+            }}
           />
         </div>
 
         <div className="space-y-2">
           <Label>Número de Parcelas</Label>
           <Input
-            type="number"
-            value={currentInstallments}
-            onChange={(e) => {
-              const value = parseInt(e.target.value) || 1;
-              onInstallmentsChange(Math.max(1, Math.min(120, value)));
+            type="text"
+            inputMode="numeric"
+            value={currentInstallmentsStr}
+            onChange={(e) => onInstallmentsChange(currentInstallments, e.target.value)}
+            onBlur={() => {
+              const val = Math.max(1, Math.min(120, parseInt(currentInstallmentsStr) || 1));
+              onInstallmentsChange(val, String(val));
             }}
-            min={1}
-            max={120}
             placeholder="Digite o número de parcelas"
           />
           <p className="text-xs text-muted-foreground">
@@ -306,7 +264,12 @@ export default function SimulatorPage() {
           <div className="grid gap-6 lg:grid-cols-3">
             <InputSection 
               currentInstallments={installments}
-              onInstallmentsChange={setInstallments}
+              currentInstallmentsStr={installmentsStr}
+              onInstallmentsChange={(val, str) => {
+                setInstallmentsStr(str);
+                const parsed = parseInt(str);
+                if (!isNaN(parsed) && parsed >= 1) setInstallments(parsed);
+              }}
             />
 
             <div className="lg:col-span-2 space-y-4">
@@ -372,14 +335,6 @@ export default function SimulatorPage() {
                               <span className="font-medium">{formatCurrency(sim.storeMargin)}</span>
                             </div>
                           </div>
-
-                          <Button
-                            className="w-full btn-primary mt-2"
-                            onClick={() => handleSaveSimulation(sim.bank.name, sim)}
-                          >
-                            <Save className="h-4 w-4 mr-2" />
-                            Salvar Simulação
-                          </Button>
                         </div>
                       </CardContent>
                     </Card>
@@ -405,7 +360,12 @@ export default function SimulatorPage() {
           <div className="grid gap-6 lg:grid-cols-3">
             <InputSection 
               currentInstallments={ownInstallments}
-              onInstallmentsChange={setOwnInstallments}
+              currentInstallmentsStr={ownInstallmentsStr}
+              onInstallmentsChange={(val, str) => {
+                setOwnInstallmentsStr(str);
+                const parsed = parseInt(str);
+                if (!isNaN(parsed) && parsed >= 1) setOwnInstallments(parsed);
+              }}
               isOwnFinancing
             />
 
@@ -454,14 +414,6 @@ export default function SimulatorPage() {
                         <span>Total a pagar:</span>
                         <span className="font-bold text-success">{formatCurrency(ownSimulation.totalValue)}</span>
                       </div>
-
-                      <Button
-                        className="w-full btn-primary"
-                        onClick={handleSaveOwnSimulation}
-                      >
-                        <Save className="h-4 w-4 mr-2" />
-                        Salvar Simulação
-                      </Button>
                     </div>
                   </CardContent>
                 </Card>

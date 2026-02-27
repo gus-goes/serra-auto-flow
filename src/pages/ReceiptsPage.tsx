@@ -177,16 +177,17 @@ export default function ReceiptsPage() {
   };
 
   const handleVendorSignature = async (receipt: typeof receipts[0]) => {
-    if (legalRep?.signature) {
+    const signatureToUse = currentUserSignature;
+    if (signatureToUse) {
       try {
         await updateSignature.mutateAsync({
           id: receipt.id,
           type: 'vendor',
-          signature: legalRep.signature,
+          signature: signatureToUse,
         });
         toast({
           title: 'Assinatura do vendedor aplicada',
-          description: 'Assinatura do representante legal foi registrada automaticamente.',
+          description: 'Sua assinatura pessoal foi registrada automaticamente.',
         });
       } catch (error) {
         toast({

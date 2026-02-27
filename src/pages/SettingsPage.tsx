@@ -657,6 +657,53 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
 
+        {/* Minha Assinatura */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Pen className="h-5 w-5 text-primary" />
+              Minha Assinatura
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Sua assinatura pessoal será usada automaticamente ao assinar propostas e recibos.
+            </p>
+            {mySignature ? (
+              <div className="space-y-2">
+                <div className="border border-input rounded-lg p-4 bg-muted/30">
+                  <img 
+                    src={mySignature} 
+                    alt="Minha assinatura" 
+                    className="max-h-24 mx-auto"
+                  />
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    if (user?.id) {
+                      updateMySignature.mutate({ userId: user.id, signature: '' });
+                    }
+                  }}
+                >
+                  Alterar Assinatura
+                </Button>
+              </div>
+            ) : (
+              <SignaturePad
+                label="Desenhe sua assinatura"
+                onSave={(sig) => {
+                  if (user?.id) {
+                    updateMySignature.mutate({ userId: user.id, signature: sig });
+                  }
+                }}
+              />
+            )}
+          </CardContent>
+        </Card>
+
         {/* App Download Links */}
         <Card>
           <CardHeader>

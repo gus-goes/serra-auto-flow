@@ -78,6 +78,55 @@ export function useUpdateProfile() {
   });
 }
 
+// Hook para buscar assinatura do usuário logado
+export function useCurrentUserSignature(userId: string | undefined) {
+  return useQuery({
+    queryKey: ['profiles', 'signature', userId],
+    queryFn: async () => {
+      if (!userId) return null;
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('signature')
+        .eq('id', userId)
+        .maybeSingle();
+      if (error) throw error;
+      return data?.signature as string | null;
+    },
+    enabled: !!userId,
+  });
+}
+
+// Mutation para salvar assinatura do usuário
+export function useUpdateUserSignature() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async ({ userId, signature }: { userId: string; signature: string }) => {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ signature } as any)
+        .eq('id', userId);
+      if (error) throw error;
+    },
+    onSuccess: (_, { userId }) => {
+      queryClient.invalidateQueries({ queryKey: ['profiles'] });
+      queryClient.invalidateQueries({ queryKey: ['profiles', 'signature', userId] });
+      toast({
+        title: 'Assinatura salva',
+        description: 'Sua assinatura foi salva com sucesso.',
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: 'Erro ao salvar assinatura',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+}
+
 // Vendedores (para selects)
 export function useVendors() {
   return useQuery({
