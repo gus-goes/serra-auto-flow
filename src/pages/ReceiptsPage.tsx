@@ -78,6 +78,7 @@ export default function ReceiptsPage() {
   const { data: vehicles = [], isLoading: loadingVehicles } = useVehicles();
   const { data: profiles = [] } = useProfiles();
   const { data: legalRep } = useLegalRepresentative();
+  const { data: currentUserSignature } = useCurrentUserSignature(user?.id);
   
   const createReceipt = useCreateReceipt();
   const deleteReceipt = useDeleteReceipt();
