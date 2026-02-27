@@ -880,39 +880,53 @@ export default function DocumentsPage() {
             </Dialog>
           </div>
 
+          {selectedWithdrawals.size > 0 && (
+            <div className="flex items-center gap-2 p-2 bg-destructive/10 rounded-lg">
+              <span className="text-sm font-medium">{selectedWithdrawals.size} selecionado(s)</span>
+              <Button variant="destructive" size="sm" disabled={isBulkDeleting} onClick={() => handleBulkDelete('desistências', selectedWithdrawals, setSelectedWithdrawals, deleteWithdrawal)}>
+                {isBulkDeleting ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Trash2 className="h-4 w-4 mr-1" />}
+                Excluir selecionados
+              </Button>
+            </div>
+          )}
+
           <Card>
             <CardContent className="p-0">
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-10">
+                      <Checkbox checked={withdrawals.length > 0 && selectedWithdrawals.size === withdrawals.length} onCheckedChange={() => toggleAll(withdrawals.map(w => w.id), selectedWithdrawals, setSelectedWithdrawals)} />
+                    </TableHead>
                     <TableHead>Número</TableHead>
                     <TableHead>Cliente</TableHead>
                     <TableHead>Veículo</TableHead>
                     <TableHead>Data</TableHead>
-                    <TableHead className="w-16">Ações</TableHead>
+                    <TableHead className="w-24">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {withdrawals.length > 0 ? withdrawals.map((withdrawal) => (
-                    <TableRow key={withdrawal.id}>
+                    <TableRow key={withdrawal.id} className={cn(selectedWithdrawals.has(withdrawal.id) && "bg-muted/50")}>
+                      <TableCell><Checkbox checked={selectedWithdrawals.has(withdrawal.id)} onCheckedChange={() => toggleSelection(selectedWithdrawals, setSelectedWithdrawals, withdrawal.id)} /></TableCell>
                       <TableCell className="font-mono text-sm">{withdrawal.declaration_number}</TableCell>
                       <TableCell>{getClientName(withdrawal.client_id)}</TableCell>
                       <TableCell>{getVehicleInfo(withdrawal.vehicle_id)}</TableCell>
                       <TableCell>{formatDateDisplay(withdrawal.declaration_date)}</TableCell>
                       <TableCell>
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          className="h-8 w-8"
-                          onClick={() => handleDownloadWithdrawal(withdrawal.id)}
-                        >
-                          <Download className="h-4 w-4" />
-                        </Button>
+                        <div className="flex gap-1">
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDownloadWithdrawal(withdrawal.id)}>
+                            <Download className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => deleteWithdrawal.mutate(withdrawal.id)}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   )) : (
                     <TableRow>
-                      <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                         Nenhuma desistência encontrada
                       </TableCell>
                     </TableRow>
