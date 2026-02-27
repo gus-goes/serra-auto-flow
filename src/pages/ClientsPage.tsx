@@ -5,6 +5,7 @@ import { useClients, useCreateClient, useUpdateClient, useDeleteClient } from '@
 import { supabase } from '@/integrations/supabase/client';
 import type { Database } from '@/integrations/supabase/types';
 import { formatCPF, formatPhone, formatDate, isValidCPF, cleanCPF, cleanPhone, isValidEmail, formatRG, cleanRG } from '@/lib/formatters';
+import { formatDateDisplay } from '@/lib/dateUtils';
 import { generateClientPDF } from '@/lib/pdfGenerator';
 import { useToast } from '@/hooks/use-toast';
 import { PrivacyMask } from '@/components/PrivacyMask';
