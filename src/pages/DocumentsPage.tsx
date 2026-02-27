@@ -782,41 +782,55 @@ export default function DocumentsPage() {
             </Dialog>
           </div>
 
+          {selectedTransfers.size > 0 && (
+            <div className="flex items-center gap-2 p-2 bg-destructive/10 rounded-lg">
+              <span className="text-sm font-medium">{selectedTransfers.size} selecionado(s)</span>
+              <Button variant="destructive" size="sm" disabled={isBulkDeleting} onClick={() => handleBulkDelete('ATPVs', selectedTransfers, setSelectedTransfers, deleteTransfer)}>
+                {isBulkDeleting ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Trash2 className="h-4 w-4 mr-1" />}
+                Excluir selecionados
+              </Button>
+            </div>
+          )}
+
           <Card>
             <CardContent className="p-0">
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-10">
+                      <Checkbox checked={transfers.length > 0 && selectedTransfers.size === transfers.length} onCheckedChange={() => toggleAll(transfers.map(t => t.id), selectedTransfers, setSelectedTransfers)} />
+                    </TableHead>
                     <TableHead>Número</TableHead>
                     <TableHead>Cliente</TableHead>
                     <TableHead>Veículo</TableHead>
                     <TableHead>Valor</TableHead>
                     <TableHead>Data</TableHead>
-                    <TableHead className="w-16">Ações</TableHead>
+                    <TableHead className="w-24">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {transfers.length > 0 ? transfers.map((transfer) => (
-                    <TableRow key={transfer.id}>
+                    <TableRow key={transfer.id} className={cn(selectedTransfers.has(transfer.id) && "bg-muted/50")}>
+                      <TableCell><Checkbox checked={selectedTransfers.has(transfer.id)} onCheckedChange={() => toggleSelection(selectedTransfers, setSelectedTransfers, transfer.id)} /></TableCell>
                       <TableCell className="font-mono text-sm">{transfer.authorization_number}</TableCell>
                       <TableCell>{getClientName(transfer.client_id)}</TableCell>
                       <TableCell>{getVehicleInfo(transfer.vehicle_id)}</TableCell>
                       <TableCell>{formatCurrency(Number(transfer.vehicle_value))}</TableCell>
                       <TableCell>{formatDateDisplay(transfer.transfer_date)}</TableCell>
                       <TableCell>
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          className="h-8 w-8"
-                          onClick={() => handleDownloadTransfer(transfer.id)}
-                        >
-                          <Download className="h-4 w-4" />
-                        </Button>
+                        <div className="flex gap-1">
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDownloadTransfer(transfer.id)}>
+                            <Download className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => deleteTransfer.mutate(transfer.id)}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   )) : (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                         Nenhuma ATPV encontrada
                       </TableCell>
                     </TableRow>
