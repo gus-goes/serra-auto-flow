@@ -219,6 +219,29 @@ export default function ProposalsPage() {
     }
   };
 
+  const handleVendorSignature = async (proposal: typeof proposals[0]) => {
+    if (legalRep?.signature) {
+      try {
+        await updateProposal.mutateAsync({ id: proposal.id, vendor_signature: legalRep.signature });
+        toast({
+          title: 'Assinatura do vendedor aplicada',
+          description: 'Assinatura do representante legal foi registrada automaticamente.',
+        });
+      } catch (error) {
+        toast({
+          title: 'Erro',
+          description: 'Não foi possível aplicar a assinatura.',
+          variant: 'destructive',
+        });
+      }
+    } else {
+      // Fallback: open signature pad if no legal rep signature
+      setSigningProposal(proposal);
+      setSignatureType('vendor');
+      setIsSignatureOpen(true);
+    }
+  };
+
   const handleDelete = async (id: string) => {
     if (confirm('Tem certeza que deseja excluir esta proposta?')) {
       try {
