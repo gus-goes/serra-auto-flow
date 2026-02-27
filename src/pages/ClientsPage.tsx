@@ -782,6 +782,12 @@ export default function ClientsPage() {
                 {filteredClients.map((client) => (
                   <TableRow key={client.id} className="table-row-hover">
                     <TableCell>
+                      <Checkbox
+                        checked={selectedIds.has(client.id)}
+                        onCheckedChange={() => toggleSelect(client.id)}
+                      />
+                    </TableCell>
+                    <TableCell>
                       <div>
                         <p className="font-medium">{client.name}</p>
                         {client.cpf && (
