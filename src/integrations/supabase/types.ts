@@ -702,6 +702,84 @@ export type Database = {
           },
         ]
       }
+      tracking_runs: {
+        Row: {
+          client_id: string | null
+          completed_at: string | null
+          created_at: string
+          created_by: string
+          current_lat: number | null
+          current_lng: number | null
+          destination_address: string
+          destination_lat: number | null
+          destination_lng: number | null
+          driver_name: string
+          id: string
+          origin_address: string
+          origin_lat: number | null
+          origin_lng: number | null
+          progress: number
+          started_at: string | null
+          status: Database["public"]["Enums"]["tracking_status"]
+          vehicle_id: string | null
+        }
+        Insert: {
+          client_id?: string | null
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string
+          current_lat?: number | null
+          current_lng?: number | null
+          destination_address: string
+          destination_lat?: number | null
+          destination_lng?: number | null
+          driver_name: string
+          id?: string
+          origin_address: string
+          origin_lat?: number | null
+          origin_lng?: number | null
+          progress?: number
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["tracking_status"]
+          vehicle_id?: string | null
+        }
+        Update: {
+          client_id?: string | null
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string
+          current_lat?: number | null
+          current_lng?: number | null
+          destination_address?: string
+          destination_lat?: number | null
+          destination_lng?: number | null
+          driver_name?: string
+          id?: string
+          origin_address?: string
+          origin_lat?: number | null
+          origin_lng?: number | null
+          progress?: number
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["tracking_status"]
+          vehicle_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tracking_runs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tracking_runs_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "vehicles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       transfer_authorizations: {
         Row: {
           authorization_number: string
@@ -1058,6 +1136,12 @@ export type Database = {
         | "financiamento_direto"
         | "a_vista"
       reservation_status: "ativa" | "cancelada" | "convertida"
+      tracking_status:
+        | "aguardando"
+        | "em_rota"
+        | "no_local"
+        | "retornando"
+        | "concluido"
       transmission_type: "manual" | "automatico" | "cvt" | "automatizado"
       vehicle_status: "disponivel" | "reservado" | "vendido"
     }
@@ -1228,6 +1312,13 @@ export const Constants = {
         "a_vista",
       ],
       reservation_status: ["ativa", "cancelada", "convertida"],
+      tracking_status: [
+        "aguardando",
+        "em_rota",
+        "no_local",
+        "retornando",
+        "concluido",
+      ],
       transmission_type: ["manual", "automatico", "cvt", "automatizado"],
       vehicle_status: ["disponivel", "reservado", "vendido"],
     },
