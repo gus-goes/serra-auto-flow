@@ -186,3 +186,39 @@ export function useClientWithdrawals() {
     enabled: !!clientRecord?.id,
   });
 }
+
+// Hook to fetch deliveries (tracking_runs) for the logged-in client
+export type ClientDelivery = {
+  id: string;
+  status: string;
+  deposit_amount: number | null;
+  deposit_status: string | null;
+  vehicle_total_price: number | null;
+  remaining_amount: number | null;
+  estimated_delivery_date: string | null;
+  destination_address: string;
+  cancellation_reason: string | null;
+  created_at: string;
+  vehicle?: { brand: string; model: string; year_fab: number; year_model: number; plate: string | null; color: string } | null;
+};
+
+export function useClientDeliveries() {
+  const { data: clientRecord } = useClientRecord();
+  
+  return useQuery({
+    queryKey: ['client-deliveries', clientRecord?.id],
+    queryFn: async () => {
+      if (!clientRecord?.id) return [];
+      
+      const { data, error } = await supabase
+        .from('tracking_runs')
+        .select('id, status, deposit_amount, deposit_status, vehicle_total_price, remaining_amount, estimated_delivery_date, destination_address, cancellation_reason, created_at, vehicle:vehicles(brand, model, year_fab, year_model, plate, color)')
+        .eq('client_id', clientRecord.id)
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      return (data || []) as unknown as ClientDelivery[];
+    },
+    enabled: !!clientRecord?.id,
+  });
+}
