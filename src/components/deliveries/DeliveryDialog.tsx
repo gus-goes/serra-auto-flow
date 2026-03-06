@@ -31,11 +31,14 @@ export function DeliveryDialog({ open, onOpenChange }: Props) {
   const [vehicleId, setVehicleId] = useState('');
   const [clientId, setClientId] = useState('');
   const [depositAmount, setDepositAmount] = useState('1500');
+  const [suggestedDeposit, setSuggestedDeposit] = useState<number | null>(null);
   const [dispatcherName, setDispatcherName] = useState('');
   const [mechanicName, setMechanicName] = useState('');
   const [originAddress, setOriginAddress] = useState('Lages - SC');
   const [destinationAddress, setDestinationAddress] = useState('');
   const [estimatedDate, setEstimatedDate] = useState<Date | undefined>();
+  const [notes, setNotes] = useState('');
+
   const [notes, setNotes] = useState('');
 
   const selectedVehicle = vehicles?.find((v) => v.id === vehicleId);
