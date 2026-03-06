@@ -704,64 +704,103 @@ export type Database = {
       }
       tracking_runs: {
         Row: {
+          cancellation_reason: string | null
           client_id: string | null
           completed_at: string | null
+          contract_id: string | null
           created_at: string
           created_by: string
           current_lat: number | null
           current_lng: number | null
+          delivery_confirmed_at: string | null
+          deposit_amount: number | null
+          deposit_status: Database["public"]["Enums"]["deposit_status"] | null
           destination_address: string
           destination_lat: number | null
           destination_lng: number | null
+          dispatcher_name: string | null
           driver_name: string
+          estimated_delivery_date: string | null
           id: string
+          mechanic_name: string | null
+          notes: string | null
           origin_address: string
           origin_lat: number | null
           origin_lng: number | null
           progress: number
+          receipt_id: string | null
+          remaining_amount: number | null
           started_at: string | null
           status: Database["public"]["Enums"]["tracking_status"]
           vehicle_id: string | null
+          vehicle_total_price: number | null
+          warranty_id: string | null
         }
         Insert: {
+          cancellation_reason?: string | null
           client_id?: string | null
           completed_at?: string | null
+          contract_id?: string | null
           created_at?: string
           created_by?: string
           current_lat?: number | null
           current_lng?: number | null
+          delivery_confirmed_at?: string | null
+          deposit_amount?: number | null
+          deposit_status?: Database["public"]["Enums"]["deposit_status"] | null
           destination_address: string
           destination_lat?: number | null
           destination_lng?: number | null
+          dispatcher_name?: string | null
           driver_name: string
+          estimated_delivery_date?: string | null
           id?: string
+          mechanic_name?: string | null
+          notes?: string | null
           origin_address: string
           origin_lat?: number | null
           origin_lng?: number | null
           progress?: number
+          receipt_id?: string | null
+          remaining_amount?: number | null
           started_at?: string | null
           status?: Database["public"]["Enums"]["tracking_status"]
           vehicle_id?: string | null
+          vehicle_total_price?: number | null
+          warranty_id?: string | null
         }
         Update: {
+          cancellation_reason?: string | null
           client_id?: string | null
           completed_at?: string | null
+          contract_id?: string | null
           created_at?: string
           created_by?: string
           current_lat?: number | null
           current_lng?: number | null
+          delivery_confirmed_at?: string | null
+          deposit_amount?: number | null
+          deposit_status?: Database["public"]["Enums"]["deposit_status"] | null
           destination_address?: string
           destination_lat?: number | null
           destination_lng?: number | null
+          dispatcher_name?: string | null
           driver_name?: string
+          estimated_delivery_date?: string | null
           id?: string
+          mechanic_name?: string | null
+          notes?: string | null
           origin_address?: string
           origin_lat?: number | null
           origin_lng?: number | null
           progress?: number
+          receipt_id?: string | null
+          remaining_amount?: number | null
           started_at?: string | null
           status?: Database["public"]["Enums"]["tracking_status"]
           vehicle_id?: string | null
+          vehicle_total_price?: number | null
+          warranty_id?: string | null
         }
         Relationships: [
           {
@@ -772,10 +811,31 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "tracking_runs_contract_id_fkey"
+            columns: ["contract_id"]
+            isOneToOne: false
+            referencedRelation: "contracts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tracking_runs_receipt_id_fkey"
+            columns: ["receipt_id"]
+            isOneToOne: false
+            referencedRelation: "receipts"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "tracking_runs_vehicle_id_fkey"
             columns: ["vehicle_id"]
             isOneToOne: false
             referencedRelation: "vehicles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tracking_runs_warranty_id_fkey"
+            columns: ["warranty_id"]
+            isOneToOne: false
+            referencedRelation: "warranties"
             referencedColumns: ["id"]
           },
         ]
@@ -1101,6 +1161,7 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "vendedor" | "cliente"
+      deposit_status: "pendente" | "pago" | "devolvido"
       fuel_type:
         | "flex"
         | "gasolina"
@@ -1272,6 +1333,7 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "vendedor", "cliente"],
+      deposit_status: ["pendente", "pago", "devolvido"],
       fuel_type: [
         "flex",
         "gasolina",
