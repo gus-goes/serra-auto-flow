@@ -82,6 +82,7 @@ export function DeliveryDialog({ open, onOpenChange }: Props) {
     setVehicleId('');
     setClientId('');
     setDepositAmount('1500');
+    setSuggestedDeposit(null);
     setDispatcherName('');
     setMechanicName('');
     setOriginAddress('Lages - SC');
