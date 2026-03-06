@@ -452,6 +452,95 @@ export default function ClienteDashboardPage() {
             </div>
           )}
 
+          {/* Pending Deliveries Alert */}
+          {deliveries.filter(d => !d.cancellation_reason && d.status !== 'concluido').length > 0 && (
+            <div className="space-y-3">
+              {deliveries
+                .filter(d => !d.cancellation_reason && d.status !== 'concluido')
+                .map((delivery) => (
+                  <motion.div
+                    key={delivery.id}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="p-3 sm:p-5 rounded-xl bg-gradient-to-r from-orange-500/10 to-[hsl(220,20%,10%)] border border-orange-500/30"
+                  >
+                    <div className="flex items-start gap-3 sm:gap-4">
+                      <div className="p-2 sm:p-3 rounded-xl bg-orange-500/20 shrink-0">
+                        <Truck className="h-5 w-5 sm:h-6 sm:w-6 text-orange-400" />
+                      </div>
+                      <div className="flex-1 min-w-0 space-y-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <h3 className="font-semibold text-white text-sm sm:text-base">Entrega em andamento</h3>
+                          {delivery.deposit_status === 'pendente' && (
+                            <Badge className="bg-red-500/20 text-red-400 border-red-500/30 text-[10px] sm:text-xs shrink-0">
+                              Pagamento Pendente
+                            </Badge>
+                          )}
+                          {delivery.deposit_status === 'pago' && (
+                            <Badge className="bg-green-500/20 text-green-400 border-green-500/30 text-[10px] sm:text-xs shrink-0">
+                              Sinal Pago
+                            </Badge>
+                          )}
+                        </div>
+
+                        {delivery.vehicle && (
+                          <div className="flex items-center gap-2 text-sm text-gray-300">
+                            <Car className="h-3.5 w-3.5 text-primary shrink-0" />
+                            <span>{delivery.vehicle.brand} {delivery.vehicle.model} {delivery.vehicle.year_fab}/{delivery.vehicle.year_model}</span>
+                          </div>
+                        )}
+
+                        <div className="flex items-center gap-2 text-xs sm:text-sm text-gray-400">
+                          <MapPin className="h-3.5 w-3.5 shrink-0" />
+                          <span className="truncate">{delivery.destination_address}</span>
+                        </div>
+
+                        <div className="flex flex-wrap gap-3 sm:gap-4 text-xs sm:text-sm">
+                          <div>
+                            <span className="text-gray-500">Sinal:</span>{' '}
+                            <span className="font-medium text-white">
+                              {formatCurrency(delivery.deposit_amount || 0)}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-gray-500">Restante:</span>{' '}
+                            <span className="font-semibold text-orange-400">
+                              {formatCurrency(delivery.remaining_amount || 0)}
+                            </span>
+                          </div>
+                          {delivery.estimated_delivery_date && (
+                            <div className="flex items-center gap-1">
+                              <Calendar className="h-3 w-3 text-gray-500" />
+                              <span className="text-gray-300">
+                                {format(new Date(delivery.estimated_delivery_date + 'T12:00:00'), 'dd/MM/yyyy')}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Status */}
+                        <div className="flex items-center gap-1.5 text-xs">
+                          <span className="text-gray-500">Status:</span>
+                          <span className={`font-medium ${
+                            delivery.status === 'aguardando' ? 'text-yellow-400' :
+                            delivery.status === 'em_rota' ? 'text-blue-400' :
+                            delivery.status === 'no_local' ? 'text-green-400' :
+                            delivery.status === 'retornando' ? 'text-purple-400' :
+                            'text-gray-400'
+                          }`}>
+                            {delivery.status === 'aguardando' && 'Aguardando'}
+                            {delivery.status === 'em_rota' && 'Em Rota'}
+                            {delivery.status === 'no_local' && 'No Local'}
+                            {delivery.status === 'retornando' && 'Retornando'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </motion.div>
+                ))}
+            </div>
+          )}
+
           {/* Stats Cards */}
           {hasClientRecord && (
             <motion.div 
