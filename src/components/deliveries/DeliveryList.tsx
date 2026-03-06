@@ -1,0 +1,123 @@
+import { Card, CardContent } from '@/components/ui/card';
+import { Progress } from '@/components/ui/progress';
+import { Delivery } from '@/hooks/useDeliveries';
+import { DeliveryStatusBadge, DepositStatusBadge, DeliveryActions } from './DeliveryStatusActions';
+import { Car, User, MapPin, Calendar, Wrench, Truck as TruckIcon } from 'lucide-react';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+import { Skeleton } from '@/components/ui/skeleton';
+
+interface Props {
+  deliveries: Delivery[];
+  isLoading: boolean;
+  filter: string;
+}
+
+export function DeliveryList({ deliveries, isLoading, filter }: Props) {
+  if (isLoading) {
+    return (
+      <div className="grid gap-4 md:grid-cols-2">
+        {[1, 2, 3].map((i) => <Skeleton key={i} className="h-52 rounded-xl" />)}
+      </div>
+    );
+  }
+
+  const filtered = filter === 'todos'
+    ? deliveries
+    : deliveries.filter((d) => {
+        if (filter === 'cancelado') return d.cancellation_reason != null;
+        return d.status === filter && !d.cancellation_reason;
+      });
+
+  if (filtered.length === 0) {
+    return (
+      <div className="text-center py-16 text-muted-foreground">
+        <TruckIcon className="h-12 w-12 mx-auto mb-3 opacity-40" />
+        <p>Nenhuma entrega encontrada.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid gap-4 md:grid-cols-2">
+      {filtered.map((d) => (
+        <Card key={d.id} className="overflow-hidden">
+          <CardContent className="p-5 space-y-4">
+            {/* Header */}
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex gap-2 flex-wrap">
+                <DeliveryStatusBadge status={d.cancellation_reason ? 'cancelado' : d.status} />
+                <DepositStatusBadge status={d.deposit_status || 'pendente'} />
+              </div>
+              {d.estimated_delivery_date && (
+                <span className="text-xs text-muted-foreground flex items-center gap-1">
+                  <Calendar className="h-3 w-3" />
+                  {format(new Date(d.estimated_delivery_date + 'T12:00:00'), 'dd/MM/yyyy')}
+                </span>
+              )}
+            </div>
+
+            {/* Vehicle */}
+            {d.vehicle && (
+              <div className="flex items-center gap-2 text-sm">
+                <Car className="h-4 w-4 text-primary" />
+                <span className="font-medium">{d.vehicle.brand} {d.vehicle.model} {d.vehicle.year_fab}/{d.vehicle.year_model}</span>
+                {d.vehicle.plate && <span className="text-muted-foreground">• {d.vehicle.plate}</span>}
+              </div>
+            )}
+
+            {/* Client */}
+            {d.client && (
+              <div className="flex items-center gap-2 text-sm">
+                <User className="h-4 w-4 text-primary" />
+                <span>{d.client.name}</span>
+                {d.client.phone && <span className="text-muted-foreground">• {d.client.phone}</span>}
+              </div>
+            )}
+
+            {/* Destination */}
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <MapPin className="h-4 w-4" />
+              <span className="truncate">{d.destination_address}</span>
+            </div>
+
+            {/* Staff */}
+            <div className="flex gap-4 text-xs text-muted-foreground">
+              {d.dispatcher_name && (
+                <span className="flex items-center gap-1"><TruckIcon className="h-3 w-3" /> {d.dispatcher_name}</span>
+              )}
+              {d.mechanic_name && (
+                <span className="flex items-center gap-1"><Wrench className="h-3 w-3" /> {d.mechanic_name}</span>
+              )}
+            </div>
+
+            {/* Financial */}
+            <div className="flex gap-4 text-sm">
+              <div>
+                <span className="text-muted-foreground">Sinal:</span>{' '}
+                <span className="font-medium">R$ {(d.deposit_amount || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Restante:</span>{' '}
+                <span className="font-medium">R$ {(d.remaining_amount || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+              </div>
+            </div>
+
+            {/* Progress */}
+            <Progress value={d.progress || 0} className="h-2" />
+
+            {/* Cancellation reason */}
+            {d.cancellation_reason && (
+              <p className="text-xs text-destructive bg-destructive/10 rounded p-2">
+                Cancelado: {d.cancellation_reason}
+              </p>
+            )}
+
+            {/* Actions */}
+            <DeliveryActions delivery={d} />
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  );
+}
