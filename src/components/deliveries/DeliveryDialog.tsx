@@ -14,6 +14,8 @@ import { useState, useEffect } from 'react';
 import { useCreateDelivery } from '@/hooks/useDeliveries';
 import { useVehicles } from '@/hooks/useVehicles';
 import { useClients } from '@/hooks/useClients';
+import { supabase } from '@/integrations/supabase/client';
+import { Badge } from '@/components/ui/badge';
 
 
 interface Props {
