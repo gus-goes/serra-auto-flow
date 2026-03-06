@@ -123,10 +123,28 @@ export function DeliveryDialog({ open, onOpenChange }: Props) {
           </div>
 
           {/* Deposit */}
+          <div className="space-y-2">
+            <Label>Valor do Sinal (R$)</Label>
+            <div className="flex gap-2 mb-2">
+              {[1100, 1500].map((val) => (
+                <Button
+                  key={val}
+                  type="button"
+                  size="sm"
+                  variant={Number(depositAmount) === val ? 'default' : 'outline'}
+                  onClick={() => setDepositAmount(String(val))}
+                  className="text-xs"
+                >
+                  R$ {val.toLocaleString('pt-BR')}
+                </Button>
+              ))}
+            </div>
+            <Input type="number" value={depositAmount} onChange={(e) => setDepositAmount(e.target.value)} placeholder="Ou digite outro valor" />
+          </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Valor do Sinal (R$)</Label>
-              <Input type="number" value={depositAmount} onChange={(e) => setDepositAmount(e.target.value)} />
+              <Label>Preço do Veículo</Label>
+              <Input value={`R$ ${vehiclePrice.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} disabled />
             </div>
             <div className="space-y-2">
               <Label>Restante</Label>
