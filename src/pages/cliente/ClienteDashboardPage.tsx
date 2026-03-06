@@ -24,7 +24,9 @@ import {
   FileSignature,
   CalendarCheck,
   Ban,
-  Smartphone
+  Smartphone,
+  Truck,
+  MapPin
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -87,6 +89,7 @@ export default function ClienteDashboardPage() {
   const { data: withdrawals = [], isLoading: isLoadingWithdrawals } = useClientWithdrawals();
   const { data: adminPhone } = useAdminPhone();
   const { data: appLinks } = useAppDownloadLinks();
+  const { data: deliveries = [], isLoading: isLoadingDeliveries } = useClientDeliveries();
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
   const downloadUrl = appLinks?.androidUrl || appLinks?.iosUrl;
