@@ -21,6 +21,7 @@ import VendorsPage from "./pages/VendorsPage";
 import SettingsPage from "./pages/SettingsPage";
 import DocumentsPage from "./pages/DocumentsPage";
 import ActivityHistoryPage from "./pages/ActivityHistoryPage";
+import DeliveriesPage from "./pages/DeliveriesPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -73,6 +74,7 @@ const App = () => (
                 <Route path="/recibos" element={<ReceiptsPage />} />
                 <Route path="/funil" element={<FunnelPage />} />
                 <Route path="/documentos" element={<DocumentsPage />} />
+                <Route path="/entregas" element={<DeliveriesPage />} />
                 <Route path="/historico" element={<ActivityHistoryPage />} />
                 <Route path="/vendedores" element={<VendorsPage />} />
                 <Route path="/configuracoes" element={<SettingsPage />} />
