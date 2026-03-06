@@ -14,7 +14,7 @@ import { useState, useEffect } from 'react';
 import { useCreateDelivery } from '@/hooks/useDeliveries';
 import { useVehicles } from '@/hooks/useVehicles';
 import { useClients } from '@/hooks/useClients';
-import { useCompanySettings } from '@/hooks/useCompanySettings';
+
 
 interface Props {
   open: boolean;
