@@ -64,6 +64,7 @@ export function DeliveryDialog({ open, onOpenChange }: Props) {
         setDepositAmount(String(data.down_payment));
       } else {
         setSuggestedDeposit(null);
+        setDepositAmount('1500');
       }
     };
     fetchProposal();
