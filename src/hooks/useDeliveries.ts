@@ -129,6 +129,25 @@ export function useUpdateDeliveryStatus() {
   });
 }
 
+export function useUpdateDeliveryDeposit() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, deposit_amount, vehicle_total_price }: { id: string; deposit_amount: number; vehicle_total_price: number }) => {
+      const remaining = vehicle_total_price - deposit_amount;
+      const { error } = await supabase
+        .from('tracking_runs')
+        .update({ deposit_amount, remaining_amount: remaining })
+        .eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['deliveries'] });
+      toast.success('Valor do sinal atualizado!');
+    },
+    onError: (err: any) => toast.error('Erro: ' + err.message),
+  });
+}
+
 export function useCancelDelivery() {
   const qc = useQueryClient();
   return useMutation({
