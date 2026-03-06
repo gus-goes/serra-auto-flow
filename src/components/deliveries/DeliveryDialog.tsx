@@ -14,6 +14,8 @@ import { useState, useEffect } from 'react';
 import { useCreateDelivery } from '@/hooks/useDeliveries';
 import { useVehicles } from '@/hooks/useVehicles';
 import { useClients } from '@/hooks/useClients';
+import { supabase } from '@/integrations/supabase/client';
+import { Badge } from '@/components/ui/badge';
 
 
 interface Props {
@@ -29,6 +31,7 @@ export function DeliveryDialog({ open, onOpenChange }: Props) {
   const [vehicleId, setVehicleId] = useState('');
   const [clientId, setClientId] = useState('');
   const [depositAmount, setDepositAmount] = useState('1500');
+  const [suggestedDeposit, setSuggestedDeposit] = useState<number | null>(null);
   const [dispatcherName, setDispatcherName] = useState('');
   const [mechanicName, setMechanicName] = useState('');
   const [originAddress, setOriginAddress] = useState('Lages - SC');
@@ -40,6 +43,32 @@ export function DeliveryDialog({ open, onOpenChange }: Props) {
   const selectedClient = clients?.find((c) => c.id === clientId);
   const vehiclePrice = selectedVehicle?.price || 0;
   const remaining = vehiclePrice - Number(depositAmount || 0);
+
+  // Fetch proposal down_payment when vehicle + client are selected
+  useEffect(() => {
+    if (!vehicleId || !clientId) {
+      setSuggestedDeposit(null);
+      return;
+    }
+    const fetchProposal = async () => {
+      const { data } = await supabase
+        .from('proposals')
+        .select('down_payment, vehicle_price')
+        .eq('client_id', clientId)
+        .eq('vehicle_id', vehicleId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (data?.down_payment && data.down_payment > 0) {
+        setSuggestedDeposit(data.down_payment);
+        setDepositAmount(String(data.down_payment));
+      } else {
+        setSuggestedDeposit(null);
+      }
+    };
+    fetchProposal();
+  }, [vehicleId, clientId]);
+
 
   // Pre-fill destination from client address
   useEffect(() => {
@@ -53,6 +82,7 @@ export function DeliveryDialog({ open, onOpenChange }: Props) {
     setVehicleId('');
     setClientId('');
     setDepositAmount('1500');
+    setSuggestedDeposit(null);
     setDispatcherName('');
     setMechanicName('');
     setOriginAddress('Lages - SC');
@@ -139,6 +169,11 @@ export function DeliveryDialog({ open, onOpenChange }: Props) {
                 </Button>
               ))}
             </div>
+            {suggestedDeposit && (
+              <Badge variant="secondary" className="cursor-pointer text-xs" onClick={() => setDepositAmount(String(suggestedDeposit))}>
+                Sugerido pela proposta: R$ {suggestedDeposit.toLocaleString('pt-BR')}
+              </Badge>
+            )}
             <Input type="number" value={depositAmount} onChange={(e) => setDepositAmount(e.target.value)} placeholder="Ou digite outro valor" />
           </div>
           <div className="grid grid-cols-2 gap-4">
