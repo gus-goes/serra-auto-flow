@@ -175,6 +175,11 @@ export function DeliveryDialog({ open, onOpenChange }: Props) {
             )}
             <Input type="number" value={depositAmount} onChange={(e) => setDepositAmount(e.target.value)} placeholder="Ou digite outro valor" />
           </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Preço do Veículo</Label>
+              <Input value={`R$ ${vehiclePrice.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} disabled />
+            </div>
             <div className="space-y-2">
               <Label>Restante</Label>
               <Input value={`R$ ${remaining.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} disabled />
