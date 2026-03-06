@@ -38,7 +38,8 @@ import {
   useClientWarranties,
   useClientTransferAuths,
   useClientReservations,
-  useClientWithdrawals
+  useClientWithdrawals,
+  useClientDeliveries
 } from '@/hooks/useClientDocuments';
 import { useAppDownloadLinks } from '@/hooks/useCompanySettings';
 import { useAdminPhone } from '@/hooks/useAdminPhone';
