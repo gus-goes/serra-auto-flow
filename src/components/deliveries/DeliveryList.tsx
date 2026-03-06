@@ -1,16 +1,75 @@
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
-import { Delivery } from '@/hooks/useDeliveries';
+import { Delivery, useUpdateDeliveryDeposit } from '@/hooks/useDeliveries';
 import { DeliveryStatusBadge, DepositStatusBadge, DeliveryActions } from './DeliveryStatusActions';
-import { Car, User, MapPin, Calendar, Wrench, Truck as TruckIcon } from 'lucide-react';
+import { Car, User, MapPin, Calendar, Wrench, Truck as TruckIcon, Pencil, Check, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { useState } from 'react';
 
 interface Props {
   deliveries: Delivery[];
   isLoading: boolean;
   filter: string;
+}
+
+function EditableDeposit({ delivery }: { delivery: Delivery }) {
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(String(delivery.deposit_amount || 0));
+  const updateDeposit = useUpdateDeliveryDeposit();
+  const isClosed = delivery.status === 'concluido' || !!delivery.cancellation_reason;
+
+  const handleSave = () => {
+    const num = Number(value);
+    if (isNaN(num) || num < 0) return;
+    updateDeposit.mutate({
+      id: delivery.id,
+      deposit_amount: num,
+      vehicle_total_price: delivery.vehicle_total_price || 0,
+    }, {
+      onSuccess: () => setEditing(false),
+    });
+  };
+
+  if (editing) {
+    return (
+      <div className="flex items-center gap-1">
+        <span className="text-muted-foreground text-sm">Sinal:</span>
+        <Input
+          type="number"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          className="h-7 w-28 text-sm"
+          autoFocus
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') handleSave();
+            if (e.key === 'Escape') setEditing(false);
+          }}
+        />
+        <Button size="icon" variant="ghost" className="h-6 w-6" onClick={handleSave} disabled={updateDeposit.isPending}>
+          <Check className="h-3 w-3" />
+        </Button>
+        <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => setEditing(false)}>
+          <X className="h-3 w-3" />
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-1">
+      <span className="text-muted-foreground text-sm">Sinal:</span>
+      <span className="font-medium text-sm">R$ {(delivery.deposit_amount || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+      {!isClosed && (
+        <Button size="icon" variant="ghost" className="h-5 w-5 ml-1" onClick={() => { setValue(String(delivery.deposit_amount || 0)); setEditing(true); }}>
+          <Pencil className="h-3 w-3" />
+        </Button>
+      )}
+    </div>
+  );
 }
 
 export function DeliveryList({ deliveries, isLoading, filter }: Props) {
@@ -92,11 +151,8 @@ export function DeliveryList({ deliveries, isLoading, filter }: Props) {
             </div>
 
             {/* Financial */}
-            <div className="flex gap-4 text-sm">
-              <div>
-                <span className="text-muted-foreground">Sinal:</span>{' '}
-                <span className="font-medium">R$ {(d.deposit_amount || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-              </div>
+            <div className="flex gap-4 text-sm items-center">
+              <EditableDeposit delivery={d} />
               <div>
                 <span className="text-muted-foreground">Restante:</span>{' '}
                 <span className="font-medium">R$ {(d.remaining_amount || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
