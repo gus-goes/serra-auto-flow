@@ -39,12 +39,36 @@ export function DeliveryDialog({ open, onOpenChange }: Props) {
   const [estimatedDate, setEstimatedDate] = useState<Date | undefined>();
   const [notes, setNotes] = useState('');
 
-  const [notes, setNotes] = useState('');
-
   const selectedVehicle = vehicles?.find((v) => v.id === vehicleId);
   const selectedClient = clients?.find((c) => c.id === clientId);
   const vehiclePrice = selectedVehicle?.price || 0;
   const remaining = vehiclePrice - Number(depositAmount || 0);
+
+  // Fetch proposal down_payment when vehicle + client are selected
+  useEffect(() => {
+    if (!vehicleId || !clientId) {
+      setSuggestedDeposit(null);
+      return;
+    }
+    const fetchProposal = async () => {
+      const { data } = await supabase
+        .from('proposals')
+        .select('down_payment, vehicle_price')
+        .eq('client_id', clientId)
+        .eq('vehicle_id', vehicleId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (data?.down_payment && data.down_payment > 0) {
+        setSuggestedDeposit(data.down_payment);
+        setDepositAmount(String(data.down_payment));
+      } else {
+        setSuggestedDeposit(null);
+      }
+    };
+    fetchProposal();
+  }, [vehicleId, clientId]);
+
 
   // Pre-fill destination from client address
   useEffect(() => {
