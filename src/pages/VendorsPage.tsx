@@ -36,6 +36,13 @@ export default function VendorsPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
 
+  // Filter only staff profiles (admin/vendedor)
+  const staffProfiles = profiles.filter((profile: any) => {
+    const userRoles = (profile as any).user_roles as Array<{ role: string }> | undefined;
+    const role = userRoles?.[0]?.role;
+    return role === 'admin' || role === 'vendedor';
+  });
+
   const [form, setForm] = useState({
     name: '',
     email: '',
