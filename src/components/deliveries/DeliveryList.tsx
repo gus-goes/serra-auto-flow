@@ -14,6 +14,7 @@ interface Props {
   deliveries: Delivery[];
   isLoading: boolean;
   filter: string;
+  onEdit?: (delivery: Delivery) => void;
 }
 
 function EditableDeposit({ delivery }: { delivery: Delivery }) {
@@ -72,7 +73,7 @@ function EditableDeposit({ delivery }: { delivery: Delivery }) {
   );
 }
 
-export function DeliveryList({ deliveries, isLoading, filter }: Props) {
+export function DeliveryList({ deliveries, isLoading, filter, onEdit }: Props) {
   if (isLoading) {
     return (
       <div className="grid gap-4 md:grid-cols-2">
@@ -170,7 +171,7 @@ export function DeliveryList({ deliveries, isLoading, filter }: Props) {
             )}
 
             {/* Actions */}
-            <DeliveryActions delivery={d} />
+            <DeliveryActions delivery={d} onEdit={onEdit} />
           </CardContent>
         </Card>
       ))}

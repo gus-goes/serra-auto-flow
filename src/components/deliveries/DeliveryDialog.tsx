@@ -11,22 +11,25 @@ import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useState, useEffect } from 'react';
-import { useCreateDelivery } from '@/hooks/useDeliveries';
+import { useCreateDelivery, useUpdateDelivery, type Delivery } from '@/hooks/useDeliveries';
 import { useVehicles } from '@/hooks/useVehicles';
 import { useClients } from '@/hooks/useClients';
 import { supabase } from '@/integrations/supabase/client';
 import { Badge } from '@/components/ui/badge';
 
-
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  editDelivery?: Delivery | null;
 }
 
-export function DeliveryDialog({ open, onOpenChange }: Props) {
+export function DeliveryDialog({ open, onOpenChange, editDelivery }: Props) {
   const createDelivery = useCreateDelivery();
+  const updateDelivery = useUpdateDelivery();
   const { data: vehicles } = useVehicles();
   const { data: clients } = useClients();
+
+  const isEditing = !!editDelivery;
 
   const [vehicleId, setVehicleId] = useState('');
   const [clientId, setClientId] = useState('');
@@ -39,13 +42,29 @@ export function DeliveryDialog({ open, onOpenChange }: Props) {
   const [estimatedDate, setEstimatedDate] = useState<Date | undefined>();
   const [notes, setNotes] = useState('');
 
+  // Populate form when editing
+  useEffect(() => {
+    if (editDelivery && open) {
+      setVehicleId(editDelivery.vehicle_id || '');
+      setClientId(editDelivery.client_id || '');
+      setDepositAmount(String(editDelivery.deposit_amount || 0));
+      setDispatcherName(editDelivery.dispatcher_name || '');
+      setMechanicName(editDelivery.mechanic_name || '');
+      setOriginAddress(editDelivery.origin_address || 'Lages - SC');
+      setDestinationAddress(editDelivery.destination_address || '');
+      setEstimatedDate(editDelivery.estimated_delivery_date ? new Date(editDelivery.estimated_delivery_date + 'T12:00:00') : undefined);
+      setNotes(editDelivery.notes || '');
+    }
+  }, [editDelivery, open]);
+
   const selectedVehicle = vehicles?.find((v) => v.id === vehicleId);
   const selectedClient = clients?.find((c) => c.id === clientId);
   const vehiclePrice = selectedVehicle?.price || 0;
   const remaining = vehiclePrice - Number(depositAmount || 0);
 
-  // Fetch proposal down_payment when vehicle + client are selected
+  // Fetch proposal down_payment when vehicle + client are selected (only for new)
   useEffect(() => {
+    if (isEditing) return;
     if (!vehicleId || !clientId) {
       setSuggestedDeposit(null);
       return;
@@ -68,16 +87,16 @@ export function DeliveryDialog({ open, onOpenChange }: Props) {
       }
     };
     fetchProposal();
-  }, [vehicleId, clientId]);
+  }, [vehicleId, clientId, isEditing]);
 
-
-  // Pre-fill destination from client address
+  // Pre-fill destination from client address (only for new)
   useEffect(() => {
+    if (isEditing) return;
     if (selectedClient) {
       const parts = [selectedClient.street, selectedClient.number, selectedClient.neighborhood, selectedClient.city, selectedClient.state].filter(Boolean);
       if (parts.length > 0) setDestinationAddress(parts.join(', '));
     }
-  }, [selectedClient]);
+  }, [selectedClient, isEditing]);
 
   const resetForm = () => {
     setVehicleId('');
@@ -94,34 +113,48 @@ export function DeliveryDialog({ open, onOpenChange }: Props) {
 
   const handleSubmit = () => {
     if (!vehicleId || !clientId || !dispatcherName || !destinationAddress) return;
-    createDelivery.mutate(
-      {
-        vehicle_id: vehicleId,
-        client_id: clientId,
-        driver_name: dispatcherName,
-        origin_address: originAddress,
-        destination_address: destinationAddress,
-        deposit_amount: Number(depositAmount),
-        vehicle_total_price: vehiclePrice,
-        estimated_delivery_date: estimatedDate ? format(estimatedDate, 'yyyy-MM-dd') : null,
-        dispatcher_name: dispatcherName,
-        mechanic_name: mechanicName,
-        notes,
-      },
-      {
+
+    const payload = {
+      vehicle_id: vehicleId,
+      client_id: clientId,
+      driver_name: dispatcherName,
+      origin_address: originAddress,
+      destination_address: destinationAddress,
+      deposit_amount: Number(depositAmount),
+      vehicle_total_price: vehiclePrice,
+      estimated_delivery_date: estimatedDate ? format(estimatedDate, 'yyyy-MM-dd') : null,
+      dispatcher_name: dispatcherName,
+      mechanic_name: mechanicName,
+      notes,
+    };
+
+    if (isEditing) {
+      updateDelivery.mutate(
+        { ...payload, id: editDelivery.id },
+        {
+          onSuccess: () => {
+            resetForm();
+            onOpenChange(false);
+          },
+        }
+      );
+    } else {
+      createDelivery.mutate(payload, {
         onSuccess: () => {
           resetForm();
           onOpenChange(false);
         },
-      }
-    );
+      });
+    }
   };
 
+  const isPending = createDelivery.isPending || updateDelivery.isPending;
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={(v) => { if (!v) resetForm(); onOpenChange(v); }}>
       <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Nova Entrega</DialogTitle>
+          <DialogTitle>{isEditing ? 'Editar Entrega' : 'Nova Entrega'}</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4">
@@ -131,7 +164,7 @@ export function DeliveryDialog({ open, onOpenChange }: Props) {
             <Select value={vehicleId} onValueChange={setVehicleId}>
               <SelectTrigger><SelectValue placeholder="Selecione o veículo" /></SelectTrigger>
               <SelectContent>
-                {vehicles?.filter(v => v.status === 'disponivel' || v.status === 'reservado').map((v) => (
+                {vehicles?.filter(v => v.status === 'disponivel' || v.status === 'reservado' || v.id === editDelivery?.vehicle_id).map((v) => (
                   <SelectItem key={v.id} value={v.id}>
                     {v.brand} {v.model} {v.year_fab}/{v.year_model} — R$ {v.price.toLocaleString('pt-BR')}
                   </SelectItem>
@@ -235,8 +268,8 @@ export function DeliveryDialog({ open, onOpenChange }: Props) {
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-          <Button onClick={handleSubmit} disabled={!vehicleId || !clientId || !dispatcherName || !destinationAddress || createDelivery.isPending}>
-            {createDelivery.isPending ? 'Criando...' : 'Criar Entrega'}
+          <Button onClick={handleSubmit} disabled={!vehicleId || !clientId || !dispatcherName || !destinationAddress || isPending}>
+            {isPending ? (isEditing ? 'Salvando...' : 'Criando...') : (isEditing ? 'Salvar Alterações' : 'Criar Entrega')}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -171,3 +171,65 @@ export function useCancelDelivery() {
     onError: (err: any) => toast.error('Erro: ' + err.message),
   });
 }
+
+export function useDeleteDelivery() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from('tracking_runs').delete().eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['deliveries'] });
+      toast.success('Entrega excluída com sucesso!');
+    },
+    onError: (err: any) => toast.error('Erro ao excluir: ' + err.message),
+  });
+}
+
+export interface UpdateDeliveryInput {
+  id: string;
+  vehicle_id: string;
+  client_id: string;
+  driver_name: string;
+  origin_address: string;
+  destination_address: string;
+  deposit_amount: number;
+  vehicle_total_price: number;
+  estimated_delivery_date: string | null;
+  dispatcher_name: string;
+  mechanic_name: string;
+  notes?: string;
+}
+
+export function useUpdateDelivery() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: UpdateDeliveryInput) => {
+      const remaining = input.vehicle_total_price - input.deposit_amount;
+      const { error } = await supabase
+        .from('tracking_runs')
+        .update({
+          vehicle_id: input.vehicle_id,
+          client_id: input.client_id,
+          driver_name: input.driver_name,
+          origin_address: input.origin_address,
+          destination_address: input.destination_address,
+          deposit_amount: input.deposit_amount,
+          vehicle_total_price: input.vehicle_total_price,
+          remaining_amount: remaining,
+          estimated_delivery_date: input.estimated_delivery_date,
+          dispatcher_name: input.dispatcher_name,
+          mechanic_name: input.mechanic_name,
+          notes: input.notes || null,
+        })
+        .eq('id', input.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['deliveries'] });
+      toast.success('Entrega atualizada com sucesso!');
+    },
+    onError: (err: any) => toast.error('Erro ao atualizar: ' + err.message),
+  });
+}

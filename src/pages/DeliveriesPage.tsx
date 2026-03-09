@@ -4,7 +4,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Plus, List, CalendarDays, Truck } from 'lucide-react';
-import { useDeliveries } from '@/hooks/useDeliveries';
+import { useDeliveries, type Delivery } from '@/hooks/useDeliveries';
 import { DeliveryList } from '@/components/deliveries/DeliveryList';
 import { DeliveryCalendar } from '@/components/deliveries/DeliveryCalendar';
 import { DeliveryDialog } from '@/components/deliveries/DeliveryDialog';
@@ -13,6 +13,17 @@ export default function DeliveriesPage() {
   const { data: deliveries = [], isLoading } = useDeliveries();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [filter, setFilter] = useState('todos');
+  const [editDelivery, setEditDelivery] = useState<Delivery | null>(null);
+
+  const handleEdit = (delivery: Delivery) => {
+    setEditDelivery(delivery);
+    setDialogOpen(true);
+  };
+
+  const handleDialogChange = (open: boolean) => {
+    setDialogOpen(open);
+    if (!open) setEditDelivery(null);
+  };
 
   return (
     <PageTransition>
@@ -28,7 +39,7 @@ export default function DeliveriesPage() {
               Gerencie entregas de veículos, sinais e agenda
             </p>
           </div>
-          <Button onClick={() => setDialogOpen(true)}>
+          <Button onClick={() => { setEditDelivery(null); setDialogOpen(true); }}>
             <Plus className="h-4 w-4 mr-2" /> Nova Entrega
           </Button>
         </div>
@@ -56,7 +67,7 @@ export default function DeliveriesPage() {
           </div>
 
           <TabsContent value="lista">
-            <DeliveryList deliveries={deliveries} isLoading={isLoading} filter={filter} />
+            <DeliveryList deliveries={deliveries} isLoading={isLoading} filter={filter} onEdit={handleEdit} />
           </TabsContent>
 
           <TabsContent value="agenda">
@@ -64,7 +75,7 @@ export default function DeliveriesPage() {
           </TabsContent>
         </Tabs>
 
-        <DeliveryDialog open={dialogOpen} onOpenChange={setDialogOpen} />
+        <DeliveryDialog open={dialogOpen} onOpenChange={handleDialogChange} editDelivery={editDelivery} />
       </div>
     </PageTransition>
   );
