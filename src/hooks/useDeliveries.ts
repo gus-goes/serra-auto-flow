@@ -136,7 +136,7 @@ export function useUpdateDeliveryDeposit() {
       const remaining = vehicle_total_price - deposit_amount;
       const { error } = await supabase
         .from('tracking_runs')
-        .update({ deposit_amount, remaining_amount: remaining })
+        .update({ deposit_amount, remaining_amount: remaining, deposit_status: 'pendente' as const })
         .eq('id', id);
       if (error) throw error;
     },
