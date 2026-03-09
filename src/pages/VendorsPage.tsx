@@ -36,6 +36,13 @@ export default function VendorsPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
 
+  // Filter only staff profiles (admin/vendedor)
+  const staffProfiles = profiles.filter((profile: any) => {
+    const userRoles = (profile as any).user_roles as Array<{ role: string }> | undefined;
+    const role = userRoles?.[0]?.role;
+    return role === 'admin' || role === 'vendedor';
+  });
+
   const [form, setForm] = useState({
     name: '',
     email: '',
@@ -291,7 +298,7 @@ export default function VendorsPage() {
       </Dialog>
 
       {/* Users Table */}
-      {profiles.length > 0 ? (
+      {staffProfiles.length > 0 ? (
         <Card>
           <CardContent className="p-0">
             <Table>
@@ -306,7 +313,7 @@ export default function VendorsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {profiles.map((profile) => {
+                {staffProfiles.map((profile) => {
                   const role = getRole(profile);
                   return (
                     <TableRow key={profile.id} className="table-row-hover">
