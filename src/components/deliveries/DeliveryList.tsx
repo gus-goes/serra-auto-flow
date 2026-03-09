@@ -171,7 +171,7 @@ export function DeliveryList({ deliveries, isLoading, filter, onEdit }: Props) {
             )}
 
             {/* Actions */}
-            <DeliveryActions delivery={d} />
+            <DeliveryActions delivery={d} onEdit={onEdit} />
           </CardContent>
         </Card>
       ))}
