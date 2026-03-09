@@ -313,7 +313,7 @@ export default function VendorsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {profiles.map((profile) => {
+                {staffProfiles.map((profile) => {
                   const role = getRole(profile);
                   return (
                     <TableRow key={profile.id} className="table-row-hover">
