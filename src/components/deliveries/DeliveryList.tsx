@@ -73,7 +73,7 @@ function EditableDeposit({ delivery }: { delivery: Delivery }) {
   );
 }
 
-export function DeliveryList({ deliveries, isLoading, filter }: Props) {
+export function DeliveryList({ deliveries, isLoading, filter, onEdit }: Props) {
   if (isLoading) {
     return (
       <div className="grid gap-4 md:grid-cols-2">
