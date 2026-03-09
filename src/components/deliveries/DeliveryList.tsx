@@ -14,6 +14,7 @@ interface Props {
   deliveries: Delivery[];
   isLoading: boolean;
   filter: string;
+  onEdit?: (delivery: Delivery) => void;
 }
 
 function EditableDeposit({ delivery }: { delivery: Delivery }) {
