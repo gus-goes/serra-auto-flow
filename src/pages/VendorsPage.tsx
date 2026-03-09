@@ -298,7 +298,7 @@ export default function VendorsPage() {
       </Dialog>
 
       {/* Users Table */}
-      {profiles.length > 0 ? (
+      {staffProfiles.length > 0 ? (
         <Card>
           <CardContent className="p-0">
             <Table>
