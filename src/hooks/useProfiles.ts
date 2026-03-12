@@ -37,16 +37,17 @@ export function useProfile(id: string | undefined) {
     queryKey: ['profiles', id],
     queryFn: async () => {
       if (!id) return null;
-      const { data, error } = await supabase
-        .from('profiles')
-        .select(`
-          *,
-          user_roles(role)
-        `)
-        .eq('id', id)
-        .maybeSingle();
-      if (error) throw error;
-      return data;
+      const [profileRes, roleRes] = await Promise.all([
+        supabase.from('profiles').select('*').eq('id', id).maybeSingle(),
+        supabase.from('user_roles').select('role').eq('user_id', id),
+      ]);
+      if (profileRes.error) throw profileRes.error;
+      if (roleRes.error) throw roleRes.error;
+      if (!profileRes.data) return null;
+      return {
+        ...profileRes.data,
+        user_roles: roleRes.data.map(r => ({ role: r.role })),
+      };
     },
     enabled: !!id,
   });
