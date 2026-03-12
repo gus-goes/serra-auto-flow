@@ -10,15 +10,21 @@ export function useProfiles() {
   return useQuery({
     queryKey: ['profiles'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select(`
-          *,
-          user_roles(role)
-        `)
-        .order('name');
-      if (error) throw error;
-      return data;
+      // Fetch profiles and roles separately to avoid FK join issues
+      const [profilesRes, rolesRes] = await Promise.all([
+        supabase.from('profiles').select('*').order('name'),
+        supabase.from('user_roles').select('user_id, role'),
+      ]);
+      if (profilesRes.error) throw profilesRes.error;
+      if (rolesRes.error) throw rolesRes.error;
+      
+      // Merge roles into profiles
+      return profilesRes.data.map(profile => ({
+        ...profile,
+        user_roles: rolesRes.data
+          .filter(r => r.user_id === profile.id)
+          .map(r => ({ role: r.role })),
+      }));
     },
     staleTime: 1000 * 60 * 5, // 5 minutes
     gcTime: 1000 * 60 * 15, // 15 minutes
