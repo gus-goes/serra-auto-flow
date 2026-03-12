@@ -10,15 +10,21 @@ export function useProfiles() {
   return useQuery({
     queryKey: ['profiles'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select(`
-          *,
-          user_roles(role)
-        `)
-        .order('name');
-      if (error) throw error;
-      return data;
+      // Fetch profiles and roles separately to avoid FK join issues
+      const [profilesRes, rolesRes] = await Promise.all([
+        supabase.from('profiles').select('*').order('name'),
+        supabase.from('user_roles').select('user_id, role'),
+      ]);
+      if (profilesRes.error) throw profilesRes.error;
+      if (rolesRes.error) throw rolesRes.error;
+      
+      // Merge roles into profiles
+      return profilesRes.data.map(profile => ({
+        ...profile,
+        user_roles: rolesRes.data
+          .filter(r => r.user_id === profile.id)
+          .map(r => ({ role: r.role })),
+      }));
     },
     staleTime: 1000 * 60 * 5, // 5 minutes
     gcTime: 1000 * 60 * 15, // 15 minutes
@@ -31,16 +37,17 @@ export function useProfile(id: string | undefined) {
     queryKey: ['profiles', id],
     queryFn: async () => {
       if (!id) return null;
-      const { data, error } = await supabase
-        .from('profiles')
-        .select(`
-          *,
-          user_roles(role)
-        `)
-        .eq('id', id)
-        .maybeSingle();
-      if (error) throw error;
-      return data;
+      const [profileRes, roleRes] = await Promise.all([
+        supabase.from('profiles').select('*').eq('id', id).maybeSingle(),
+        supabase.from('user_roles').select('role').eq('user_id', id),
+      ]);
+      if (profileRes.error) throw profileRes.error;
+      if (roleRes.error) throw roleRes.error;
+      if (!profileRes.data) return null;
+      return {
+        ...profileRes.data,
+        user_roles: roleRes.data.map(r => ({ role: r.role })),
+      };
     },
     enabled: !!id,
   });
