@@ -1002,7 +1002,7 @@ export default function ClientsPage() {
                   className="w-full"
                   variant="outline"
                   onClick={() => handleCopyToClipboard(
-                    `Olá ${credentialsDialog.client?.name}! Suas credenciais de acesso ao portal da Autos da Serra foram criadas.\n\nAcesse: https://sistemaautosdaserra.netlify.app\n\nLogin: ${credentialsDialog.generatedCredentials?.email}\nSenha: ${credentialsDialog.generatedCredentials?.password}\n\nQualquer dúvida, estamos à disposição!`,
+                    `Olá ${credentialsDialog.client?.name}! Suas credenciais de acesso ao portal da Autos da Serra foram criadas.\n\nAcesse: https://sistema.autosdaserra.com\n\nLogin: ${credentialsDialog.generatedCredentials?.email}\nSenha: ${credentialsDialog.generatedCredentials?.password}\n\nQualquer dúvida, estamos à disposição!`,
                     'message'
                   )}
                 >
