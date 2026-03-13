@@ -996,7 +996,7 @@ export default function ClientsPage() {
                   readOnly
                   rows={7}
                   className="font-mono text-sm resize-none"
-                  value={`Olá ${credentialsDialog.client?.name}! Suas credenciais de acesso ao portal da Autos da Serra foram criadas.\n\nAcesse: https://sistemaautosdaserra.netlify.app\n\nLogin: ${credentialsDialog.generatedCredentials?.email}\nSenha: ${credentialsDialog.generatedCredentials?.password}\n\nQualquer dúvida, estamos à disposição!`}
+                  value={`Olá ${credentialsDialog.client?.name}! Suas credenciais de acesso ao portal da Autos da Serra foram criadas.\n\nAcesse: https://sistema.autosdaserra.com\n\nLogin: ${credentialsDialog.generatedCredentials?.email}\nSenha: ${credentialsDialog.generatedCredentials?.password}\n\nQualquer dúvida, estamos à disposição!`}
                 />
                 <Button
                   className="w-full"
